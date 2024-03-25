@@ -1,0 +1,99 @@
+/* app/tailwind.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	html:focus-within {
+		scroll-behavior: smooth;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html:focus-within {
+			scroll-behavior: auto;
+		}
+
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
+	}
+
+	body {
+		-webkit-font-smoothing: antialiased;
+	}
+
+	* {
+		outline-offset: 0.25rem;
+		outline-color: theme('colors.orange[500]');
+	}
+}
+
+@layer utilities {
+	.indication-shadow {
+		filter: drop-shadow(0 0 2px theme('colors.zinc[800]'))
+			drop-shadow(0 0 4px theme('colors.zinc[800]'));
+	}
+
+	.orange-glow-text {
+		text-shadow:
+			0px 0px 2px theme('colors.orange[300]'),
+			0px 0px 4px theme('colors.orange[300]'),
+			0px 0px 8px theme('colors.orange[300]'),
+			0px 0px 12px theme('colors.orange[300]'),
+			0px 0px 16px theme('colors.orange[300]'),
+			0px 0px 24px theme('colors.orange[300]'),
+			0px 0px 32px theme('colors.orange[300]');
+	}
+
+	.orange-glow-box {
+		box-shadow:
+			0px 0px 2px theme('colors.orange[300]'),
+			0px 0px 4px theme('colors.orange[300]'),
+			0px 0px 8px theme('colors.orange[300]'),
+			0px 0px 12px theme('colors.orange[300]'),
+			0px 0px 16px theme('colors.orange[300]'),
+			0px 0px 24px theme('colors.orange[300]'),
+			0px 0px 32px theme('colors.orange[300]'),
+			0px 0px 64px theme('colors.orange[300]'),
+			0px 0px 128px theme('colors.orange[300]');
+	}
+
+	.text-shadow {
+		text-shadow:
+			0 0 2px theme('colors.zinc[900]'),
+			0 0 4px theme('colors.zinc[900]'),
+			0 0 8px theme('colors.zinc[900]');
+	}
+
+	.hover-fade {
+		transition: opacity 0.15s ease-in-out;
+	}
+
+	.hover-fade.inactive:not(:focus-within) {
+		opacity: 0;
+		cursor: none !important;
+	}
+
+	@supports (selector(:has(*))) {
+		.hover-fade:has(:focus-visible) {
+			opacity: 1;
+			cursor: auto;
+		}
+	}
+
+	/* 
+		Firefox doesn't support :has yet, so we will
+		provide a less ideal fallback using :focus-within
+		 */
+	@supports not (selector(:has(*))) {
+		.hover-fade:focus-within {
+			opacity: 1;
+			cursor: auto;
+		}
+	}
+}

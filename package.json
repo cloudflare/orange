@@ -1,0 +1,83 @@
+{
+	"module": "worker.js",
+	"private": true,
+	"sideEffects": false,
+	"scripts": {
+		"build": "remix build",
+		"lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
+		"dev": "remix dev --manual -c \"npm start\"",
+		"start": "wrangler dev ./build/index.js",
+		"prebuild": "npm run clean",
+		"clean": "del public/build && del build",
+		"ci-test": "CI=true run-p typecheck test",
+		"remove-sourcemaps": "del public/build/**/*.map",
+		"deploy": "npm run ci-test && npm run build -- --sourcemap && npm run remove-sourcemaps && wrangler publish --define __RELEASE__:\\\"$(git rev-parse --short HEAD)\\\" --define __SENTRY_DSN__:\\\"$SENTRY_DSN\\\"",
+		"prettier": "prettier -w --ignore-path .gitignore .",
+		"typecheck": "tsc --noEmit --skipLibCheck",
+		"typecheck:watch": "npm run typecheck -- --watch",
+		"prepare": "husky install",
+		"test": "vitest"
+	},
+	"dependencies": {
+		"@heroicons/react": "^2.1.1",
+		"@mediapipe/selfie_segmentation": "^0.1.1675465747",
+		"@radix-ui/react-alert-dialog": "^1.0.5",
+		"@radix-ui/react-checkbox": "^1.0.4",
+		"@radix-ui/react-dialog": "^1.0.5",
+		"@radix-ui/react-dropdown-menu": "^2.0.6",
+		"@radix-ui/react-label": "^2.0.2",
+		"@radix-ui/react-select": "^2.0.0",
+		"@radix-ui/react-slot": "^1.0.2",
+		"@radix-ui/react-switch": "^1.0.3",
+		"@radix-ui/react-toast": "^1.1.5",
+		"@radix-ui/react-tooltip": "^1.0.7",
+		"@radix-ui/react-visually-hidden": "^1.0.3",
+		"@remix-run/cloudflare": "2.4.1",
+		"@remix-run/cloudflare-workers": "2.4.1",
+		"@remix-run/react": "2.4.1",
+		"@tensorflow-models/body-segmentation": "^1.0.2",
+		"@tensorflow/tfjs-backend-webgl": "^4.15.0",
+		"@tensorflow/tfjs-core": "^4.15.0",
+		"clsx": "^2.0.0",
+		"cookie": "^0.6.0",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0",
+		"react-flip-toolkit": "^7.1.0",
+		"react-query": "^3.39.3",
+		"react-use": "^17.4.2",
+		"tailwind-merge": "^2.2.0",
+		"tiny-invariant": "^1.3.1",
+		"webrtc-adapter": "^8.2.3"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20231218.0",
+		"@peculiar/webcrypto": "^1.4.3",
+		"@remix-run/dev": "2.4.1",
+		"@remix-run/eslint-config": "2.4.1",
+		"@types/react": "^18.2.45",
+		"@types/react-dom": "^18.2.18",
+		"del-cli": "^5.1.0",
+		"eslint": "^8.56.0",
+		"git-format-staged": "^3.0.0",
+		"husky": "^8.0.3",
+		"msw": "^2.0.11",
+		"npm-run-all": "^4.1.5",
+		"prettier": "^3.1.1",
+		"prettier-plugin-organize-imports": "^3.2.4",
+		"tailwindcss": "^3.4.0",
+		"typescript": "^5.3.3",
+		"vitest": "^1.1.0",
+		"wrangler": "^3.22.1"
+	},
+	"overrides": {
+		"msw": {
+			"typescript": "$typescript"
+		}
+	},
+	"engines": {
+		"node": ">=16.13"
+	},
+	"msw": {
+		"workerDirectory": "public"
+	}
+}

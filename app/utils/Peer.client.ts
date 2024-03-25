@@ -1,0 +1,609 @@
+import invariant from 'tiny-invariant'
+import 'webrtc-adapter'
+import { History } from './History'
+import { BulkRequestDispatcher, FIFOScheduler } from './Peer.utils'
+import type {
+	CallsRequest,
+	CallsResponse,
+	CloseTracksRequest,
+	ErrorResponse,
+	NewSessionResponse,
+	RenegotiateRequest,
+	RenegotiationResponse,
+	SessionDescription,
+	TrackObject,
+	TracksRequest,
+	TracksResponse,
+} from './callsTypes'
+import Ewma from './ewma'
+
+const iceGathertingTimeout = 1500 /* ms */
+const newTrackTimeout = 10000
+
+const logCallsApiUsage = (message: string) => {
+	console.debug(
+		`%c 📞 Calls API: ${message}`,
+		'color: orange; background: black;'
+	)
+}
+
+export type PeerParams = {
+	iceTrickleEnabled: boolean
+	baseURL: string
+	onDisconnect: (connectionState: RTCPeerConnectionState, event: Event) => void
+	onConnect: (connectionState: RTCPeerConnectionState, event: Event) => void
+}
+
+type PushTrackRequestEntry = {
+	trackName: string
+	track: MediaStreamTrack
+	transceiver: RTCRtpTransceiver
+}
+
+export type PeerHistory =
+	| {
+			type: 'request'
+			endpoint: string
+			body: CallsRequest
+	  }
+	| {
+			type: 'response'
+			endpoint: string
+			body: CallsResponse
+	  }
+
+export type PeerDebugInfo = ReturnType<Peer['getDebugInfo']>
+
+const PullTrackBatchSizeLimit = 32
+
+export default class Peer {
+	pc: RTCPeerConnection
+	transceivers: RTCRtpTransceiver[]
+	params: PeerParams
+	pendingTrackTransceivers: Record<string, (track: MediaStreamTrack) => void>
+	trackToMid: Record<string, string>
+
+	pushTrackDispatcher: BulkRequestDispatcher<
+		PushTrackRequestEntry,
+		TracksResponse
+	>
+	pullTrackDispatcher: BulkRequestDispatcher<
+		TrackObject,
+		{
+			bulkResponse: TracksResponse & ErrorResponse
+			trackPromises: (Promise<MediaStreamTrack> | undefined)[]
+		}
+	>
+	closeTrackDispatcher: BulkRequestDispatcher<string, TracksResponse>
+
+	initialization: Promise<void>
+	taskScheduler: FIFOScheduler
+	sessionId: string | undefined
+	history = new History<PeerHistory>()
+
+	constructor(params: Partial<PeerParams> = {}) {
+		this.pc = new RTCPeerConnection({
+			iceServers: [
+				{
+					urls: 'stun:stun.cloudflare.com:3478',
+				},
+			],
+			bundlePolicy: 'max-bundle',
+		})
+
+		this.transceivers = []
+		this.params = this.#defaultParams(params)
+		this.pendingTrackTransceivers = {}
+		this.trackToMid = {}
+		this.initialization = this.#init()
+		this.taskScheduler = new FIFOScheduler()
+		this.pushTrackDispatcher = new BulkRequestDispatcher()
+		this.pullTrackDispatcher = new BulkRequestDispatcher(
+			PullTrackBatchSizeLimit
+		)
+		this.closeTrackDispatcher = new BulkRequestDispatcher()
+		setInterval(() => this.checkStats(900), 1000)
+	}
+
+	#defaultParams(params: Partial<PeerParams>) {
+		return {
+			iceTrickleEnabled: false,
+			baseURL: '/api/calls',
+			onDisconnect: () => {},
+			onConnect: () => {},
+			...params,
+		}
+	}
+
+	static async #sendRequest(
+		method: string,
+		endpoint: string,
+		request: CallsRequest,
+		history: History<PeerHistory>,
+		remainingAttempts = 2
+	): Promise<CallsResponse> {
+		const httpRequest: RequestInit = {
+			method: method,
+			mode: 'cors',
+			redirect: 'manual',
+			headers: {
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify(request),
+		} as const
+		logCallsApiUsage('Sending Calls request:')
+		console.debug(httpRequest.method, endpoint)
+		console.debug(httpRequest)
+
+		try {
+			history.log({ type: 'request', endpoint: endpoint, body: request })
+			const response = await fetch(
+				endpoint + '?forceTracing=true&streamDebug=true',
+				httpRequest
+			)
+
+			// handle Access redirect
+			if (response.status === 0) {
+				alert('Access session is expired, reloading page.')
+				location.reload()
+			}
+			const callsResponse = await response.json<CallsResponse>()
+			history.log({ type: 'response', endpoint: endpoint, body: callsResponse })
+			return callsResponse
+		} catch (error) {
+			if (remainingAttempts === 0) {
+				throw error
+			} else {
+				console.error('Calls request failed, retrying...')
+				return Peer.#sendRequest(
+					method,
+					endpoint,
+					request,
+					history,
+					remainingAttempts - 1
+				)
+			}
+		}
+	}
+
+	#setVideoCodecPreference(transceiver: RTCRtpTransceiver) {
+		if (
+			typeof RTCRtpSender.getCapabilities === 'undefined' ||
+			typeof transceiver.setCodecPreferences === 'undefined'
+		) {
+			return
+		}
+		const capability = RTCRtpSender.getCapabilities('video')
+		const codecs = capability ? capability.codecs : []
+		codecs.sort((a, b) =>
+			a.mimeType === 'video/VP9' && b.mimeType !== 'video/VP9' ? -1 : 0
+		)
+		transceiver.setCodecPreferences(codecs)
+	}
+
+	async #init() {
+		// In order to establish a connection we should provide at least one
+		// transceiver with candidate ports. This dummy "inactive" audio track
+		// works for that purpose
+		this.transceivers.push(
+			this.pc.addTransceiver('audio', { direction: 'inactive' })
+		)
+
+		this.pc.setLocalDescription(await this.pc.createOffer())
+
+		this.pc.ontrack = (event) => {
+			if (event.transceiver.mid === null) return
+			let resolve = this.pendingTrackTransceivers[event.transceiver.mid]
+			if (resolve) {
+				delete this.pendingTrackTransceivers[event.transceiver.mid]
+				resolve(event.track)
+			} else {
+				console.warn('No pending track for transceiver', event.transceiver)
+			}
+		}
+
+		let connectedState = new Promise((resolve, _) => {
+			this.pc.addEventListener('connectionstatechange', () => {
+				if (this.pc.connectionState == 'connected') {
+					resolve(true)
+				}
+			})
+		})
+
+		let gatheringReady = new Promise((resolve, _) => {
+			// get all the candidates it can until to reach iceGathertingTimeout
+			setTimeout(() => resolve(true), iceGathertingTimeout)
+			if (this.params.iceTrickleEnabled) {
+				// if ice trickle enabled, gathering is ready when it gets the first candidate
+				this.pc.addEventListener('icecandidate', (e) => {
+					resolve(true)
+					// send ICE trickle update here
+				})
+			}
+			this.pc.onicegatheringstatechange = (ev) => {
+				if (this.pc.iceGatheringState === 'complete') {
+					resolve(true)
+				}
+			}
+		})
+
+		this.pc.addEventListener('connectionstatechange', (event) => {
+			switch (this.pc.connectionState) {
+				case 'connected':
+					this.params.onConnect(this.pc.connectionState, event)
+					break
+				case 'failed':
+				case 'disconnected':
+					this.params.onDisconnect(this.pc.connectionState, event)
+			}
+		})
+		await gatheringReady
+		invariant(this.pc.localDescription)
+		logCallsApiUsage('Sending initial offer')
+		const response = (await Peer.#sendRequest(
+			'POST',
+			`${this.params.baseURL}/sessions/new`,
+			{
+				sessionDescription: {
+					type: 'offer',
+					sdp: this.pc.localDescription.sdp,
+				} as SessionDescription,
+			},
+			this.history
+		)) as NewSessionResponse
+		if (response.errorCode) {
+			throw new Error(response.errorDescription)
+		}
+		this.sessionId = response.sessionId
+		await this.pc.setRemoteDescription(
+			new RTCSessionDescription(response.sessionDescription)
+		)
+		await connectedState
+	}
+
+	#getTransceiverFor(track: MediaStreamTrack) {
+		const transceiver = this.pc.addTransceiver(track, { direction: 'sendonly' })
+		if (track.kind == 'video') {
+			this.#setVideoCodecPreference(transceiver)
+		}
+		this.transceivers.push(transceiver)
+		return transceiver
+	}
+
+	async replaceTrack(resourceID: string, track: MediaStreamTrack) {
+		console.debug(`Peer.replaceTrack: ${resourceID} ${track.id}`)
+		const id = resourceID.split('/')[1]
+		// need to find the sender based on the MID?
+		const mid = this.trackToMid[id]
+		invariant(mid, `mid for ${id} not found`)
+		const sender = this.pc.getTransceivers().find((t) => t.mid === mid)?.sender
+		invariant(sender, `sender for ${resourceID} not found`)
+		this.trackToMid[track.id] = mid
+		sender.replaceTrack(track)
+		return resourceID.replace(id, track.id)
+	}
+
+	async pushTrack(
+		trackName: string,
+		track: MediaStreamTrack
+	): Promise<TrackObject> {
+		console.debug(`Peer.pushTrack: ${track.kind} ${trackName}`)
+		await this.initialization
+		const bulkResponse = (await this.pushTrackDispatcher.doBulkRequest(
+			{
+				trackName: trackName,
+				track: track,
+				transceiver: this.#getTransceiverFor(track),
+			},
+			async (batchCopy: PushTrackRequestEntry[]) => {
+				return await this.taskScheduler.schedule(async () => {
+					// Local offer must be created one time at most for the tracks
+					await this.pc.setLocalDescription(await this.pc.createOffer())
+					invariant(this.pc.localDescription)
+					const request: TracksRequest = {
+						tracks: batchCopy.map((trackEntry) => {
+							return {
+								location: 'local',
+								mid: trackEntry.transceiver.mid,
+								trackName: trackEntry.trackName,
+							}
+						}),
+						sessionDescription: {
+							sdp: this.pc.localDescription.sdp,
+							type: 'offer',
+						},
+					}
+					// stage 0
+					const response = (await Peer.#sendRequest(
+						'POST',
+						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
+						request,
+						this.history
+					)) as TracksResponse
+					if (!response.errorCode) {
+						// If everything went fine, we set the remote answer (once)
+						await this.pc.setRemoteDescription(
+							new RTCSessionDescription(response.sessionDescription)
+						)
+					}
+					return response
+				})
+			}
+		)) as TracksResponse
+		if (bulkResponse.errorCode) {
+			throw new Error(bulkResponse.errorDescription)
+		}
+		const trackResponse = bulkResponse.tracks?.find(
+			(track) => track.trackName == trackName
+		)
+		if (!trackResponse) {
+			throw new Error(`No response for trackName=${trackName}`)
+		}
+		if (trackResponse.errorCode) {
+			throw new Error(
+				`${trackResponse.errorCode}: ${trackResponse.errorDescription}`
+			)
+		}
+		invariant(trackResponse.mid)
+		this.trackToMid[track.id] = trackResponse.mid
+		return {
+			location: 'remote',
+			sessionId: this.sessionId,
+			trackName: trackName,
+		}
+	}
+
+	#resolveTrack(mid: string) {
+		return new Promise<MediaStreamTrack>((resolve, reject) => {
+			setTimeout(reject, newTrackTimeout, 'track resolving timed out')
+			this.pendingTrackTransceivers[mid] = (track: MediaStreamTrack) =>
+				resolve(track)
+		})
+	}
+
+	async #renegotiate() {
+		// stage 1
+		invariant(this.pc.currentLocalDescription)
+		const request: RenegotiateRequest = {
+			sessionDescription: {
+				sdp: this.pc.currentLocalDescription.sdp,
+				type: 'answer',
+			},
+		}
+		const response = (await Peer.#sendRequest(
+			'PUT',
+			`${this.params.baseURL}/sessions/${this.sessionId}/renegotiate`,
+			request,
+			this.history
+		)) as RenegotiationResponse
+		if (response.errorCode) {
+			throw new Error(response.errorDescription)
+		}
+	}
+
+	async pullTrack(trackObject: TrackObject): Promise<MediaStreamTrack> {
+		console.debug(
+			`Peer.pullTrack: ${trackObject.trackName} from peer ${trackObject.sessionId}`
+		)
+		await this.initialization
+		const { bulkResponse, trackPromises } =
+			await this.pullTrackDispatcher.doBulkRequest(
+				trackObject,
+				async (batchCopy: TrackObject[]) => {
+					return await this.taskScheduler.schedule(async () => {
+						const request: TracksRequest = {
+							tracks: batchCopy,
+						}
+						const response = (await Peer.#sendRequest(
+							'POST',
+							`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
+							request,
+							this.history
+						)) as TracksResponse
+						if (response.errorCode) {
+							throw new Error(response.errorDescription)
+						}
+						invariant(response.tracks)
+						// resolving a mid as MediaStreamTrack must be done before setting
+						// the remote offer to be able to catch it in time
+						let trackPromises = response.tracks.map((track) => {
+							if (track.mid) {
+								return this.#resolveTrack(track.mid)
+							}
+						})
+						if (response.requiresImmediateRenegotiation) {
+							await this.pc.setRemoteDescription(
+								new RTCSessionDescription(response.sessionDescription)
+							)
+							const answerSDP = await this.pc.createAnswer()
+							await this.pc.setLocalDescription(answerSDP)
+							await this.#renegotiate()
+						}
+						return { bulkResponse: response, trackPromises: trackPromises }
+					})
+				}
+			)
+		const trackResponseIdx = bulkResponse.tracks?.findIndex(
+			(track) =>
+				track.sessionId == trackObject.sessionId &&
+				track.trackName == trackObject.trackName
+		)
+		if (
+			!bulkResponse.tracks ||
+			trackResponseIdx === undefined ||
+			trackResponseIdx == -1
+		) {
+			throw new Error(
+				`No response for sessionId=${trackObject.sessionId}, trackName=${trackObject.trackName}`
+			)
+		}
+		const trackResponse = bulkResponse.tracks[trackResponseIdx]
+		if (trackResponse.errorCode) {
+			throw new Error(
+				`${trackResponse.errorCode}: ${trackResponse.errorDescription}`
+			)
+		}
+		const trackPromise = trackPromises[trackResponseIdx]
+		invariant(trackPromise)
+		invariant(trackResponse.mid)
+		const track = await trackPromise
+		this.trackToMid[track.id] = trackResponse.mid
+		return track
+	}
+
+	async closeTrack(track: MediaStreamTrack) {
+		console.debug(`Peer.closeTrack: ${track.id}`)
+		const mid = this.trackToMid[track.id]
+		if (!mid) {
+			throw new Error('stream has no associated transceiver')
+		}
+		await this.initialization
+		const bulkResponse = await this.closeTrackDispatcher.doBulkRequest(
+			mid,
+			async (batchCopy: string[]) => {
+				return await this.taskScheduler.schedule(async () => {
+					// Either the transceiver is sendonly or recvonly, we close it from this side
+					// to trigger the appropriate response from Thunderclap
+					let transceivers = this.pc.getTransceivers().filter((t) => {
+						invariant(t.mid)
+						return batchCopy.includes(t.mid)
+					})
+					transceivers.forEach((t) => (t.direction = 'inactive'))
+
+					await this.pc.setLocalDescription(await this.pc.createOffer())
+					invariant(this.pc.localDescription)
+					const request: CloseTracksRequest = {
+						tracks: batchCopy.map((mid) => {
+							return { mid: mid }
+						}),
+						sessionDescription: {
+							sdp: this.pc.localDescription.sdp,
+							type: 'offer',
+						},
+						force: false,
+					}
+					const response = (await Peer.#sendRequest(
+						'PUT',
+						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/close`,
+						request,
+						this.history
+					)) as TracksResponse
+
+					if (response.errorCode) {
+						throw new Error(response.errorDescription)
+					}
+
+					await this.pc.setRemoteDescription(
+						new RTCSessionDescription(response.sessionDescription)
+					)
+					return response
+				})
+			}
+		)
+		const trackResponse = bulkResponse.tracks?.find(
+			(track) => track.mid === mid
+		)
+		if (!trackResponse) {
+			throw new Error(`No response for mid=${mid}`)
+		}
+		if (trackResponse.errorCode) {
+			throw new Error(
+				`${trackResponse.errorCode}: ${trackResponse.errorDescription}`
+			)
+		}
+		delete this.trackToMid[track.id]
+		this.transceivers = this.transceivers.filter(
+			(transceiver) => transceiver.mid != mid
+		)
+	}
+
+	outboundPacketLossPercentageEwma = new Ewma(1000, 0)
+	inboundPacketLossPercentageEwma = new Ewma(1000, 0)
+
+	checkStats = async (timeout: number) => {
+		const baseline = await this.pc.getStats()
+		await new Promise((res) => setTimeout(res, timeout))
+		const now = await this.pc.getStats()
+
+		now.forEach((nowReport: Stats) => {
+			if (
+				nowReport.type !== 'remote-inbound-rtp' &&
+				nowReport.type !== 'inbound-rtp'
+			)
+				return
+			const baseReport = baseline.get(nowReport.id) as Stats
+			if (!baseReport) return
+
+			// For outbound-rtp, packetsLost might not be present. Consider it as 0 in such cases.
+			const packetsLost = Math.max(
+				(nowReport.packetsLost || 0) - (baseReport.packetsLost || 0),
+				0
+			)
+
+			if (
+				nowReport.type === 'remote-inbound-rtp' &&
+				nowReport.fractionLost !== undefined
+			) {
+				this.outboundPacketLossPercentageEwma.insert(nowReport.fractionLost)
+				return
+			}
+
+			const packetsReceived =
+				nowReport.packetsReceived - baseReport.packetsReceived
+
+			if (packetsReceived > 0) {
+				const packetLossPercentage = packetsLost / packetsReceived
+				this.inboundPacketLossPercentageEwma.insert(packetLossPercentage)
+			}
+		})
+	}
+
+	getDebugInfo() {
+		return {
+			trackToMid: this.trackToMid,
+			commandHistoryEntries: this.history.entries,
+			inboundPacketLossPercentage: this.inboundPacketLossPercentageEwma.value(),
+			outboundPacketLossPercentage:
+				this.outboundPacketLossPercentageEwma.value(),
+		}
+	}
+}
+
+interface Stats {
+	id: string
+	timestamp: number
+	type: string
+	codecId: string
+	kind: string
+	mediaType: string
+	ssrc: number
+	transportId: string
+	jitter: number
+	packetsLost: number
+	packetsReceived: number
+	audioLevel: number
+	bytesReceived: number
+	concealedSamples: number
+	concealmentEvents: number
+	fecPacketsDiscarded: number
+	fecPacketsReceived: number
+	fractionLost?: number
+	headerBytesReceived: number
+	insertedSamplesForDeceleration: number
+	jitterBufferDelay: number
+	jitterBufferEmittedCount: number
+	jitterBufferMinimumDelay: number
+	jitterBufferTargetDelay: number
+	lastPacketReceivedTimestamp: number
+	mid: string
+	packetsDiscarded: number
+	packetsSent: number
+	playoutId: string
+	remoteId: string
+	removedSamplesForAcceleration: number
+	silentConcealedSamples: number
+	totalAudioEnergy: number
+	totalSamplesDuration: number
+	totalSamplesReceived: number
+	trackIdentifier: string
+}
