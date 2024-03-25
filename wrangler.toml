@@ -1,0 +1,39 @@
+name = "orange-meets"
+# https://developers.cloudflare.com/workers/platform/compatibility-dates
+compatibility_date = "2022-04-05"
+account_id = "a67e14daa5f8dceeb91fe5449ba496eb"
+main = "./build/index.js"
+
+[site]
+  bucket = "./public"
+
+[[build.upload.rules]]
+  type = "ESModule"
+  globs = ["**/*.js"]
+
+[vars]
+CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
+ACCOUNT_ID = "8477399eb04accc1792af96aeaa25222"
+
+[[queues.producers]]
+ queue = "orange-meets-feedback-queue"
+ binding = "FEEDBACK_QUEUE"
+
+[[queues.consumers]]
+ queue = "orange-meets-feedback-queue"
+ max_batch_size = 10 # optional: defaults to 10
+ max_batch_timeout = 5 # optional: defaults to 5 seconds
+
+[durable_objects]
+ bindings = [
+  { name = "rooms", class_name = "ChatRoom" }
+]
+
+# Indicate that you want the ChatRoom class to be callable as Durable Objects.
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["ChatRoom"]
+
+# The necessary secrets are:
+# - CALLS_APP_SECRET
+# To add secret, run `echo <VALUE> | wrangler secret put <NAME>`

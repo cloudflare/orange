@@ -1,0 +1,7 @@
+{
+	"useTabs": true,
+	"semi": false,
+	"singleQuote": true,
+	"plugins": ["prettier-plugin-organize-imports"],
+	"trailingComma": "es5"
+}
