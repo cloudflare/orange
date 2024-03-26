@@ -13,7 +13,6 @@ main = "./build/index.js"
 
 [vars]
 CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
-ACCOUNT_ID = "8477399eb04accc1792af96aeaa25222"
 
 [[queues.producers]]
  queue = "orange-meets-feedback-queue"
