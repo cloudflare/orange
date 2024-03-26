@@ -1,6 +1,5 @@
 export type Env = {
 	USER_DIRECTORY_URL?: string
-	ACCOUNT_ID: string
 	FEEDBACK_URL?: string
 	FEEDBACK_QUEUE?: Queue
 	CALLS_APP_ID: string
