@@ -21,20 +21,28 @@ Open up [http://127.0.0.1:8787](http://127.0.0.1:8787) and you should be ready t
 
 ## Deployment
 
-First you will need to create the feedback queue:
+1. Make sure you've installed `wrangler` and are logged in by running:
+
+```sh
+wrangler login
+```
+
+2. Update the `account_id` and `CALLS_APP_ID` in `wrangler.toml` to use your own Cloudflare Account ID and Calls App ID
+
+3. You will also need to set the token as a secret by running:
+
+```sh
+wrangler secret put CALLS_APP_SECRET
+```
+
+4. Create the feedback queue:
 
 ```sh
 wrangler queues create orange-meets-feedback-queue
 ```
 
-Then you can run
+5. Then you can run
 
 ```sh
 npm run deploy
-```
-
-You will also need to set the token as a secret by running:
-
-```sh
-wrangler secret put CALLS_APP_SECRET
 ```
