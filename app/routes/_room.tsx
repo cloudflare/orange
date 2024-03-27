@@ -3,7 +3,9 @@ import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
 import { useState } from 'react'
 import invariant from 'tiny-invariant'
+import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
+import { Icon } from '~/components/Icon/Icon'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import usePushedTrack from '~/hooks/usePushedTrack'
@@ -23,7 +25,20 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 export default function RoomWithPermissions() {
 	return (
 		<EnsurePermissions>
-			<Room />
+			<EnsureOnline
+				fallback={
+					<div className="grid h-full place-items-center">
+						<div>
+							<h1 className="flex items-center gap-3 text-3xl font-black">
+								<Icon type="SignalSlashIcon" />
+								You are offline
+							</h1>
+						</div>
+					</div>
+				}
+			>
+				<Room />
+			</EnsureOnline>
 		</EnsurePermissions>
 	)
 }
@@ -37,7 +52,7 @@ function Room() {
 
 	const userMedia = useUserMedia(mode)
 	const room = useRoom({ roomName, userMedia })
-	const { peer, debugInfo } = usePeerConnection()
+	const { peer, debugInfo, iceConnectionState } = usePeerConnection()
 
 	const pushedVideoTrack = usePushedTrack(peer, userMedia.videoStreamTrack)
 	const pushedAudioTrack = usePushedTrack(peer, userMedia.audioStreamTrack)
@@ -54,6 +69,7 @@ function Room() {
 		userDirectoryUrl,
 		peer,
 		peerDebugInfo: debugInfo,
+		iceConnectionState,
 		room,
 		pushedTracks: {
 			video: pushedVideoTrack,

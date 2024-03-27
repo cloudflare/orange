@@ -5,18 +5,32 @@ import Peer from '~/utils/Peer.client'
 export const usePeerConnection = () => {
 	const [peer, setPeer] = useState<Peer | null>(null)
 	const [debugInfo, setDebugInfo] = useState<PeerDebugInfo>()
+	const [iceConnectionState, setIceConnectionState] =
+		useState<RTCIceConnectionState>('new')
 
 	useEffect(() => {
 		const p = new Peer()
 		setPeer(p)
-		const handler = () => {
+		const debugHandler = () => {
 			setDebugInfo(p.getDebugInfo())
 		}
-		p.history.addEventListener('logentry', handler)
+		const iceConnectionStateChangeHandler = () => {
+			setIceConnectionState(p.pc.iceConnectionState)
+		}
+		p.pc.addEventListener(
+			'iceconnectionstatechange',
+			iceConnectionStateChangeHandler
+		)
+		p.history.addEventListener('logentry', debugHandler)
 		return () => {
-			p.history.removeEventListener('logentry', handler)
+			p.history.removeEventListener('logentry', debugHandler)
+			p.pc.removeEventListener(
+				'connectionstatechange',
+				iceConnectionStateChangeHandler
+			)
+			p.destroy()
 		}
 	}, [])
 
-	return { peer, debugInfo }
+	return { peer, debugInfo, iceConnectionState }
 }
