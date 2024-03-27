@@ -190,6 +190,7 @@ export default class Peer {
 		)
 
 		this.pc.setLocalDescription(await this.pc.createOffer())
+		this.pc.addEventListener('iceconnectionstatechange', this.handleIceFailure)
 
 		this.pc.ontrack = (event) => {
 			if (event.transceiver.mid === null) return
@@ -566,6 +567,27 @@ export default class Peer {
 			outboundPacketLossPercentage:
 				this.outboundPacketLossPercentageEwma.value(),
 		}
+	}
+
+	handleIceFailure = async () => {
+		const { iceConnectionState } = this.pc
+		if (iceConnectionState === 'closed' || iceConnectionState === 'failed') {
+			alert(
+				`Oh no! It appears that your connection closed unexpectedly. We've copied your session id to your clipboard, and will now reload the page to reconnect!`
+			)
+			if (this.sessionId) {
+				await navigator.clipboard.writeText(this.sessionId)
+			}
+			window.location.reload()
+		}
+	}
+
+	destroy() {
+		this.pc.removeEventListener(
+			'iceconnectionstatechange',
+			this.handleIceFailure
+		)
+		this.pc.close()
 	}
 }
 
