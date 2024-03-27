@@ -13,6 +13,7 @@ export type RoomContextType = {
 	userMedia: UserMedia
 	peer: Peer | null
 	peerDebugInfo?: PeerDebugInfo
+	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
 	pushedTracks: {
 		video?: string

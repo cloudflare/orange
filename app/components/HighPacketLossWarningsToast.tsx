@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Toast, { Root } from '~/components/Toast'
+import { useConditionForAtLeast } from '~/hooks/useConditionForAtLeast'
 import type Peer from '~/utils/Peer.client'
 import { useRoomContext } from '../hooks/useRoomContext'
 import { Icon } from './Icon/Icon'
@@ -21,21 +22,6 @@ export function usePacketLossInformation(): Partial<
 	}, [peer])
 
 	return debugInfo ?? {}
-}
-
-function useConditionForAtLeast(condition: boolean, time: number) {
-	const [value, setValue] = useState(condition)
-
-	useEffect(() => {
-		let timeout = window.setTimeout(() => {
-			setValue(condition)
-		}, time)
-		return () => {
-			clearTimeout(timeout)
-		}
-	}, [condition, time])
-
-	return value
 }
 
 export function HighPacketLossWarningsToast() {
@@ -66,7 +52,7 @@ export function HighPacketLossWarningsToast() {
 
 	return (
 		<Root duration={Infinity}>
-			<div className="text-sm space-y-2">
+			<div className="space-y-2 text-sm">
 				<div className="font-bold">
 					<Toast.Title className="flex items-center gap-2">
 						<Icon type="WifiIcon" />
@@ -78,7 +64,7 @@ export function HighPacketLossWarningsToast() {
 					<div className="text-gray-500 dark:text-gray-200">
 						<div>Packet Loss</div>
 						<div className="flex gap-4">
-							<div className="flex gap-1 items-center">
+							<div className="flex items-center gap-1">
 								<div className="sr-only">Outbound</div>
 								<Icon
 									className="text-gray-400 dark:text-gray-300"
@@ -86,7 +72,7 @@ export function HighPacketLossWarningsToast() {
 								/>
 								<span>{outbound}%</span>
 							</div>
-							<div className="flex gap-1 items-center">
+							<div className="flex items-center gap-1">
 								<div className="sr-only">Inbound</div>
 								<Icon
 									className="text-gray-400 dark:text-gray-300"
