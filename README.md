@@ -35,13 +35,7 @@ wrangler login
 wrangler secret put CALLS_APP_SECRET
 ```
 
-4. Create the feedback queue:
-
-```sh
-wrangler queues create orange-meets-feedback-queue
-```
-
-5. Then you can run
+4. Then you can run
 
 ```sh
 npm run deploy

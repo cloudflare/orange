@@ -9,3 +9,4 @@ node_modules
 /.mf
 .env
 .dev.vars
+.sentryclirc

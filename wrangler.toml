@@ -14,15 +14,6 @@ main = "./build/index.js"
 [vars]
 CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
 
-[[queues.producers]]
- queue = "orange-meets-feedback-queue"
- binding = "FEEDBACK_QUEUE"
-
-[[queues.consumers]]
- queue = "orange-meets-feedback-queue"
- max_batch_size = 10 # optional: defaults to 10
- max_batch_timeout = 5 # optional: defaults to 5 seconds
-
 [durable_objects]
  bindings = [
   { name = "rooms", class_name = "ChatRoom" }
