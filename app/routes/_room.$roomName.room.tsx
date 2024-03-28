@@ -7,7 +7,7 @@ import { useMeasure, useMount, useWindowSize } from 'react-use'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
-import { IceDisconnectedToast } from '~/components/IceDisconnectedToast'
+import { IceConnectionStateToast } from '~/components/IceConnectionStateToast'
 import { Icon } from '~/components/Icon/Icon'
 import { LeaveRoomButton } from '~/components/LeaveRoomButton'
 import { MicButton } from '~/components/MicButton'
@@ -306,7 +306,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />
-			<IceDisconnectedToast />
+			<IceConnectionStateToast />
 		</PullAudioTracks>
 	)
 }

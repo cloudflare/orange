@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from 'react'
+import { mode } from '~/utils/mode'
 
 function getSnapshot() {
-	return navigator.onLine
+	// we disable this in dev to make it easier to simulate
+	// ice disconnection by turning off wifi without causing
+	// the entire meeting room to unmount
+	return mode === 'development' ? true : navigator.onLine
 }
 
 function getServerSnapshot() {

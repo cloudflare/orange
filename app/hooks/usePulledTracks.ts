@@ -32,6 +32,18 @@ export default function usePulledTracks(
 		mountedRef.current = false
 	})
 
+	// when peer changes, wipe out previous track info
+	// but we don't need to worry about closing them
+	// because teardown of peer will have taken care
+	// of that. It's important to do this before pulling
+	// tracks in the next effect below!
+	useEffect(() => {
+		if (mountedRef.current) {
+			setPulledTrackRecord({})
+			pendingTracksRef.current = {}
+		}
+	}, [peer])
+
 	useEffect(() => {
 		if (!peer) return
 		tracksToPull.forEach((track) => {

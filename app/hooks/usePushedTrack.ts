@@ -9,13 +9,20 @@ export default function usePushedTrack(
 	const [transceiverId, setTransceiverId] = useState<string>()
 	const [pending, setPending] = useState(false)
 
+	const sessionId = peer?.sessionId
+
 	useEffect(() => {
-		if (pending || !peer || !mediaStreamTrack) return
+		if (pending || !sessionId || !mediaStreamTrack) return
 		// important that we don't call pushTrack more
 		// than once here so we'll set state. If the media
 		// stream changes while this is pending we'll replace
 		// it once it is done
-		if (transceiverId === undefined) {
+		if (
+			// track hasn't been pushed at all
+			transceiverId === undefined ||
+			// this means the peer changed and we need to push a new track
+			!transceiverId.startsWith(sessionId)
+		) {
 			setPending(true)
 			keepTrying(() =>
 				peer
@@ -30,9 +37,7 @@ export default function usePushedTrack(
 		} else {
 			peer.replaceTrack(transceiverId, mediaStreamTrack)
 		}
-	}, [mediaStreamTrack, peer, pending, transceiverId])
-
-	// TODO: need to sort out how to close this when unmounting
+	}, [mediaStreamTrack, peer, pending, sessionId, transceiverId])
 
 	return transceiverId
 }

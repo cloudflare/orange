@@ -80,6 +80,7 @@ export default class Peer {
 	taskScheduler: FIFOScheduler
 	sessionId: string | undefined
 	history = new History<PeerHistory>()
+	statsInterval = -1
 
 	constructor(params: Partial<PeerParams> = {}) {
 		this.pc = new RTCPeerConnection({
@@ -102,7 +103,6 @@ export default class Peer {
 			PullTrackBatchSizeLimit
 		)
 		this.closeTrackDispatcher = new BulkRequestDispatcher()
-		setInterval(() => this.checkStats(900), 1000)
 	}
 
 	#defaultParams(params: Partial<PeerParams>) {
@@ -190,7 +190,6 @@ export default class Peer {
 		)
 
 		this.pc.setLocalDescription(await this.pc.createOffer())
-		this.pc.addEventListener('iceconnectionstatechange', this.handleIceFailure)
 
 		this.pc.ontrack = (event) => {
 			if (event.transceiver.mid === null) return
@@ -260,6 +259,7 @@ export default class Peer {
 			new RTCSessionDescription(response.sessionDescription)
 		)
 		await connectedState
+		this.statsInterval = window.setInterval(() => this.checkStats(900), 1000)
 	}
 
 	#getTransceiverFor(track: MediaStreamTrack) {
@@ -453,6 +453,8 @@ export default class Peer {
 	}
 
 	async closeTrack(track: MediaStreamTrack) {
+		// no-op when peer connection is already closed
+		if (this.pc.connectionState === 'closed') return
 		console.debug(`Peer.closeTrack: ${track.id}`)
 		const mid = this.trackToMid[track.id]
 		if (!mid) {
@@ -569,24 +571,8 @@ export default class Peer {
 		}
 	}
 
-	handleIceFailure = async () => {
-		const { iceConnectionState } = this.pc
-		if (iceConnectionState === 'closed' || iceConnectionState === 'failed') {
-			alert(
-				`Oh no! It appears that your connection closed unexpectedly. We've copied your session id to your clipboard, and will now reload the page to reconnect!`
-			)
-			if (this.sessionId) {
-				await navigator.clipboard.writeText(this.sessionId)
-			}
-			window.location.reload()
-		}
-	}
-
 	destroy() {
-		this.pc.removeEventListener(
-			'iceconnectionstatechange',
-			this.handleIceFailure
-		)
+		window.clearInterval(this.statsInterval)
 		this.pc.close()
 	}
 }
