@@ -15,68 +15,71 @@ function pullTrack(peer: Peer, track: string) {
 export default function usePulledTracks(
 	tracksToPull: string[]
 ): Record<string, MediaStreamTrack> {
+	const { peer } = useRoomContext()
 	// using useState here because we want React to re-render here
 	// when there is a change
 	const [pulledTrackRecord, setPulledTrackRecord] = useState<
 		Record<string, MediaStreamTrack>
 	>({})
-	// using useRef here because we don't care about making React
-	// re-render when this changes and the api is easier to deal with
+	// using useRef here because we don't want React
+	// to re-render when these change
 	const pendingTracksRef = useRef<Record<string, Promise<MediaStreamTrack>>>({})
+	const tracksToPullRef = useRef(tracksToPull)
+	tracksToPullRef.current = tracksToPull
 	const mountedRef = useRef(true)
-	const { peer } = useRoomContext()
-
-	useEffect(() => {
-		if (peer === null) return
-		const pendingTracks = pendingTracksRef.current
-		for (const track of tracksToPull) {
-			if (track in pulledTrackRecord || track in pendingTracks) continue
-			pendingTracks[track] = pullTrack(peer, track).then((mediaStreamTrack) => {
-				if (mountedRef.current) {
-					setPulledTrackRecord((tm) => ({ ...tm, [track]: mediaStreamTrack }))
-					delete pendingTracks[track]
-				}
-				return mediaStreamTrack
-			})
-		}
-
-		return () => {
-			for (const track in pulledTrackRecord) {
-				if (!tracksToPull.includes(track)) {
-					const mediaStreamTrack = pulledTrackRecord[track]
-					if (mediaStreamTrack !== null) peer.closeTrack(mediaStreamTrack)
-					if (mountedRef.current)
-						setPulledTrackRecord((tm) => {
-							const clone = { ...tm }
-							delete clone[track]
-							return clone
-						})
-				}
-			}
-			for (const track in pendingTracks) {
-				if (!tracksToPull.includes(track)) {
-					pendingTracks[track].then((mediaStreamTrack) => {
-						peer.closeTrack(mediaStreamTrack)
-					})
-				}
-			}
-		}
-	}, [peer, pulledTrackRecord, tracksToPull])
 
 	useUnmount(() => {
 		mountedRef.current = false
-		if (!peer) return
-		for (const track in pulledTrackRecord) {
-			const mediaStreamTrack = pulledTrackRecord[track]
-			if (mediaStreamTrack !== null) peer.closeTrack(mediaStreamTrack)
-		}
-		const pendingTracks = pendingTracksRef.current
-		for (const pendingTrack in pendingTracks) {
-			pendingTracks[pendingTrack].then((mediaStreamTrack) => {
-				peer.closeTrack(mediaStreamTrack)
-			})
-		}
 	})
+
+	useEffect(() => {
+		if (!peer) return
+		tracksToPull.forEach((track) => {
+			const alreadyPulled =
+				pulledTrackRecord[track] ||
+				pendingTracksRef.current[track] !== undefined
+			if (alreadyPulled) return
+			const pending = pullTrack(peer, track).then((mediaStreamTrack) => {
+				if (!mountedRef.current) return mediaStreamTrack
+				if (tracksToPullRef.current.includes(track)) {
+					setPulledTrackRecord((current) => ({
+						...current,
+						[track]: mediaStreamTrack,
+					}))
+					delete pendingTracksRef.current[track]
+				} else {
+					peer.closeTrack(mediaStreamTrack)
+				}
+				return mediaStreamTrack
+			})
+			pendingTracksRef.current[track] = pending
+		})
+
+		const trackSet = new Set(tracksToPull)
+		Object.entries(pulledTrackRecord).forEach(([key, value]) => {
+			if (trackSet.has(key)) {
+				return
+			}
+			peer.closeTrack(value)
+			setPulledTrackRecord((current) => {
+				const clone = { ...current }
+				delete clone[key]
+				return clone
+			})
+		})
+	}, [peer, pulledTrackRecord, tracksToPull])
+
+	useEffect(() => {
+		if (!peer) return
+		const pendingTracks = pendingTracksRef.current
+		return () => {
+			if (mountedRef.current) return
+			Object.values(pendingTracks).forEach((promise) => {
+				promise.then((t) => peer.closeTrack(t))
+			})
+			Object.values(pulledTrackRecord).forEach((t) => peer.closeTrack(t))
+		}
+	}, [peer, pulledTrackRecord])
 
 	return pulledTrackRecord
 }
