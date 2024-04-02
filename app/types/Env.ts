@@ -5,6 +5,7 @@ export type Env = {
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
 	TRACE_LINK?: string
+	API_EXTRA_PARAMS?: string
 	limiters: DurableObjectNamespace
 	rooms: DurableObjectNamespace
 }

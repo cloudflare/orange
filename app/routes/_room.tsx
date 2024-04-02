@@ -14,11 +14,12 @@ import type { RoomContextType } from '~/hooks/useRoomContext'
 import useUserMedia from '~/hooks/useUserMedia'
 
 export const loader = async ({ context }: LoaderFunctionArgs) => {
-	const { mode, TRACE_LINK } = context
+	const { mode, TRACE_LINK, API_EXTRA_PARAMS } = context
 	return json({
 		mode,
 		userDirectoryUrl: context.USER_DIRECTORY_URL,
 		traceLink: TRACE_LINK,
+		apiExtraParams: API_EXTRA_PARAMS,
 	})
 }
 
@@ -48,11 +49,13 @@ function Room() {
 	const { roomName } = useParams()
 	invariant(roomName)
 
-	const { mode, userDirectoryUrl, traceLink } = useLoaderData<typeof loader>()
+	const { mode, userDirectoryUrl, traceLink, apiExtraParams } =
+		useLoaderData<typeof loader>()
 
 	const userMedia = useUserMedia(mode)
 	const room = useRoom({ roomName, userMedia })
-	const { peer, debugInfo, iceConnectionState } = usePeerConnection()
+	const { peer, debugInfo, iceConnectionState } =
+		usePeerConnection(apiExtraParams)
 
 	const pushedVideoTrack = usePushedTrack(peer, userMedia.videoStreamTrack)
 	const pushedAudioTrack = usePushedTrack(peer, userMedia.audioStreamTrack)
