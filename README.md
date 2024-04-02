@@ -1,5 +1,7 @@
 # Welcome to Orange Meets
 
+![A screenshot showing a room in Orange Meets](orange-meets.png)
+
 ## Variables
 
 Go to the [Cloudflare Calls dashboard](https://dash.cloudflare.com/?to=/:account/calls) and create an application.
