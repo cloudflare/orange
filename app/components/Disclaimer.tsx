@@ -14,19 +14,16 @@ export const Disclaimer: FC<DisclaimerProps> = ({ className }) => {
 			)}
 		>
 			Orange Meets is a demo application built using{' '}
-			<a
-				className="underline"
-				href="https://blog.cloudflare.com/announcing-cloudflare-calls/"
-			>
+			<a className="underline" href="https://developers.cloudflare.com/calls/">
 				Cloudflare Calls
 			</a>
-			. If you experience issues, please report them in the app. To build your
-			own WebRTC application using Cloudflare Calls,{' '}
+			. To build your own WebRTC application using Cloudflare Calls, get started
+			in the{' '}
 			<a
 				className="underline"
 				href="https://dash.cloudflare.com/?to=/:account/calls"
 			>
-				get started in the Cloudflare Dashboard
+				Cloudflare Dashboard
 			</a>
 			.
 		</p>
