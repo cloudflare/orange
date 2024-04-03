@@ -81,7 +81,7 @@ CALLS_APP_ID = "9effffd0c077c1115c7d285e55593a9a"
 
 
 [env.public.vars]
-CALLS_APP_ID = "e6f8a5bffdd0a4a9a71673db4d61183b"
+CALLS_APP_ID = "d83fd70c193329ea4f683ffe7b34d056"
 PUBLIC = "true"
 
 [[env.public.queues.producers]]
