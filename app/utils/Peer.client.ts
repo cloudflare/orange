@@ -30,6 +30,7 @@ const logCallsApiUsage = (message: string) => {
 export type PeerParams = {
 	iceTrickleEnabled: boolean
 	baseURL: string
+	apiExtraParams?: string
 	onDisconnect: (connectionState: RTCPeerConnectionState, event: Event) => void
 	onConnect: (connectionState: RTCPeerConnectionState, event: Event) => void
 }
@@ -117,11 +118,18 @@ export default class Peer {
 
 	static async #sendRequest(
 		method: string,
-		endpoint: string,
 		request: CallsRequest,
 		history: History<PeerHistory>,
+		endpoint: string,
+		extraParams = '',
 		remainingAttempts = 2
 	): Promise<CallsResponse> {
+		const url = new URL(endpoint, window.location.origin)
+		const extraParamEntries = [...new URLSearchParams(extraParams).entries()]
+		extraParamEntries.forEach(([key, value]) => {
+			url.searchParams.append(key, value)
+		})
+
 		const httpRequest: RequestInit = {
 			method: method,
 			mode: 'cors',
@@ -137,10 +145,7 @@ export default class Peer {
 
 		try {
 			history.log({ type: 'request', endpoint: endpoint, body: request })
-			const response = await fetch(
-				endpoint + '?forceTracing=true&streamDebug=true',
-				httpRequest
-			)
+			const response = await fetch(url, httpRequest)
 
 			// handle Access redirect
 			if (response.status === 0) {
@@ -157,9 +162,10 @@ export default class Peer {
 				console.error('Calls request failed, retrying...')
 				return Peer.#sendRequest(
 					method,
-					endpoint,
 					request,
 					history,
+					endpoint,
+					extraParams,
 					remainingAttempts - 1
 				)
 			}
@@ -243,14 +249,15 @@ export default class Peer {
 		logCallsApiUsage('Sending initial offer')
 		const response = (await Peer.#sendRequest(
 			'POST',
-			`${this.params.baseURL}/sessions/new`,
 			{
 				sessionDescription: {
 					type: 'offer',
 					sdp: this.pc.localDescription.sdp,
 				} as SessionDescription,
 			},
-			this.history
+			this.history,
+			`${this.params.baseURL}/sessions/new`,
+			this.params.apiExtraParams
 		)) as NewSessionResponse
 		if (response.errorCode) {
 			throw new Error(response.errorDescription)
@@ -317,9 +324,10 @@ export default class Peer {
 					// stage 0
 					const response = (await Peer.#sendRequest(
 						'POST',
-						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
 						request,
-						this.history
+						this.history,
+						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
+						this.params.apiExtraParams
 					)) as TracksResponse
 					if (!response.errorCode) {
 						// If everything went fine, we set the remote answer (once)
@@ -373,9 +381,10 @@ export default class Peer {
 		}
 		const response = (await Peer.#sendRequest(
 			'PUT',
-			`${this.params.baseURL}/sessions/${this.sessionId}/renegotiate`,
 			request,
-			this.history
+			this.history,
+			`${this.params.baseURL}/sessions/${this.sessionId}/renegotiate`,
+			this.params.apiExtraParams
 		)) as RenegotiationResponse
 		if (response.errorCode) {
 			throw new Error(response.errorDescription)
@@ -397,9 +406,10 @@ export default class Peer {
 						}
 						const response = (await Peer.#sendRequest(
 							'POST',
-							`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
 							request,
-							this.history
+							this.history,
+							`${this.params.baseURL}/sessions/${this.sessionId}/tracks/new`,
+							this.params.apiExtraParams
 						)) as TracksResponse
 						if (response.errorCode) {
 							throw new Error(response.errorDescription)
@@ -485,9 +495,10 @@ export default class Peer {
 					}
 					const response = (await Peer.#sendRequest(
 						'PUT',
-						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/close`,
 						request,
-						this.history
+						this.history,
+						`${this.params.baseURL}/sessions/${this.sessionId}/tracks/close`,
+						this.params.apiExtraParams
 					)) as TracksResponse
 
 					if (response.errorCode) {
