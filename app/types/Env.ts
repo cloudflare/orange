@@ -8,4 +8,7 @@ export type Env = {
 	API_EXTRA_PARAMS?: string
 	limiters: DurableObjectNamespace
 	rooms: DurableObjectNamespace
+	MAX_WEBCAM_FRAMERATE?: string
+	MAX_WEBCAM_BITRATE?: string
+	MAX_WEBCAM_QUALITY_LEVEL?: string
 }
