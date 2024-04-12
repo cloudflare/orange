@@ -172,21 +172,6 @@ export default class Peer {
 		}
 	}
 
-	#setVideoCodecPreference(transceiver: RTCRtpTransceiver) {
-		if (
-			typeof RTCRtpSender.getCapabilities === 'undefined' ||
-			typeof transceiver.setCodecPreferences === 'undefined'
-		) {
-			return
-		}
-		const capability = RTCRtpSender.getCapabilities('video')
-		const codecs = capability ? capability.codecs : []
-		codecs.sort((a, b) =>
-			a.mimeType === 'video/VP9' && b.mimeType !== 'video/VP9' ? -1 : 0
-		)
-		transceiver.setCodecPreferences(codecs)
-	}
-
 	async #init() {
 		// In order to establish a connection we should provide at least one
 		// transceiver with candidate ports. This dummy "inactive" audio track
@@ -269,11 +254,14 @@ export default class Peer {
 		await connectedState
 	}
 
-	#getTransceiverFor(track: MediaStreamTrack) {
-		const transceiver = this.pc.addTransceiver(track, { direction: 'sendonly' })
-		if (track.kind == 'video') {
-			this.#setVideoCodecPreference(transceiver)
-		}
+	#getTransceiverFor(
+		track: MediaStreamTrack,
+		sendEncodings?: RTCRtpEncodingParameters[]
+	) {
+		const transceiver = this.pc.addTransceiver(track, {
+			direction: 'sendonly',
+			sendEncodings,
+		})
 		this.transceivers.push(transceiver)
 		return transceiver
 	}
@@ -291,9 +279,33 @@ export default class Peer {
 		return resourceID.replace(id, track.id)
 	}
 
+	async configureSender(
+		resourceID: string,
+		track: MediaStreamTrack,
+		newParams: {
+			encodings?: RTCRtpEncodingParameters[]
+		}
+	) {
+		console.debug(`Peer.configureSender: ${resourceID} ${track.id}`)
+		const id = resourceID.split('/')[1]
+		// need to find the sender based on the MID?
+		const mid = this.trackToMid[id]
+		invariant(mid, `mid for ${id} not found`)
+		const sender = this.pc.getTransceivers().find((t) => t.mid === mid)?.sender
+		invariant(sender, `sender for ${resourceID} not found`)
+		this.trackToMid[track.id] = mid
+		const parameters = sender.getParameters()
+		newParams.encodings?.forEach((encoding, i) => {
+			const existing = parameters.encodings[i]
+			parameters.encodings[i] = { ...existing, ...encoding }
+		})
+		sender.setParameters(parameters)
+	}
+
 	async pushTrack(
 		trackName: string,
-		track: MediaStreamTrack
+		track: MediaStreamTrack,
+		sendEncodings?: RTCRtpEncodingParameters[]
 	): Promise<TrackObject> {
 		console.debug(`Peer.pushTrack: ${track.kind} ${trackName}`)
 		await this.initialization
@@ -301,7 +313,7 @@ export default class Peer {
 			{
 				trackName: trackName,
 				track: track,
-				transceiver: this.#getTransceiverFor(track),
+				transceiver: this.#getTransceiverFor(track, sendEncodings),
 			},
 			async (batchCopy: PushTrackRequestEntry[]) => {
 				return await this.taskScheduler.schedule(async () => {
@@ -531,6 +543,7 @@ export default class Peer {
 
 	outboundPacketLossPercentageEwma = new Ewma(1000, 0)
 	inboundPacketLossPercentageEwma = new Ewma(1000, 0)
+	availableOutboundBitrate = new Ewma(1000, 0)
 
 	checkStats = async (timeout: number) => {
 		const baseline = await this.pc.getStats()
@@ -538,6 +551,15 @@ export default class Peer {
 		const now = await this.pc.getStats()
 
 		now.forEach((nowReport: Stats) => {
+			if (
+				nowReport.type === 'candidate-pair' &&
+				'availableOutgoingBitrate' in nowReport
+			) {
+				this.availableOutboundBitrate.insert(
+					Number(nowReport.availableOutgoingBitrate)
+				)
+			}
+
 			if (
 				nowReport.type !== 'remote-inbound-rtp' &&
 				nowReport.type !== 'inbound-rtp'
@@ -577,6 +599,7 @@ export default class Peer {
 			inboundPacketLossPercentage: this.inboundPacketLossPercentageEwma.value(),
 			outboundPacketLossPercentage:
 				this.outboundPacketLossPercentageEwma.value(),
+			availableOutboundBitrate: this.availableOutboundBitrate.value(),
 		}
 	}
 

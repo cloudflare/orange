@@ -4,7 +4,13 @@ import type Peer from '~/utils/Peer.client'
 
 export default function usePushedTrack(
 	peer: Peer | null,
-	mediaStreamTrack?: MediaStreamTrack
+	mediaStreamTrack?: MediaStreamTrack,
+	{
+		priority,
+		maxBitrate,
+		maxFramerate,
+		scaleResolutionDownBy,
+	}: RTCRtpEncodingParameters = {}
 ) {
 	const [transceiverId, setTransceiverId] = useState<string>()
 	const [pending, setPending] = useState(false)
@@ -31,6 +37,28 @@ export default function usePushedTrack(
 			peer.replaceTrack(transceiverId, mediaStreamTrack)
 		}
 	}, [mediaStreamTrack, peer, pending, transceiverId])
+
+	useEffect(() => {
+		if (!mediaStreamTrack || !transceiverId || !peer) {
+			return
+		}
+
+		const encodings = [
+			{ maxBitrate, maxFramerate, priority, scaleResolutionDownBy },
+		]
+
+		peer.configureSender(transceiverId, mediaStreamTrack, {
+			encodings,
+		})
+	}, [
+		maxBitrate,
+		maxFramerate,
+		mediaStreamTrack,
+		peer,
+		priority,
+		scaleResolutionDownBy,
+		transceiverId,
+	])
 
 	// TODO: need to sort out how to close this when unmounting
 
