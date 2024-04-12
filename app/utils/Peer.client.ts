@@ -172,21 +172,6 @@ export default class Peer {
 		}
 	}
 
-	#setVideoCodecPreference(transceiver: RTCRtpTransceiver) {
-		if (
-			typeof RTCRtpSender.getCapabilities === 'undefined' ||
-			typeof transceiver.setCodecPreferences === 'undefined'
-		) {
-			return
-		}
-		const capability = RTCRtpSender.getCapabilities('video')
-		const codecs = capability ? capability.codecs : []
-		codecs.sort((a, b) =>
-			a.mimeType === 'video/VP9' && b.mimeType !== 'video/VP9' ? -1 : 0
-		)
-		transceiver.setCodecPreferences(codecs)
-	}
-
 	async #init() {
 		// In order to establish a connection we should provide at least one
 		// transceiver with candidate ports. This dummy "inactive" audio track
@@ -271,9 +256,6 @@ export default class Peer {
 
 	#getTransceiverFor(track: MediaStreamTrack) {
 		const transceiver = this.pc.addTransceiver(track, { direction: 'sendonly' })
-		if (track.kind == 'video') {
-			this.#setVideoCodecPreference(transceiver)
-		}
 		this.transceivers.push(transceiver)
 		return transceiver
 	}
