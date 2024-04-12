@@ -211,6 +211,12 @@ export default function useUserMedia(mode: Mode) {
 		navigator.mediaDevices
 			.getDisplayMedia()
 			.then((ms) => {
+				ms.getVideoTracks().forEach((track) => {
+					if ('contentHint' in track) {
+						// optimize for legibility in shared screen
+						track.contentHint = 'text'
+					}
+				})
 				setScreenShareStream(ms)
 				setScreenshareUnavailableReason(undefined)
 				ms.getVideoTracks()[0].addEventListener('ended', () => {
