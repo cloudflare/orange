@@ -59,6 +59,24 @@ export default function RoomWithPermissions() {
 	)
 }
 
+function tryToGetDimensions(videoStreamTrack?: MediaStreamTrack) {
+	if (
+		videoStreamTrack === undefined ||
+		// TODO: Determine a better way to get dimensions in Firefox
+		// where this isn't API isn't supported. For now, Firefox will
+		// just not be constrained and scaled down by dimension scaling
+		// but the bandwidth and framerate constraints will still apply
+		// https://caniuse.com/?search=getCapabilities
+		videoStreamTrack.getCapabilities === undefined
+	) {
+		return { height: 0, width: 0 }
+	}
+	const height = videoStreamTrack?.getCapabilities().height?.max ?? 0
+	const width = videoStreamTrack?.getCapabilities().width?.max ?? 0
+
+	return { height, width }
+}
+
 function Room() {
 	const [joined, setJoined] = useState(false)
 	const { roomName } = useParams()
@@ -81,8 +99,7 @@ function Room() {
 
 	const scaleResolutionDownBy = useMemo(() => {
 		const videoStreamTrack = userMedia.videoStreamTrack
-		const height = videoStreamTrack?.getCapabilities().height?.max ?? 0
-		const width = videoStreamTrack?.getCapabilities().width?.max ?? 0
+		const { height, width } = tryToGetDimensions(videoStreamTrack)
 		// we need to do this in case camera is in portrait mode
 		const smallestDimension = Math.min(height, width)
 		return Math.max(smallestDimension / maxWebcamQualityLevel, 1)
