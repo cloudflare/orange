@@ -32,6 +32,9 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		userDirectoryUrl: context.USER_DIRECTORY_URL,
 		traceLink: TRACE_LINK,
 		apiExtraParams: API_EXTRA_PARAMS,
+		feedbackEnabled:
+			context.FEEDBACK_QUEUE !== undefined &&
+			context.FEEDBACK_URL !== undefined,
 		maxWebcamFramerate: numberOrUndefined(MAX_WEBCAM_FRAMERATE),
 		maxWebcamBitrate: numberOrUndefined(MAX_WEBCAM_BITRATE),
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),
@@ -86,6 +89,7 @@ function Room() {
 		mode,
 		userDirectoryUrl,
 		traceLink,
+		feedbackEnabled,
 		apiExtraParams,
 		maxWebcamBitrate = 1_200_000,
 		maxWebcamFramerate = 24,
@@ -124,6 +128,7 @@ function Room() {
 		traceLink,
 		userMedia,
 		userDirectoryUrl,
+		feedbackEnabled,
 		peer,
 		peerDebugInfo: debugInfo,
 		iceConnectionState,

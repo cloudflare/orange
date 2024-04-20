@@ -7,6 +7,7 @@ import type useRoom from './useRoom'
 
 export type RoomContextType = {
 	traceLink?: string
+	feedbackEnabled: boolean
 	userDirectoryUrl?: string
 	joined: boolean
 	setJoined: Dispatch<SetStateAction<boolean>>
