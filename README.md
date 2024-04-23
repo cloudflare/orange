@@ -7,6 +7,10 @@ To build your own WebRTC application using Cloudflare Calls, get started in the 
 
 ![A screenshot showing a room in Orange Meets](orange-meets.png)
 
+## Architecture Diagram
+
+![Diagram of Orange Meets architecture](architecture.png)
+
 ## Variables
 
 Go to the [Cloudflare Calls dashboard](https://dash.cloudflare.com/?to=/:account/calls) and create an application.
