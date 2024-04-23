@@ -22,7 +22,6 @@ durable_objects.bindings = [
 
 [env.production.vars]
 CALLS_APP_ID = "700932c6384d6f4ba19838afa3ab93cd"
-SENTRY_DSN = "https://3591887731314095bc28b3ad11882a17@o51786.ingest.sentry.io/4504375343054848"
 
 [[env.production.queues.producers]]
  queue = "orange-meets-feedback-queue"
