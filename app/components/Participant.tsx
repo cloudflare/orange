@@ -1,6 +1,7 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { forwardRef, useEffect } from 'react'
 import { Flipped } from 'react-flip-toolkit'
+import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
 import type { User } from '~/types/Messages'
@@ -44,6 +45,22 @@ export const Participant = forwardRef<
 	) => {
 		const { data } = useUserMetadata(user.name)
 		const { traceLink } = useRoomContext()
+
+		useDeadPulledTrackMonitor(
+			user.tracks.video,
+			user.transceiverSessionId,
+			user.tracks.videoEnabled,
+			videoTrack,
+			user.name
+		)
+
+		useDeadPulledTrackMonitor(
+			user.tracks.audio,
+			user.transceiverSessionId,
+			user.tracks.audioEnabled,
+			audioTrack,
+			user.name
+		)
 
 		const pinned = flipId === pinnedId
 
