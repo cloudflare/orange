@@ -2,7 +2,7 @@ export default function populateTraceLink(
 	sessionID: string,
 	traceLink?: string
 ) {
-	if (traceLink === undefined) return undefined
+	if (!traceLink) return undefined
 	const url = new URL(traceLink)
 
 	const end = +new Date()
