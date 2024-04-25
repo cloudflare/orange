@@ -1,4 +1,5 @@
 {
+	"name": "orange-meets",
 	"module": "worker.js",
 	"private": true,
 	"sideEffects": false,
