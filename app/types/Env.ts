@@ -4,6 +4,8 @@ export type Env = {
 	FEEDBACK_QUEUE?: Queue
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
+	TURN_SERVICE_ID?: string
+	TURN_SERVICE_TOKEN?: string
 	TRACE_LINK?: string
 	API_EXTRA_PARAMS?: string
 	limiters: DurableObjectNamespace
