@@ -12,6 +12,7 @@ import usePushedTrack from '~/hooks/usePushedTrack'
 import useRoom from '~/hooks/useRoom'
 import type { RoomContextType } from '~/hooks/useRoomContext'
 import useUserMedia from '~/hooks/useUserMedia'
+import { getIceServers } from '~/utils/getIceServers.server'
 
 function numberOrUndefined(value: unknown): number | undefined {
 	const num = Number(value)
@@ -27,11 +28,13 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		MAX_WEBCAM_BITRATE,
 		MAX_WEBCAM_QUALITY_LEVEL,
 	} = context
+
 	return json({
 		mode,
 		userDirectoryUrl: context.USER_DIRECTORY_URL,
 		traceLink: TRACE_LINK,
 		apiExtraParams: API_EXTRA_PARAMS,
+		iceServers: await getIceServers(context),
 		feedbackEnabled:
 			context.FEEDBACK_QUEUE !== undefined &&
 			context.FEEDBACK_URL !== undefined,
@@ -91,6 +94,7 @@ function Room() {
 		traceLink,
 		feedbackEnabled,
 		apiExtraParams,
+		iceServers,
 		maxWebcamBitrate = 1_200_000,
 		maxWebcamFramerate = 24,
 		maxWebcamQualityLevel = 1080,
@@ -98,8 +102,10 @@ function Room() {
 
 	const userMedia = useUserMedia(mode)
 	const room = useRoom({ roomName, userMedia })
-	const { peer, debugInfo, iceConnectionState } =
-		usePeerConnection(apiExtraParams)
+	const { peer, debugInfo, iceConnectionState } = usePeerConnection({
+		apiExtraParams,
+		iceServers,
+	})
 
 	const scaleResolutionDownBy = useMemo(() => {
 		const videoStreamTrack = userMedia.videoStreamTrack

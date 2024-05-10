@@ -33,6 +33,7 @@ export type PeerParams = {
 	apiExtraParams?: string
 	onDisconnect: (connectionState: RTCPeerConnectionState, event: Event) => void
 	onConnect: (connectionState: RTCPeerConnectionState, event: Event) => void
+	iceServers?: RTCIceServer[]
 }
 
 type PushTrackRequestEntry = {
@@ -84,14 +85,13 @@ export default class Peer {
 
 	constructor(params: Partial<PeerParams> = {}) {
 		this.pc = new RTCPeerConnection({
-			iceServers: [
+			iceServers: params.iceServers ?? [
 				{
 					urls: 'stun:stun.cloudflare.com:3478',
 				},
 			],
 			bundlePolicy: 'max-bundle',
 		})
-
 		this.transceivers = []
 		this.params = this.#defaultParams(params)
 		this.pendingTrackTransceivers = {}
