@@ -18,7 +18,8 @@
 		"typecheck:watch": "npm run typecheck -- --watch",
 		"prepare": "husky install",
 		"test": "vitest",
-		"test:ci": "vitest --watch false"
+		"test:ci": "vitest --watch false",
+		"check": "npm run lint && npm run typecheck && npm run test:ci"
 	},
 	"dependencies": {
 		"@heroicons/react": "^2.1.3",
