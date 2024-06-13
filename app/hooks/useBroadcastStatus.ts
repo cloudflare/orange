@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useUnmount } from 'react-use'
-import type { User } from '~/types/Messages'
+import type { ClientMessage, User } from '~/types/Messages'
 import type Peer from '~/utils/Peer.client'
 import type Signal from '~/utils/Signal'
 import type { RoomContextType } from './useRoomContext'
@@ -80,7 +80,7 @@ export default function useBroadcastStatus({
 					transceiverSessionId: peer?.sessionId,
 					tracks: {},
 				},
-			})
+			} satisfies ClientMessage)
 		}
 	})
 }
