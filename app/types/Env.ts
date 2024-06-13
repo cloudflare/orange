@@ -8,7 +8,7 @@ export type Env = {
 	TURN_SERVICE_TOKEN?: string
 	TRACE_LINK?: string
 	API_EXTRA_PARAMS?: string
-	limiters: DurableObjectNamespace
+	// limiters: DurableObjectNamespace
 	rooms: DurableObjectNamespace
 	MAX_WEBCAM_FRAMERATE?: string
 	MAX_WEBCAM_BITRATE?: string
