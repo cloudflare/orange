@@ -21,7 +21,7 @@ export default function useMediaDevices(
 			mounted = false
 			navigator.mediaDevices.removeEventListener('devicechange', requestDevices)
 		}
-	}, [])
+	}, [setDevices])
 
 	return devices.filter(filter)
 }
