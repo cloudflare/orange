@@ -7,10 +7,6 @@ main = "./build/index.js"
 [site]
   bucket = "./public"
 
-[[build.upload.rules]]
-  type = "ESModule"
-  globs = ["**/*.js"]
-
 [vars]
 CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
 

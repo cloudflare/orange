@@ -19,7 +19,7 @@ Overlay.displayName = 'Overlay'
 export const Content = forwardRef<
 	HTMLDivElement,
 	AlertDialog.AlertDialogContentProps
->(({ className, children, ...rest }, ref) => (
+>(({ children, ...rest }, ref) => (
 	<AlertDialog.Content
 		ref={ref}
 		className={cn(
