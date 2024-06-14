@@ -11,6 +11,8 @@ import { assertNonNullable } from '~/utils/assertNonNullable'
 import getUsername from '~/utils/getUsername.server'
 import { handleErrors } from '~/utils/handleErrors.server'
 
+import { DurableObject } from 'cloudflare:workers'
+
 type Session = {
 	heartbeatTimeout: ReturnType<typeof setTimeout> | null
 	webSocket?: WebSocket
@@ -28,7 +30,7 @@ type Session = {
 // ChatRoom implements a Durable Object that coordinates an individual chat room. Participants
 // connect to the room using WebSockets, and the room broadcasts messages from each participant
 // to all others.
-export class ChatRoom implements DurableObject {
+export class ChatRoom extends DurableObject {
 	/**
 	 * WebSocket objects for each client, along with some metadata
 	 */
@@ -42,15 +44,8 @@ export class ChatRoom implements DurableObject {
 	lastTimestamp: number = 0
 	stateSyncInterval: ReturnType<typeof setInterval> | null = null
 
-	// We'd like to use Cloudflare's fancy RPC Durable Objects
-	// but currently we can't figure out a way to mark cloudflare:workers
-	// as an external when remix compiles it. Until then, let's match the
-	// newer style member names .ctx and .env
-	ctx: DurableObjectState
-	env: Env
 	constructor(ctx: DurableObjectState, env: Env) {
-		this.ctx = ctx
-		this.env = env
+		super(ctx, env)
 		// check for previous sessions.
 		this.ctx.blockConcurrencyWhile(async () => {
 			this.sessions = (await this.ctx.storage.get<Session[]>('sessions')) ?? []
