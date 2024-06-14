@@ -7,7 +7,7 @@ module.exports = {
 	serverDependenciesToBundle: [
 		/^(?!__STATIC_CONTENT_MANIFEST|cloudflare:workers).*$/,
 	],
-	serverMainFields: ['browser', 'module', 'main'],
+	serverMainFields: ['workerd', 'browser', 'module', 'main'],
 	serverMinify: true,
 	serverModuleFormat: 'esm',
 	serverPlatform: 'neutral',
