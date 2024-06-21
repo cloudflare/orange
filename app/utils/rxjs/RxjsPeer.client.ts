@@ -7,7 +7,6 @@ import {
 	from,
 	fromEvent,
 	map,
-	of,
 	retry,
 	share,
 	shareReplay,
@@ -224,47 +223,46 @@ export class RxjsPeer {
 			take(1),
 			map((t) => t.id)
 		)
+
 		const transceiver$ = combineLatest([stableId$, this.session$]).pipe(
 			withLatestFrom(track$),
 			map(([[stableId, session], track]) => {
+				const transceiver = session.peerConnection.addTransceiver(track, {
+					direction: 'sendonly',
+				})
 				console.log('🌱 creating transceiver!')
 				return {
-					transceiver: session.peerConnection.addTransceiver(track, {
-						direction: 'sendonly',
-					}),
+					transceiver,
 					stableId,
 					session,
 				}
+			}),
+			shareReplay({
+				refCount: true,
+				bufferSize: 1,
 			})
 		)
 
-		return combineLatest([transceiver$, track$]).pipe(
+		const pushedTrackData$ = transceiver$.pipe(
 			switchMap(
-				([
-					{
-						stableId,
-						transceiver,
-						session: { peerConnection, sessionId },
-					},
-					track,
-				]) => {
-					if (transceiver.sender.transport !== null) {
-						console.log('♻︎ replacing track')
-						transceiver.sender.replaceTrack(track)
-						return of({
-							location: 'remote' as const,
-							sessionId,
-							trackName: stableId,
-						})
-					}
-					return this.#pushTrackInBulk(
+				({ session: { peerConnection, sessionId }, transceiver, stableId }) =>
+					this.#pushTrackInBulk(
 						peerConnection,
 						transceiver,
 						sessionId,
 						stableId
 					)
+			)
+		)
+
+		return combineLatest([pushedTrackData$, transceiver$, track$]).pipe(
+			tap(([_trackData, { transceiver }, track]) => {
+				if (transceiver.sender.transport !== null) {
+					console.log('♻︎ replacing track')
+					transceiver.sender.replaceTrack(track)
 				}
-			),
+			}),
+			map(([trackData]) => trackData),
 			shareReplay({
 				refCount: true,
 				bufferSize: 1,
