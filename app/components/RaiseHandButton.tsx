@@ -16,7 +16,7 @@ export const RaiseHandButton: FC<RaiseHandButtonProps> = ({
 	<Tooltip content={raisedHand ? 'Lower hand' : 'Raise Hand'}>
 		<Button
 			displayType={raisedHand ? 'primary' : 'secondary'}
-			onClick={(e) => {
+			onClick={(_e) => {
 				onClick && onClick()
 				if (!raisedHand) playSound('raiseHand')
 			}}

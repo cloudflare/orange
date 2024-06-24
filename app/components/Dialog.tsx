@@ -57,7 +57,10 @@ const DialogClose = () => (
 
 export const Dialog = RadixDialog.Root
 export const Trigger = RadixDialog.Trigger
-export const Portal = ({ container, ...rest }: RadixDialog.PortalProps) => (
+export const Portal = ({
+	container: _container,
+	...rest
+}: RadixDialog.PortalProps) => (
 	<RadixDialog.Portal
 		container={
 			typeof document !== 'undefined'

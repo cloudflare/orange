@@ -1,13 +1,20 @@
-import type { AppLoadContext } from '@remix-run/cloudflare'
-import type { ClientMessage, ServerMessage, User } from '~/types/Messages'
+import type { Env } from '~/types/Env'
+import type {
+	ClientMessage,
+	MessageFromServer,
+	ServerMessage,
+	User,
+} from '~/types/Messages'
 import { assertError } from '~/utils/assertError'
 import assertNever from '~/utils/assertNever'
 import { assertNonNullable } from '~/utils/assertNonNullable'
 import getUsername from '~/utils/getUsername.server'
 import { handleErrors } from '~/utils/handleErrors.server'
 
+import { DurableObject } from 'cloudflare:workers'
+
 type Session = {
-	heartbeatTimeout: NodeJS.Timer | null
+	heartbeatTimeout: ReturnType<typeof setTimeout> | null
 	webSocket?: WebSocket
 	blockedMessages: ServerMessage[]
 	messageQueue: ServerMessage[]
@@ -23,32 +30,25 @@ type Session = {
 // ChatRoom implements a Durable Object that coordinates an individual chat room. Participants
 // connect to the room using WebSockets, and the room broadcasts messages from each participant
 // to all others.
-export class ChatRoom {
-	storage: DurableObjectStorage
-	env: AppLoadContext
-	sessions: Session[]
-	lastTimestamp: number
-	stateSyncInterval: NodeJS.Timer | null = null
+export class ChatRoom extends DurableObject {
+	/**
+	 * WebSocket objects for each client, along with some metadata
+	 */
+	sessions: Session[] = []
+	/**
+	 * We keep track of the last-seen message's timestamp just so that we can assign monotonically
+		increasing timestamps even if multiple messages arrive simultaneously (see below). There's
+		no need to store this to disk since we assume if the object is destroyed and recreated, much
+		more than a millisecond will have gone by.
+	 */
+	lastTimestamp: number = 0
+	stateSyncInterval: ReturnType<typeof setInterval> | null = null
 
-	constructor(state: DurableObjectState, env: AppLoadContext) {
-		this.storage = state.storage
-
-		// `env` is our environment bindings (discussed earlier).
-		this.env = env
-
-		// We will put the WebSocket objects for each client, along with some metadata, into
-		// `sessions`.
-		this.sessions = []
-
-		// We keep track of the last-seen message's timestamp just so that we can assign monotonically
-		// increasing timestamps even if multiple messages arrive simultaneously (see below). There's
-		// no need to store this to disk since we assume if the object is destroyed and recreated, much
-		// more than a millisecond will have gone by.
-		this.lastTimestamp = 0
-
+	constructor(ctx: DurableObjectState, env: Env) {
+		super(ctx, env)
 		// check for previous sessions.
-		state.blockConcurrencyWhile(async () => {
-			this.sessions = (await this.storage.get<Session[]>('sessions')) ?? []
+		this.ctx.blockConcurrencyWhile(async () => {
+			this.sessions = (await this.ctx.storage.get<Session[]>('sessions')) ?? []
 			this.sessions.forEach((s) => this.setupHeartbeatInterval(s))
 		})
 	}
@@ -102,7 +102,7 @@ export class ChatRoom {
 					from: 'server',
 					timestamp: this.lastTimestamp,
 					message,
-				})
+				} satisfies MessageFromServer)
 			)
 			session.messageQueue = session.messageQueue.filter((m) => m !== message)
 		} else {
@@ -111,15 +111,22 @@ export class ChatRoom {
 		await this.storeSessions()
 	}
 
-	storeSessions = async () =>
-		this.storage.put(
+	async storeSessions() {
+		await this.ctx.storage.put(
 			'sessions',
-			this.sessions.map(({ webSocket, heartbeatTimeout, ...s }) => s)
+			this.sessions.map(
+				({
+					webSocket: _websocket,
+					heartbeatTimeout: _heartbeatTimeout,
+					...s
+				}) => s
+			)
 		)
+	}
 
-	broadcastState = () => {
+	broadcastState() {
 		if (this.sessions.length > 0 && this.stateSyncInterval === null) {
-			this.stateSyncInterval = setInterval(this.broadcastState, 5000)
+			this.stateSyncInterval = setInterval(() => this.broadcastState(), 5000)
 		} else if (this.sessions.length === 0 && this.stateSyncInterval !== null) {
 			clearInterval(this.stateSyncInterval)
 			this.stateSyncInterval = null
@@ -134,7 +141,7 @@ export class ChatRoom {
 		})
 	}
 
-	setupHeartbeatInterval = (session: Session) => {
+	setupHeartbeatInterval(session: Session) {
 		const resetHeartBeatTimeout = () => {
 			if (session.heartbeatTimeout) clearTimeout(session.heartbeatTimeout)
 			session.heartbeatTimeout = setTimeout(() => {
@@ -145,7 +152,7 @@ export class ChatRoom {
 		return resetHeartBeatTimeout
 	}
 
-	handleUserLeft = (session: Session) => {
+	handleUserLeft(session: Session) {
 		session.quit = true
 		this.sessions = this.sessions.filter((member) => member !== session)
 		this.broadcastState()

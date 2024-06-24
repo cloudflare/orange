@@ -229,6 +229,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 								<Participant
 									user={identity}
 									flipId={'identity user screenshare'}
+									isSelf
 									isScreenShare
 									videoTrack={userMedia.screenShareVideoTrack}
 									pinnedId={pinnedId}

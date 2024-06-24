@@ -174,7 +174,7 @@ const Document: FC<{ children?: ReactNode }> = ({ children }) => {
 	)
 }
 
-export const ErrorBoundary = ({}) => {
+export const ErrorBoundary = () => {
 	return (
 		<Document>
 			<div className="grid h-full place-items-center">
