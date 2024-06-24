@@ -21,7 +21,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function SetUsername() {
 	return (
 		<div className="grid h-full gap-4 place-content-center">
-			<h1 className="text-3xl font-bold">🍊 Orange Meets</h1>
+			<h1 className="text-3xl font-bold">📹 BeKind Meets</h1>
 			<Form className="flex items-end gap-4" method="post">
 				<div className="grid gap-3">
 					<label htmlFor="username">Enter your display name</label>
@@ -29,12 +29,13 @@ export default function SetUsername() {
 						autoComplete="off"
 						autoFocus
 						required
+						className='focus:outline-teal-400'
 						type="text"
 						id="username"
 						name="username"
 					/>
 				</div>
-				<Button className="text-xs" type="submit">
+				<Button className="text-xs bg-teal-400 border-teal-400 hover:bg-teal-500 hover:border-teal-500" type="submit">
 					Submit
 				</Button>
 			</Form>

@@ -1,4 +1,6 @@
 import type { ActionFunction, LoaderFunctionArgs } from '@remix-run/cloudflare'
+import { useState, useEffect } from 'react';
+import slugify from 'slugify';
 import { json, redirect } from '@remix-run/cloudflare'
 import { Form, useLoaderData } from '@remix-run/react'
 import invariant from 'tiny-invariant'
@@ -26,6 +28,17 @@ export const action: ActionFunction = async ({ request }) => {
 
 export default function Index() {
 	const { username, usedAccess } = useLoaderData<typeof loader>()
+	const [roomName, setRoomName] = useState('');
+	const [slugifyRoomName, setSlugifyRoomName] = useState('');
+
+	useEffect(() => {
+		if (roomName) {
+			const slugifiedRoomName = slugify(roomName);
+			setSlugifyRoomName(slugify(roomName));
+		}
+	}, [roomName]);
+
+
 	const { data } = useUserMetadata(username)
 
 	return (
@@ -33,10 +46,10 @@ export default function Index() {
 			<div className="flex-1"></div>
 			<div className="space-y-6">
 				<div>
-					<h1 className="text-3xl font-bold">🍊 Orange Meets</h1>
+					<h1 className="text-3xl font-bold">BeKind Meets</h1>
 					<div className="flex items-center justify-between gap-3">
-						<p className="text-sm text-zinc-500 dark:text-zinc-400">
-							Logged in as {data?.displayName}
+						<p className="text-sm text-zinc-500 dark:text-zinc-400 ">
+							Logged in as <span className="font-bold"> {data?.displayName}</span>
 						</p>
 						{!usedAccess && (
 							<a
@@ -49,7 +62,12 @@ export default function Index() {
 					</div>
 				</div>
 				<div>
-					<ButtonLink to="/new" className="text-sm">
+					<Label>Room name</Label>
+					<input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} className="w-full rounded border-2 border-zinc-500 text-zinc-900 dark:text-zinc-50 bg-zinc-50 dark:bg-zinc-700 px-2 py-1" />
+				</div>
+
+				<div>
+					<ButtonLink to={`/${slugifyRoomName}`} className="text-sm bg-teal-400 border-teal-400 hover:bg-teal-500 hover:border-teal-500">
 						New Room
 					</ButtonLink>
 				</div>

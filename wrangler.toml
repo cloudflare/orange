@@ -1,14 +1,14 @@
-name = "orange-meets"
+name = "bekind-meets"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
 compatibility_date = "2022-04-05"
-account_id = "a67e14daa5f8dceeb91fe5449ba496eb"
+account_id = "ae71219efb5c8d5de57757ccb4ed2eb2"
 main = "./build/index.js"
 
 [site]
   bucket = "./public"
 
 [vars]
-CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
+CALLS_APP_ID = "a732d8df918864223ec5142c4def7b36"
 
 [durable_objects]
  bindings = [
