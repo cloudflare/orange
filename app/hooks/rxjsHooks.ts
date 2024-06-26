@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Observable } from 'rxjs'
-import { BehaviorSubject } from 'rxjs'
+import { BehaviorSubject, Observable } from 'rxjs'
 
-export function useObservableState<T, U>(
+export function useSubscribedState<T>(observable: Observable<T>): T | undefined
+export function useSubscribedState<T>(
 	observable: Observable<T>,
-	defaultValue: U
-): T | U {
-	const [state, setState] = useState<T | U>(defaultValue)
-
-	useEffect(() => {
-		const sub = observable.subscribe(setState)
-		return () => {
-			sub.unsubscribe()
-		}
-	}, [observable])
-
-	return state
+	defaultValue: T
+): T
+export function useSubscribedState<T>(
+	observable: Observable<T>,
+	defaultValue?: T
+): T {
+	const [state, setState] = useState(defaultValue)
+	useObservableEffect(observable, setState)
+	return state as any
 }
 
 export function useObservableEffect<T>(
@@ -32,7 +29,11 @@ export function useObservableEffect<T>(
 	}, [observable])
 }
 
-export function useBehaviorSubject<T>(value: T) {
+/**
+ * Turns a value into a stable observable that will emit new
+ * values when the value changes, and completes upon unmounting.
+ */
+export function useStateObservable<T>(value: T) {
 	const ref = useRef(new BehaviorSubject(value))
 	const previousValue = useRef<T>()
 	if (previousValue.current !== value) {
@@ -48,5 +49,5 @@ export function useBehaviorSubject<T>(value: T) {
 		}
 	}, [])
 
-	return ref.current
+	return ref.current.asObservable()
 }

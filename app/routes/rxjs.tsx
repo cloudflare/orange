@@ -1,7 +1,7 @@
 import type { ComponentProps, ElementRef } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import { Observable, map, shareReplay } from 'rxjs'
-import { useObservableEffect, useObservableState } from '~/hooks/rxjsHooks'
+import { useObservableEffect, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useIsServer } from '~/hooks/useIsServer'
 import { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
@@ -26,11 +26,11 @@ function Rxjs() {
 		[]
 	)
 
-	const peerConnectionState = useObservableState(
+	const peerConnectionState = useSubscribedState(
 		client.peerConnectionState$,
 		'new'
 	)
-	const sessionId = useObservableState(
+	const sessionId = useSubscribedState(
 		client.session$.pipe(map((x) => x.sessionId)),
 		null
 	)
