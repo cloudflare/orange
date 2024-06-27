@@ -155,10 +155,11 @@ export class RxjsPeer {
 		trackName: string
 	): Observable<TrackObject> {
 		return new Observable<TrackObject>((subscribe) => {
-			console.log('📤 pushing track')
-			this.pushTrackDispatcher
+			console.log('📤 pushing track ', trackName)
+			const pushedTrackPromise = this.pushTrackDispatcher
 				.doBulkRequest({ trackName, transceiver }, (tracks) =>
 					this.taskScheduler.schedule(async () => {
+						console.log(tracks)
 						await peerConnection.setLocalDescription(
 							await peerConnection.createOffer()
 						)
@@ -208,9 +209,11 @@ export class RxjsPeer {
 				.catch((err) => subscribe.error(err))
 
 			return () => {
-				this.taskScheduler.schedule(async () => {
-					console.log('🔚 Closing pushed track')
-					return this.closeTrack(peerConnection, transceiver.mid, sessionId)
+				pushedTrackPromise.then(() => {
+					this.taskScheduler.schedule(async () => {
+						console.log('🔚 Closing pushed track ', trackName)
+						return this.closeTrack(peerConnection, transceiver.mid, sessionId)
+					})
 				})
 			}
 		})
@@ -277,8 +280,8 @@ export class RxjsPeer {
 	): Observable<MediaStreamTrack> {
 		let mid = ''
 		return new Observable((subscribe) => {
-			console.log('📥 pulling track')
-			this.pullTrackDispatcher
+			console.log('📥 pulling track ', trackData.trackName)
+			const pulledTrackPromise = this.pullTrackDispatcher
 				.doBulkRequest(trackData, (tracks) =>
 					this.taskScheduler.schedule(async () => {
 						const newTrackResponse: TracksResponse = await fetch(
@@ -355,14 +358,17 @@ export class RxjsPeer {
 					} else {
 						subscribe.error(new Error('Missing Track Info'))
 					}
+					return trackData.trackName
 				})
 			return () => {
-				if (mid) {
-					console.log('🔚 Closing pulled track')
-					this.taskScheduler.schedule(async () =>
-						this.closeTrack(peerConnection, mid, sessionId)
-					)
-				}
+				pulledTrackPromise.then((trackName) => {
+					if (mid) {
+						console.log('🔚 Closing pulled track ', trackName)
+						this.taskScheduler.schedule(async () =>
+							this.closeTrack(peerConnection, mid, sessionId)
+						)
+					}
+				})
 			}
 		})
 	}
@@ -382,7 +388,7 @@ export class RxjsPeer {
 				([{ peerConnection }]) => peerConnection.connectionState === 'connected'
 			),
 			switchMap(([{ peerConnection, sessionId }, trackData]) =>
-				from(this.#pullTrackInBulk(peerConnection, sessionId, trackData))
+				this.#pullTrackInBulk(peerConnection, sessionId, trackData)
 			)
 		)
 	}

@@ -21,12 +21,38 @@ export function useObservableEffect<T>(
 ) {
 	const fnRef = useRef(fn)
 	fnRef.current = fn
-	useEffect(() => {
-		const sub = observable.subscribe((v) => fnRef.current(v))
+	useSettledEffect(() => {
+		const subscription = observable.subscribe((v) => fnRef.current(v))
 		return () => {
-			sub.unsubscribe()
+			subscription.unsubscribe()
 		}
 	}, [observable])
+}
+
+const noop = () => {}
+
+/**
+ * Effect that only runs once the effect has stopped
+ * re-running long enough for the event loop to drain
+ */
+export function useSettledEffect(
+	fn: () => void | (() => void),
+	deps?: unknown[]
+) {
+	const fnRef = useRef(fn)
+	fnRef.current = fn
+
+	const cleanupRef = useRef<() => void>(noop)
+	useEffect(() => {
+		const timeout = setTimeout(() => {
+			cleanupRef.current = fnRef.current() ?? noop
+		})
+		return () => {
+			clearTimeout(timeout)
+			cleanupRef.current()
+			cleanupRef.current = noop
+		}
+	}, deps)
 }
 
 /**
