@@ -30,8 +30,12 @@ function Rxjs() {
 		client.peerConnectionState$,
 		'new'
 	)
+
 	const sessionId = useSubscribedState(
-		client.session$.pipe(map((x) => x.sessionId)),
+		useMemo(
+			() => client.session$.pipe(map((x) => x.sessionId)),
+			[client.session$]
+		),
 		null
 	)
 
