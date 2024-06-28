@@ -60,7 +60,7 @@ export const Trigger = RadixDialog.Trigger
 export const Portal = ({
 	container: _container,
 	...rest
-}: RadixDialog.PortalProps) => (
+}: React.ComponentProps<typeof RadixDialog.Portal>) => (
 	<RadixDialog.Portal
 		container={
 			typeof document !== 'undefined'
