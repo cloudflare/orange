@@ -1,7 +1,7 @@
 export async function trackIsHealthy(
 	track: MediaStreamTrack
 ): Promise<boolean> {
-	console.log(`👩🏻‍⚕️ Checking track health...`)
+	console.info(`👩🏻‍⚕️ Checking track health...`)
 	// TODO:
 	// if (track.kind === "audio") {
 	//   test audio stream with web audio api
@@ -11,10 +11,13 @@ export async function trackIsHealthy(
 	// }
 	//
 
-	const randomFailure = Math.random() < 0.2
+	const randomFailuresEnabled =
+		localStorage.getItem('flags.randomTrackFailuresEnabled') === 'true'
+
+	const randomFailure = randomFailuresEnabled && Math.random() < 0.2
 
 	if (randomFailure) {
-		console.log('Random failure!')
+		console.log('🎲 Random track failure!')
 	}
 
 	const healthy =
@@ -22,6 +25,7 @@ export async function trackIsHealthy(
 		track.readyState === 'live' &&
 		track.enabled &&
 		!randomFailure
-	console.log(`👩🏻‍⚕️ track is ${healthy ? 'healthy' : 'unhealthy'}!`)
+
+	console.info(`👩🏻‍⚕️ track is ${healthy ? 'healthy' : 'unhealthy'}!`)
 	return healthy
 }
