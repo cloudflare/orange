@@ -56,7 +56,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	if (!CF_Authorization) return defaultResponse
 
 	const [, payload] = CF_Authorization.split('.')
-	const data = JSON.parse(atob(payload))
+	const data = JSON.parse(Buffer.from(payload, 'base64').toString())
 	const expires = new Date(data.exp * 1000)
 	const now = new Date()
 	if (addOneDay(now) > expires) {
