@@ -11,7 +11,7 @@ export type DeadTrackInfo = {
 }
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-	if (!context.FEEDBACK_URL || !context.FEEDBACK_QUEUE) {
+	if (!context.env.FEEDBACK_URL || !context.env.FEEDBACK_QUEUE) {
 		throw new Response('not found', { status: 404 })
 	}
 	const info: DeadTrackInfo = await request.json()
@@ -81,7 +81,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 		],
 	}
 
-	await context.FEEDBACK_QUEUE.send(chatCard)
+	await context.env.FEEDBACK_QUEUE.send(chatCard)
 
 	return json({
 		status: 'ok',

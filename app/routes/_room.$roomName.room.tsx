@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { useLoaderData, useNavigate, useParams } from '@remix-run/react'
+import { nanoid } from 'nanoid'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
@@ -34,7 +35,9 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
 	return json({
 		username,
-		bugReportsEnabled: Boolean(context.FEEDBACK_QUEUE && context.FEEDBACK_URL),
+		bugReportsEnabled: Boolean(
+			context.env.FEEDBACK_QUEUE && context.env.FEEDBACK_URL
+		),
 		mode: context.mode,
 	})
 }
@@ -50,7 +53,7 @@ function useGridDebugControls(
 ) {
 	const [enabled, setEnabled] = useState(defaultEnabled)
 	const [fakeUsers, setFakeUsers] = useState<string[]>(
-		Array.from({ length: initialCount }).map(() => crypto.randomUUID())
+		Array.from({ length: initialCount }).map(() => nanoid())
 	)
 
 	useEffect(() => {
@@ -71,9 +74,7 @@ function useGridDebugControls(
 		() =>
 			enabled ? (
 				<>
-					<Button
-						onClick={() => setFakeUsers((fu) => [...fu, crypto.randomUUID()])}
-					>
+					<Button onClick={() => setFakeUsers((fu) => [...fu, nanoid(14)])}>
 						<Icon type="PlusIcon" />
 					</Button>
 					<Button
@@ -121,7 +122,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		userMedia,
 		peer,
 		pushedTracks,
-		room: { otherUsers, signal, identity },
+		room: { otherUsers, websocket, identity },
 	} = useRoomContext()
 
 	const { GridDebugControls, fakeUsers } = useGridDebugControls({
@@ -148,7 +149,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	useBroadcastStatus({
 		userMedia,
 		peer,
-		signal,
+		websocket,
 		identity,
 		pushedTracks,
 		raisedHand,

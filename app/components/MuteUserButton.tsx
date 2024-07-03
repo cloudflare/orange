@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
-import type { User } from '~/types/Messages'
+import type { ClientMessage, User } from '~/types/Messages'
 import AlertDialog from './AlertDialog'
 import type { ButtonProps } from './Button'
 import { Button } from './Button'
@@ -62,10 +62,12 @@ export const MuteUserButton: FC<MuteUserButtonProps> = ({
 						<AlertDialog.Action asChild>
 							<Button
 								onClick={() => {
-									room.signal.sendMessage({
-										type: 'muteUser',
-										id: user.id,
-									})
+									room.websocket.send(
+										JSON.stringify({
+											type: 'muteUser',
+											id: user.id,
+										} satisfies ClientMessage)
+									)
 								}}
 								className="text-sm"
 								displayType="danger"

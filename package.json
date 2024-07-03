@@ -41,6 +41,9 @@
 		"@tensorflow/tfjs-core": "^4.15.0",
 		"clsx": "^2.1.1",
 		"cookie": "^0.6.0",
+		"nanoid": "^5.0.7",
+		"partyserver": "^0.0.44",
+		"partysocket": "^1.0.1",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1",
 		"react-flip-toolkit": "^7.1.0",
@@ -74,7 +77,8 @@
 		"msw": {
 			"typescript": "$typescript"
 		},
-		"pretty-format": "29.7.0"
+		"pretty-format": "29.7.0",
+		"esbuild": "^0.23.0"
 	},
 	"engines": {
 		"node": ">=16.13"
