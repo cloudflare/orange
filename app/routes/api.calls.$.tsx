@@ -15,7 +15,7 @@ const proxiedUrl = (url: string, appId: string) => {
 const proxyCallsApi = async ({ request, context }: LoaderFunctionArgs) => {
 	const { headers, body, url, method } = request
 	const newHeaders = new Headers(headers)
-	newHeaders.set('Authorization', `Bearer ${context.CALLS_APP_SECRET}`)
+	newHeaders.set('Authorization', `Bearer ${context.env.CALLS_APP_SECRET}`)
 	const proxyInit: RequestInit = {
 		headers: newHeaders,
 		method,
@@ -34,7 +34,7 @@ const proxyCallsApi = async ({ request, context }: LoaderFunctionArgs) => {
 		}
 	}
 
-	return fetch(proxiedUrl(url, context.CALLS_APP_ID), proxyInit)
+	return fetch(proxiedUrl(url, context.env.CALLS_APP_ID), proxyInit)
 }
 
 export const loader = proxyCallsApi

@@ -22,22 +22,24 @@ function numberOrUndefined(value: unknown): number | undefined {
 export const loader = async ({ context }: LoaderFunctionArgs) => {
 	const {
 		mode,
-		TRACE_LINK,
-		API_EXTRA_PARAMS,
-		MAX_WEBCAM_FRAMERATE,
-		MAX_WEBCAM_BITRATE,
-		MAX_WEBCAM_QUALITY_LEVEL,
+		env: {
+			TRACE_LINK,
+			API_EXTRA_PARAMS,
+			MAX_WEBCAM_FRAMERATE,
+			MAX_WEBCAM_BITRATE,
+			MAX_WEBCAM_QUALITY_LEVEL,
+		},
 	} = context
 
 	return json({
 		mode,
-		userDirectoryUrl: context.USER_DIRECTORY_URL,
+		userDirectoryUrl: context.env.USER_DIRECTORY_URL,
 		traceLink: TRACE_LINK,
 		apiExtraParams: API_EXTRA_PARAMS,
-		iceServers: await getIceServers(context),
+		iceServers: await getIceServers(context.env),
 		feedbackEnabled:
-			context.FEEDBACK_QUEUE !== undefined &&
-			context.FEEDBACK_URL !== undefined,
+			context.env.FEEDBACK_QUEUE !== undefined &&
+			context.env.FEEDBACK_URL !== undefined,
 		maxWebcamFramerate: numberOrUndefined(MAX_WEBCAM_FRAMERATE),
 		maxWebcamBitrate: numberOrUndefined(MAX_WEBCAM_BITRATE),
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),

@@ -8,6 +8,8 @@ import {
 } from 'react'
 import { style } from '~/utils/style'
 
+import { nanoid } from 'nanoid'
+
 export const Root = style(
 	Toast.Root,
 	'bg-white rounded dark:bg-zinc-500 shadow p-3 text-zinc-800 dark:text-zinc-50'
@@ -33,7 +35,7 @@ export const NotificationToastsProvider = (props: { children?: ReactNode }) => {
 				...ms,
 				{
 					...options,
-					id: crypto.randomUUID(),
+					id: nanoid(14),
 					content,
 				},
 			]),

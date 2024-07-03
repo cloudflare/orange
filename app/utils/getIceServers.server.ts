@@ -1,9 +1,9 @@
-import type { AppLoadContext } from '@remix-run/cloudflare'
+import type { Env } from '~/types/Env'
 
 export async function getIceServers({
 	TURN_SERVICE_ID,
 	TURN_SERVICE_TOKEN,
-}: AppLoadContext): Promise<undefined | RTCIceServer[]> {
+}: Env): Promise<undefined | RTCIceServer[]> {
 	if (TURN_SERVICE_TOKEN === undefined || TURN_SERVICE_ID === undefined) return
 
 	return fetch(

@@ -1,6 +1,7 @@
 import type { ActionFunction, LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json, redirect } from '@remix-run/cloudflare'
-import { Form, useLoaderData } from '@remix-run/react'
+import { Form, useLoaderData, useNavigate } from '@remix-run/react'
+import { nanoid } from 'nanoid'
 import invariant from 'tiny-invariant'
 import { Button, ButtonLink } from '~/components/Button'
 import { Disclaimer } from '~/components/Disclaimer'
@@ -26,6 +27,7 @@ export const action: ActionFunction = async ({ request }) => {
 
 export default function Index() {
 	const { username, usedAccess } = useLoaderData<typeof loader>()
+	const navigate = useNavigate()
 	const { data } = useUserMetadata(username)
 
 	return (
@@ -49,7 +51,19 @@ export default function Index() {
 					</div>
 				</div>
 				<div>
-					<ButtonLink to="/new" className="text-sm">
+					<ButtonLink
+						to="/new"
+						className="text-sm"
+						onClick={(e) => {
+							// We shouldn't need a whole server visit to start a new room,
+							// so let's just do a redirect here
+							e.preventDefault()
+							navigate(`/${nanoid(8)}`)
+							// if someone clicks the link to create a new room
+							// before the js has loaded then we'll use a server side redirect
+							// (in new.tsx) to send the user to a new room
+						}}
+					>
 						New Room
 					</ButtonLink>
 				</div>

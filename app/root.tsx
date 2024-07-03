@@ -42,7 +42,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	}
 
 	const defaultResponse = json({
-		userDirectoryUrl: context.USER_DIRECTORY_URL,
+		userDirectoryUrl: context.env.USER_DIRECTORY_URL,
 	})
 
 	// we only care about verifying token freshness if request was a user

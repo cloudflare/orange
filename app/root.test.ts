@@ -51,7 +51,7 @@ describe('root loader', () => {
 		})
 
 		try {
-			await loader({ request, context: {} as any, params: {} })
+			await loader({ request, context: { env: {} } as any, params: {} })
 		} catch (e) {
 			if (!(e instanceof Response)) throw e
 			var response = e
@@ -87,7 +87,11 @@ describe('root loader', () => {
 			},
 		})
 
-		const response = await loader({ request, context: {} as any, params: {} })
+		const response = await loader({
+			request,
+			context: { env: {} } as any,
+			params: {},
+		})
 
 		expect(response?.status).not.equals(302)
 	})
@@ -112,7 +116,11 @@ describe('root loader', () => {
 			},
 		})
 
-		const response = await loader({ request, context: {} as any, params: {} })
+		const response = await loader({
+			request,
+			context: { env: {} } as any,
+			params: {},
+		})
 
 		expect(response?.status).not.equals(302)
 	})
@@ -121,7 +129,11 @@ describe('root loader', () => {
 		const request = new Request('https://orange.cloudflare.dev', {})
 		let redirect = null
 		try {
-			const response = await loader({ request, context: {} as any, params: {} })
+			const response = await loader({
+				request,
+				context: { env: {} } as any,
+				params: {},
+			})
 			expect(response.status).not.equals(302)
 		} catch (r) {
 			if (!(r instanceof Response)) throw r
@@ -142,7 +154,11 @@ describe('root loader', () => {
 		})
 		let redirect = null
 		try {
-			const response = await loader({ request, context: {} as any, params: {} })
+			const response = await loader({
+				request,
+				context: { env: {} } as any,
+				params: {},
+			})
 			expect(response.status).not.equals(302)
 		} catch (r) {
 			if (!(r instanceof Response)) throw r
