@@ -5,7 +5,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "remix build",
-		"lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
+		"lint": "prettier --check . && eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
 		"dev": "remix dev --manual -c \"npm start\"",
 		"start": "wrangler dev ./build/index.js",
 		"prebuild": "npm run clean",
@@ -13,10 +13,9 @@
 		"ci-test": "CI=true run-p typecheck test",
 		"remove-sourcemaps": "del public/build/**/*.map",
 		"deploy": "npm run ci-test && npm run build -- --sourcemap && npm run remove-sourcemaps && wrangler publish --define __RELEASE__:\\\"$(git rev-parse --short HEAD)\\\" --define __SENTRY_DSN__:\\\"$SENTRY_DSN\\\"",
-		"prettier": "prettier -w --ignore-path .gitignore .",
+		"prettier": "prettier -w .",
 		"typecheck": "tsc --noEmit --skipLibCheck",
 		"typecheck:watch": "npm run typecheck -- --watch",
-		"prepare": "husky install",
 		"test": "vitest",
 		"test:ci": "vitest --watch false",
 		"check": "npm run lint && npm run typecheck && npm run test:ci"
@@ -62,7 +61,6 @@
 		"del-cli": "^5.1.0",
 		"eslint": "^8.56.0",
 		"git-format-staged": "^3.1.1",
-		"husky": "^9.0.11",
 		"msw": "^2.3.1",
 		"npm-run-all": "^4.1.5",
 		"prettier": "^3.3.2",
