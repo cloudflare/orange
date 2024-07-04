@@ -29,7 +29,7 @@ export default async function getUsername(request: Request) {
 	if (accessUsername) return accessUsername
 
 	const session = await getSession(request.headers.get('Cookie'))
-	const sessionUsername = session.get('username')
+	const sessionUsername = session.get('username') as string | null
 	if (typeof sessionUsername === 'string') return sessionUsername
 
 	return null

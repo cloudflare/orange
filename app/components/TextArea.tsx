@@ -3,7 +3,7 @@ import { cn } from '~/utils/style'
 
 export const TextArea = forwardRef<
 	HTMLTextAreaElement,
-	JSX.IntrinsicElements['textarea']
+	React.JSX.IntrinsicElements['textarea']
 >(({ className, ...rest }, ref) => (
 	<textarea
 		ref={ref}

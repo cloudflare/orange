@@ -18,7 +18,7 @@ export default function useRoom({
 		party: 'rooms',
 		room: roomName,
 		onMessage: (e) => {
-			const message = JSON.parse(e.data) as ServerMessage
+			const message = JSON.parse(e.data as string) as ServerMessage
 			switch (message.type) {
 				case 'roomState':
 					// prevent updating state if nothing has changed

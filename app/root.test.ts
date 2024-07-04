@@ -54,7 +54,7 @@ describe('root loader', () => {
 			await loader({ request, context: { env: {} } as any, params: {} })
 		} catch (e) {
 			if (!(e instanceof Response)) throw e
-			var response = e
+			const response = e
 			expect(response.status).toBe(302)
 			expect(response.headers.get('Location')).toBe(url.toString())
 			expect(response.headers.get('Set-Cookie')).toBe(

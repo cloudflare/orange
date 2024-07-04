@@ -1,0 +1,13 @@
+node_modules
+.DS_STORE
+.wrangler
+
+/.cache
+/build
+/dist
+/public/build
+/.mf
+.env
+.dev.vars
+.sentryclirc
+public/mockServiceWorker.js

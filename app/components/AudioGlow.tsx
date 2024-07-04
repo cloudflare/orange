@@ -23,7 +23,9 @@ export const AudioGlow: FC<AudioGlowProps> = ({
 				'opacity-[--opacity] transition-opacity',
 				className
 			)}
-			style={{ '--opacity': Math.min(1, audioLevel * 4) } as any}
+			style={
+				{ '--opacity': Math.min(1, audioLevel * 4) } as React.CSSProperties
+			}
 			aria-hidden
 		>
 			{children}

@@ -65,7 +65,7 @@ interface IconProps {
 }
 
 export const Icon: FC<
-	IconProps & Omit<JSX.IntrinsicElements['svg'], 'ref'>
+	IconProps & Omit<React.JSX.IntrinsicElements['svg'], 'ref'>
 > = ({ type, className, ...rest }) => {
 	const Component = iconMap[type]
 	return <Component className={cn('h-[1em]', className)} {...rest} />

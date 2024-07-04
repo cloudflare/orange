@@ -28,7 +28,7 @@ export default function usePushedTrack(
 					.pushTrack(mediaStreamTrack.id, mediaStreamTrack)
 					.then((trackObject) => {
 						// backwards compatibility: trackObject -> ResourceID
-						let resourceID = `${trackObject.sessionId}/${trackObject.trackName}`
+						const resourceID = `${trackObject.sessionId}/${trackObject.trackName}`
 						setTransceiverId(resourceID)
 						setPending(false)
 					})

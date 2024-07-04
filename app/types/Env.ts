@@ -13,4 +13,5 @@ export type Env = {
 	MAX_WEBCAM_FRAMERATE?: string
 	MAX_WEBCAM_BITRATE?: string
 	MAX_WEBCAM_QUALITY_LEVEL?: string
+	__STATIC_CONTENT: KVNamespace
 }

@@ -8,14 +8,10 @@ export interface EnsurePermissionsProps {
 type PermissionState = 'denied' | 'granted' | 'prompt' | 'unable-to-determine'
 
 async function getExistingPermissionState(): Promise<PermissionState> {
-	try {
-		const query = await navigator.permissions.query({
-			name: 'microphone' as any,
-		})
-		return query.state
-	} catch (error) {
-		return 'unable-to-determine'
-	}
+	const query = await navigator.permissions.query({
+		name: 'microphone' as PermissionName,
+	})
+	return query.state
 }
 
 export function EnsurePermissions(props: EnsurePermissionsProps) {
@@ -25,9 +21,15 @@ export function EnsurePermissions(props: EnsurePermissionsProps) {
 	const mountedRef = useRef(true)
 
 	useEffect(() => {
-		getExistingPermissionState().then((result) => {
-			if (mountedRef.current) setPermissionState(result)
-		})
+		getExistingPermissionState().then(
+			(result) => {
+				if (mountedRef.current) setPermissionState(result)
+			},
+			(err) => {
+				console.error('Error getting existing permission state:', err)
+				if (mountedRef.current) setPermissionState('unable-to-determine')
+			}
+		)
 		return () => {
 			mountedRef.current = false
 		}

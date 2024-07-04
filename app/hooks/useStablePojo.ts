@@ -6,5 +6,5 @@ import { useMemo } from 'react'
  */
 export function useStablePojo<T>(value: T): T {
 	const jsonString = JSON.stringify(value)
-	return useMemo(() => JSON.parse(jsonString), [jsonString])
+	return useMemo(() => JSON.parse(jsonString) as T, [jsonString])
 }

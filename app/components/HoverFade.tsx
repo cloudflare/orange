@@ -17,7 +17,7 @@ export const HoverFade: FC<HoverFadeProps> = ({
 	const [visible, setVisible] = useState(false)
 
 	useEffect(() => {
-		let mounted = true
+		const mounted = true
 		if (visible) {
 			const t = setTimeout(() => {
 				if (mounted) setVisible(false)

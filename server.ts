@@ -1,4 +1,3 @@
-// @ts-ignore
 import {
 	getAssetFromKV,
 	MethodNotAllowedError,
@@ -7,7 +6,7 @@ import {
 import type { AppLoadContext, ServerBuild } from '@remix-run/cloudflare'
 import { createRequestHandler } from '@remix-run/cloudflare'
 import * as build from '@remix-run/dev/server-build'
-// @ts-expect-error
+// @ts-expect-error __STATIC_CONTENT_MANIFEST is a custom module injected by the build
 import manifestJSON from '__STATIC_CONTENT_MANIFEST'
 import { mode } from '~/utils/mode'
 import { queue } from './app/queue'
@@ -27,8 +26,8 @@ const notImplemented = () => {
 export const createKvAssetHandler = (ASSET_MANIFEST: Record<string, string>) =>
 	async function handleAsset(
 		request: Request,
-		env: any,
-		ctx: any,
+		env: Env,
+		ctx: ExecutionContext,
 		build: ServerBuild
 	) {
 		const ASSET_NAMESPACE = env.__STATIC_CONTENT
@@ -57,9 +56,9 @@ export const createKvAssetHandler = (ASSET_MANIFEST: Record<string, string>) =>
 			}
 
 			let cacheControl = {}
-			let url = new URL(event.request.url)
-			let assetpath = build.assets.url.split('/').slice(0, -1).join('/')
-			let requestpath = url.pathname.split('/').slice(0, -1).join('/')
+			const url = new URL(event.request.url)
+			const assetpath = build.assets.url.split('/').slice(0, -1).join('/')
+			const requestpath = url.pathname.split('/').slice(0, -1).join('/')
 
 			if (requestpath.startsWith(assetpath)) {
 				// Assets are hashed by Remix so are safe to cache in the browser
@@ -98,7 +97,9 @@ export const createKvAssetHandler = (ASSET_MANIFEST: Record<string, string>) =>
 export { ChatRoom } from './app/durableObjects/ChatRoom.server'
 export { queue } from './app/queue'
 
-const kvAssetHandler = createKvAssetHandler(JSON.parse(manifestJSON))
+const kvAssetHandler = createKvAssetHandler(
+	JSON.parse(manifestJSON as string) as Record<string, string>
+)
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {

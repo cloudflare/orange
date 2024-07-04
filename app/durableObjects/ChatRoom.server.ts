@@ -34,9 +34,9 @@ export class ChatRoom extends Server<Env> {
 			)
 		)
 
-		if (!this.ctx.storage.getAlarm()) {
+		if (!(await this.ctx.storage.getAlarm())) {
 			// start the alarm to broadcast state every 30 seconds
-			this.ctx.storage.setAlarm(30000)
+			await this.ctx.storage.setAlarm(30000)
 		}
 
 		// cleaning out storage used by older versions of this code
@@ -86,17 +86,14 @@ export class ChatRoom extends Server<Env> {
 		)
 	}
 
-	async onMessage(
-		connection: Connection<User>,
-		message: WSMessage
-	): Promise<void> {
+	onMessage(connection: Connection<User>, message: WSMessage): void {
 		try {
 			if (typeof message !== 'string') {
 				console.warn('Received non-string message')
 				return
 			}
 
-			let data: ClientMessage = JSON.parse(message)
+			const data = JSON.parse(message) as ClientMessage
 
 			switch (data.type) {
 				case 'userLeft':
@@ -106,7 +103,7 @@ export class ChatRoom extends Server<Env> {
 					connection.setState(data.user)
 					this.broadcastState()
 					break
-				case 'directMessage':
+				case 'directMessage': {
 					const { to, message } = data
 
 					for (const otherConnection of this.getConnections<User>()) {
@@ -123,7 +120,7 @@ export class ChatRoom extends Server<Env> {
 						`User with id "${to}" not found, cannot send DM from "${connection.state!.name}"`
 					)
 					break
-
+				}
 				case 'muteUser':
 					for (const otherConnection of this.getConnections<User>()) {
 						if (otherConnection.id === data.id) {
@@ -177,10 +174,10 @@ export class ChatRoom extends Server<Env> {
 		this.broadcastState()
 	}
 
-	alarm(): void | Promise<void> {
+	async alarm(): Promise<void> {
 		// technically we don't need to broadcast state on an alarm,
 		// but let's keep it for a while and see if it's useful
 		this.broadcastState()
-		this.ctx.storage.setAlarm(30000)
+		await this.ctx.storage.setAlarm(30000)
 	}
 }

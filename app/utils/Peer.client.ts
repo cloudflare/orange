@@ -103,7 +103,11 @@ export default class Peer {
 			PullTrackBatchSizeLimit
 		)
 		this.closeTrackDispatcher = new BulkRequestDispatcher()
-		setInterval(() => this.checkStats(900), 1000)
+		setInterval(() => {
+			this.checkStats(900).catch((error) => {
+				console.error('Error checking stats', error)
+			})
+		}, 1000)
 	}
 
 	#defaultParams(params: Partial<PeerParams>) {
@@ -185,7 +189,7 @@ export default class Peer {
 
 		this.pc.ontrack = (event) => {
 			if (event.transceiver.mid === null) return
-			let resolve = this.pendingTrackTransceivers[event.transceiver.mid]
+			const resolve = this.pendingTrackTransceivers[event.transceiver.mid]
 			if (resolve) {
 				delete this.pendingTrackTransceivers[event.transceiver.mid]
 				resolve(event.track)
@@ -194,7 +198,7 @@ export default class Peer {
 			}
 		}
 
-		let connectedState = new Promise((resolve, _) => {
+		const connectedState = new Promise((resolve, _) => {
 			this.pc.addEventListener('connectionstatechange', () => {
 				if (this.pc.connectionState == 'connected') {
 					resolve(true)
@@ -202,7 +206,7 @@ export default class Peer {
 			})
 		})
 
-		let gatheringReady = new Promise((resolve, _) => {
+		const gatheringReady = new Promise((resolve, _) => {
 			// get all the candidates it can until to reach iceGathertingTimeout
 			setTimeout(() => resolve(true), iceGathertingTimeout)
 			if (this.params.iceTrickleEnabled) {
@@ -309,7 +313,7 @@ export default class Peer {
 	): Promise<TrackObject> {
 		console.debug(`Peer.pushTrack: ${track.kind} ${trackName}`)
 		await this.initialization
-		const bulkResponse = (await this.pushTrackDispatcher.doBulkRequest(
+		const bulkResponse = await this.pushTrackDispatcher.doBulkRequest(
 			{
 				trackName: trackName,
 				track: track,
@@ -350,7 +354,7 @@ export default class Peer {
 					return response
 				})
 			}
-		)) as TracksResponse
+		)
 		if (bulkResponse.errorCode) {
 			throw new Error(bulkResponse.errorDescription)
 		}
@@ -429,7 +433,7 @@ export default class Peer {
 						invariant(response.tracks)
 						// resolving a mid as MediaStreamTrack must be done before setting
 						// the remote offer to be able to catch it in time
-						let trackPromises = response.tracks.map((track) => {
+						const trackPromises = response.tracks.map((track) => {
 							if (track.mid) {
 								return this.#resolveTrack(track.mid)
 							} else return undefined
@@ -487,7 +491,7 @@ export default class Peer {
 				return await this.taskScheduler.schedule(async () => {
 					// Either the transceiver is sendonly or recvonly, we close it from this side
 					// to trigger the appropriate response from Thunderclap
-					let transceivers = this.pc.getTransceivers().filter((t) => {
+					const transceivers = this.pc.getTransceivers().filter((t) => {
 						invariant(t.mid)
 						return batchCopy.includes(t.mid)
 					})

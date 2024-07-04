@@ -55,8 +55,8 @@ export default class Ewma {
 		invariant(typeof x === 'number', 'x is not a number')
 		invariant(!isNaN(x), 'x can not be NaN')
 
-		var now = this._clock.now()
-		var elapsed = now - this._stamp
+		const now = this._clock.now()
+		const elapsed = now - this._stamp
 		this._stamp = now
 
 		// This seemingly magic equation is derived from the fact that we are
@@ -69,7 +69,7 @@ export default class Ewma {
 		// For a detailed proof read:
 		// A Framework for the Analysis of Unevenly Spaced Time Series Data
 		// Eckner, 2014
-		var w = Math.pow(2, -elapsed / this._decay)
+		const w = Math.pow(2, -elapsed / this._decay)
 		this._ewma = w * this._ewma + (1.0 - w) * x
 	}
 

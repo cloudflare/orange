@@ -47,7 +47,9 @@ export default function monitorAudioLevel({
 	return () => {
 		mediaStreamAudioSourceNode.disconnect()
 		analyserNode.disconnect()
-		audioContext.close()
+		audioContext.close().catch((error) => {
+			console.error('Could not close audio context', error)
+		})
 		clearInterval(interval)
 		clearTimeout(timeout)
 		stream.removeTrack(mediaStreamTrack)

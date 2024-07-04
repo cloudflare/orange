@@ -30,12 +30,14 @@ export default async function blurVideoTrack(
 	const mediaStream = new MediaStream()
 	mediaStream.addTrack(originalVideoStreamTrack)
 	video.srcObject = mediaStream
-	video.play()
+	video.play().catch((err) => {
+		console.error('Error playing video', err)
+	})
 	await loaded
 
 	const canvas = document.createElement('canvas')
 	// we need to create a context in order for this to work with firefox
-	const _contex = canvas.getContext('2d')
+	const _context = canvas.getContext('2d')
 	canvas.height = h
 	canvas.width = w
 
@@ -60,9 +62,15 @@ export default async function blurVideoTrack(
 	const blurredTrack = canvas.captureStream().getVideoTracks()[0]
 
 	let t = -1
-	async function tick() {
-		await drawBlur()
-		t = window.setTimeout(tick, 1000 / 30) // 30fps
+	function tick() {
+		drawBlur().then(
+			() => {
+				t = window.setTimeout(tick, 1000 / 30) // 30fps
+			},
+			(err) => {
+				console.error('Error drawing blur', err)
+			}
+		)
 	}
 
 	await drawBlur()

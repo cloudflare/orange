@@ -55,7 +55,7 @@ export default function useUserMedia(mode: Mode) {
 		setAudioEnabled(false)
 	}
 
-	const turnMicOn = async () => {
+	const turnMicOn = () => {
 		setAudioEnabled(true)
 	}
 
@@ -105,15 +105,20 @@ export default function useUserMedia(mode: Mode) {
 
 		getUserMediaExtended({
 			audio: audioDeviceId ? { deviceId: audioDeviceId } : true,
-		}).then((ms) => {
-			if (!mounted) {
-				ms.getTracks().forEach((t) => t.stop())
-				return
+		}).then(
+			(ms) => {
+				if (!mounted) {
+					ms.getTracks().forEach((t) => t.stop())
+					return
+				}
+				const [mutedTrack] = ms.getAudioTracks()
+				mutedTrack.enabled = false
+				setMutedAudioStreamTrack(mutedTrack)
+			},
+			(err) => {
+				console.error('Error getting muted audio track', err)
 			}
-			const [mutedTrack] = ms.getAudioTracks()
-			mutedTrack.enabled = false
-			setMutedAudioStreamTrack(mutedTrack)
-		})
+		)
 		return () => {
 			mounted = false
 		}
