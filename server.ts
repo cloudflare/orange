@@ -104,7 +104,7 @@ export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const assetResponse = await kvAssetHandler(request, env, ctx, build)
 		if (assetResponse) return assetResponse
-		return remixHandler(request, { env, mode, abc: 123 })
+		return remixHandler(request, { env, mode })
 	},
 	queue,
 }
