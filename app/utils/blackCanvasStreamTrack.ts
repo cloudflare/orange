@@ -1,9 +1,9 @@
 import invariant from 'tiny-invariant'
 
-export function blackCanvasStreamTrack(videoTrack: MediaStreamTrack) {
+export function blackCanvasStreamTrack(videoTrack?: MediaStreamTrack) {
 	const canvas = document.createElement('canvas')
-	canvas.height = videoTrack.getSettings().height ?? 0
-	canvas.width = videoTrack.getSettings().width ?? 0
+	canvas.height = videoTrack?.getSettings().height ?? 720
+	canvas.width = videoTrack?.getSettings().width ?? 1280
 	const ctx = canvas.getContext('2d')
 	invariant(ctx)
 	ctx.fillStyle = 'black'

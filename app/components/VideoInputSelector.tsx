@@ -1,16 +1,14 @@
 import type { FC } from 'react'
-import { useVideoInputDeviceId } from '~/hooks/globalPersistedState'
 import useMediaDevices from '~/hooks/useMediaDevices'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { errorMessageMap } from '~/hooks/useUserMedia'
 import { Option, Select } from './Select'
 
 export const VideoInputSelector: FC<{ id?: string }> = ({ id }) => {
-	const [videoDeviceId, setVideoDeviceId] = useVideoInputDeviceId()
 	const videoInputDevices = useMediaDevices((d) => d.kind === 'videoinput')
 
 	const {
-		userMedia: { videoUnavailableReason },
+		userMedia: { videoUnavailableReason, videoDeviceId, setVideoDeviceId },
 	} = useRoomContext()
 
 	if (videoUnavailableReason) {

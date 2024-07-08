@@ -1,18 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocalStorage, useUnmount } from 'react-use'
+import {
+	catchError,
+	combineLatest,
+	of,
+	shareReplay,
+	switchMap,
+	tap,
+} from 'rxjs'
 import invariant from 'tiny-invariant'
 import { blackCanvasStreamTrack } from '~/utils/blackCanvasStreamTrack'
 import blurVideoTrack from '~/utils/blurVideoTrack'
-import { getUserMediaExtended } from '~/utils/getUserMedia'
+import { createEmptyAudioTrack } from '~/utils/createEmptyAudioTrack'
 import keyInObject from '~/utils/keyInObject'
 import type { Mode } from '~/utils/mode'
 import noiseSuppression from '~/utils/noiseSuppression'
-import {
-	useAudioInputDeviceId,
-	useAudioInputDeviceLabel,
-	useVideoInputDeviceId,
-	useVideoInputDeviceLabel,
-} from './globalPersistedState'
+import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
+import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
+import { useStateObservable, useSubscribedState } from './rxjsHooks'
 
 // export const userRejectedPermission = 'NotAllowedError'
 
@@ -21,7 +26,9 @@ export const errorMessageMap = {
 		'Permission was denied. Grant permission and reload to enable.',
 	NotFoundError: 'No device was found.',
 	NotReadableError: 'Device is already in use.',
-	OverconstrainedError: 'No device was found that meets constraints',
+	OverconstrainedError: 'No device was found that meets constraints.',
+	DevicesExhaustedError: 'All devices failed to initialize.',
+	UnknownError: 'An unknown error occurred.',
 }
 
 type UserMediaError = keyof typeof errorMessageMap
@@ -32,15 +39,7 @@ export default function useUserMedia(mode: Mode) {
 		'suppress-noise',
 		false
 	)
-	const [audioDeviceId, setAudioDeviceId] = useAudioInputDeviceId()
-	const [audioDeviceLabel, setAudioDeviceLabel] = useAudioInputDeviceLabel()
-	const [videoDeviceId, setVideoDeviceId] = useVideoInputDeviceId()
-	const [videoDeviceLabel, setVideoDeviceLabel] = useVideoInputDeviceLabel()
-	const [audioStreamTrack, setAudioStreamTrack] = useState<MediaStreamTrack>()
-	const [mutedAudioStreamTrack, setMutedAudioStreamTrack] =
-		useState<MediaStreamTrack>()
 	const [audioEnabled, setAudioEnabled] = useState(mode === 'production')
-	const [videoStreamTrack, setVideoStreamTrack] = useState<MediaStreamTrack>()
 	const [videoEnabled, setVideoEnabled] = useState(true)
 	const [screenShareStream, setScreenShareStream] = useState<MediaStream>()
 	const [screenShareEnabled, setScreenShareEnabled] = useState(false)
@@ -51,6 +50,44 @@ export default function useUserMedia(mode: Mode) {
 	const [screenshareUnavailableReason, setScreenshareUnavailableReason] =
 		useState<UserMediaError>()
 
+	const blurVideo$ = useStateObservable(blurVideo)
+	const videoEnabled$ = useStateObservable(videoEnabled)
+	const videoTrack$ = useMemo(
+		() =>
+			combineLatest([
+				videoEnabled$.pipe(
+					switchMap((enabled) =>
+						enabled
+							? getUserMediaTrack$('videoinput').pipe(
+									tap({
+										error: (e) => {
+											invariant(e instanceof Error)
+											setVideoUnavailableReason(
+												e.name in errorMessageMap
+													? (e.name as UserMediaError)
+													: 'UnknownError'
+											)
+										},
+									}),
+									catchError(() => of(undefined))
+								)
+							: of(blackCanvasStreamTrack())
+					)
+				),
+				blurVideo$,
+			]).pipe(
+				switchMap(([track, blur]) =>
+					blur && track ? blurVideoTrack(track) : of(track)
+				),
+				shareReplay({
+					refCount: true,
+					bufferSize: 1,
+				})
+			),
+		[videoEnabled$, blurVideo$]
+	)
+	const videoTrack = useSubscribedState(videoTrack$)
+
 	const turnMicOff = () => {
 		setAudioEnabled(false)
 	}
@@ -59,76 +96,35 @@ export default function useUserMedia(mode: Mode) {
 		setAudioEnabled(true)
 	}
 
-	useEffect(() => {
-		let mounted = true
-		getUserMediaExtended({
-			audio: audioDeviceId
-				? { deviceId: audioDeviceId, label: audioDeviceLabel }
-				: true,
-		})
-			.then(async (ms) => {
-				if (!mounted) {
-					ms.getTracks().forEach((t) => t.stop())
-					return
-				}
-				const audio = ms.getAudioTracks()[0]
-				const { deviceId } = audio.getSettings()
-				setAudioDeviceId(deviceId)
-				setAudioDeviceLabel(
-					(await navigator.mediaDevices.enumerateDevices()).find(
-						(d) => d.deviceId === deviceId
-					)?.label
-				)
-				// this will fire if the device is disconnected
-				// in which case we will switch to whatever the
-				// default is.
-				audio.addEventListener('ended', () => {
-					setAudioDeviceId(undefined)
-				})
-
-				const audioTrack = suppressNoise ? noiseSuppression(audio) : audio
-
-				setAudioStreamTrack((prevAudio) => {
-					// release previous audio input device if
-					// there was one
-					if (prevAudio) prevAudio.stop()
-					return audioTrack
-				})
-				setAudioUnavailableReason(undefined)
+	const suppressNoiseEnabled$ = useStateObservable(suppressNoise)
+	const audioTrack$ = useMemo(() => {
+		return combineLatest([
+			getUserMediaTrack$('audioinput').pipe(
+				tap({
+					error: (e) => {
+						invariant(e instanceof Error)
+						setAudioUnavailableReason(
+							e.name in errorMessageMap
+								? (e.name as UserMediaError)
+								: 'UnknownError'
+						)
+					},
+				}),
+				catchError(() => of(undefined))
+			),
+			suppressNoiseEnabled$,
+		]).pipe(
+			switchMap(([track, suppressNoise]) =>
+				of(suppressNoise && track ? noiseSuppression(track) : track)
+			),
+			shareReplay({
+				refCount: true,
+				bufferSize: 1,
 			})
-			.catch((e: Error) => {
-				if (!mounted) return
-				setAudioEnabled(false)
-				invariant(keyInObject(errorMessageMap, e.name))
-				setAudioUnavailableReason(e.name)
-			})
-
-		getUserMediaExtended({
-			audio: audioDeviceId ? { deviceId: audioDeviceId } : true,
-		}).then((ms) => {
-			if (!mounted) {
-				ms.getTracks().forEach((t) => t.stop())
-				return
-			}
-			const [mutedTrack] = ms.getAudioTracks()
-			mutedTrack.enabled = false
-			setMutedAudioStreamTrack(mutedTrack)
-		})
-		return () => {
-			mounted = false
-		}
-	}, [
-		suppressNoise,
-		audioDeviceId,
-		setAudioDeviceId,
-		audioDeviceLabel,
-		setAudioDeviceLabel,
-	])
+		)
+	}, [suppressNoiseEnabled$])
 
 	useUnmount(() => {
-		audioStreamTrack?.stop()
-		mutedAudioStreamTrack?.stop()
-		videoStreamTrack?.stop()
 		screenShareStream?.getTracks().forEach((t) => t.stop())
 	})
 
@@ -139,73 +135,6 @@ export default function useUserMedia(mode: Mode) {
 	const turnCameraOff = () => {
 		setVideoEnabled(false)
 	}
-
-	useEffect(() => {
-		let mounted = true
-		if (videoEnabled) {
-			getUserMediaExtended({
-				video: videoDeviceId
-					? { deviceId: videoDeviceId, label: videoDeviceLabel }
-					: true,
-			})
-				.then(async (ms) => {
-					if (!mounted) {
-						ms.getTracks().forEach((t) => t.stop())
-						return
-					}
-					const sourceTrack = ms.getVideoTracks()[0]
-					const { deviceId } = sourceTrack.getSettings()
-					setVideoDeviceId(deviceId)
-					setVideoDeviceLabel(
-						(await navigator.mediaDevices.enumerateDevices()).find(
-							(d) => d.deviceId === deviceId
-						)?.label
-					)
-
-					sourceTrack.addEventListener('ended', () => {
-						setVideoDeviceId(undefined)
-					})
-
-					const videoTrack = blurVideo
-						? await blurVideoTrack(sourceTrack)
-						: sourceTrack
-
-					setVideoStreamTrack((oldTrack) => {
-						if (oldTrack) {
-							oldTrack.stop()
-						}
-						return videoTrack
-					})
-					setVideoUnavailableReason(undefined)
-				})
-				.catch((e: Error) => {
-					if (!mounted) return
-					setVideoEnabled(false)
-					invariant(keyInObject(errorMessageMap, e.name))
-					setVideoUnavailableReason(e.name)
-				})
-		} else {
-			setVideoStreamTrack((oldTrack) => {
-				if (oldTrack) {
-					const newTrack = blackCanvasStreamTrack(oldTrack)
-					oldTrack.stop()
-					return newTrack
-				} else {
-					return undefined
-				}
-			})
-		}
-		return () => {
-			mounted = false
-		}
-	}, [
-		blurVideo,
-		setVideoDeviceId,
-		setVideoDeviceLabel,
-		videoDeviceId,
-		videoDeviceLabel,
-		videoEnabled,
-	])
 
 	const startScreenShare = () => {
 		navigator.mediaDevices
@@ -239,21 +168,32 @@ export default function useUserMedia(mode: Mode) {
 		setScreenShareStream(undefined)
 	}
 
-	const videoTrack = useMemo(
-		() =>
-			videoEnabled || !videoStreamTrack
-				? videoStreamTrack
-				: blackCanvasStreamTrack(videoStreamTrack),
-		[videoEnabled, videoStreamTrack]
-	)
-
 	const screenShareVideoTrack = screenShareStream?.getVideoTracks()[0]
+
+	const setVideoDeviceId = (deviceId: string) =>
+		navigator.mediaDevices.enumerateDevices().then((devices) => {
+			const device = devices.find((d) => d.deviceId === deviceId)
+			if (device) prependDeviceToPrioritizeList(device)
+		})
+
+	const setAudioDeviceId = (deviceId: string) =>
+		navigator.mediaDevices.enumerateDevices().then((devices) => {
+			const device = devices.find((d) => d.deviceId === deviceId)
+			if (device) prependDeviceToPrioritizeList(device)
+		})
+
+	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
+	const mutedAudioStreamTrack = useMemo(() => createEmptyAudioTrack(), [])
+	const videoDeviceId = videoTrack?.getSettings().deviceId
+	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
 
 	return {
 		turnMicOn,
 		turnMicOff,
-		audioStreamTrack: audioEnabled ? audioStreamTrack : mutedAudioStreamTrack,
-		audioMonitorStreamTrack: audioStreamTrack,
+		audioStreamTrack: audioEnabled
+			? alwaysOnAudioStreamTrack
+			: mutedAudioStreamTrack,
+		audioMonitorStreamTrack: alwaysOnAudioStreamTrack,
 		audioEnabled,
 		audioUnavailableReason,
 		turnCameraOn,
@@ -274,6 +214,7 @@ export default function useUserMedia(mode: Mode) {
 		setBlurVideo,
 		suppressNoise,
 		setSuppressNoise,
+		videoTrack$,
 	}
 }
 

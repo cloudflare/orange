@@ -72,7 +72,7 @@ export default function Lobby() {
 				</div>
 				{(userMedia.audioUnavailableReason ||
 					userMedia.videoUnavailableReason) && (
-					<div className="p-3 rounded-md text-zinc-800 bg-zinc-200 dark:text-zinc-200 dark:bg-zinc-700">
+					<div className="p-3 rounded-md text-sm text-zinc-800 bg-zinc-200 dark:text-zinc-200 dark:bg-zinc-700">
 						{userMedia.audioUnavailableReason === 'NotAllowedError' &&
 							userMedia.videoUnavailableReason === undefined && (
 								<p>Mic permission was denied.</p>
@@ -94,6 +94,18 @@ export default function Lobby() {
 									: ''}{' '}
 								and reload the page to join.
 							</p>
+						)}
+						{userMedia.audioUnavailableReason === 'DevicesExhaustedError' && (
+							<p>No working microphone found.</p>
+						)}
+						{userMedia.videoUnavailableReason === 'DevicesExhaustedError' && (
+							<p>No working webcam found.</p>
+						)}
+						{userMedia.audioUnavailableReason === 'UnknownError' && (
+							<p>Unknown microphone error.</p>
+						)}
+						{userMedia.videoUnavailableReason === 'UnknownError' && (
+							<p>Unknown webcam error.</p>
 						)}
 					</div>
 				)}
