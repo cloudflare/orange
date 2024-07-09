@@ -16,6 +16,8 @@ export default function noiseSuppression(
 		suppressor.stopEffect()
 		MediaStreamTrack.prototype.stop.call(originalAudioStreamTrack)
 	}
+	noiseSuppressedTrack.getSettings = () =>
+		originalAudioStreamTrack.getSettings()
 	return noiseSuppressedTrack
 }
 

@@ -80,5 +80,7 @@ export default async function blurVideoTrack(
 		blurredTrack.dispatchEvent(e)
 	})
 
+	blurredTrack.getSettings = () => originalVideoStreamTrack.getSettings()
+
 	return blurredTrack
 }
