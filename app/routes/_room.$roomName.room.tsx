@@ -275,16 +275,23 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 							userMedia.audioStreamTrack &&
 							userMedia.videoStreamTrack &&
 							fakeUsers.map((uid) => (
-								<Participant
-									user={identity}
-									isSelf
-									videoTrack={userMedia.videoStreamTrack}
-									audioTrack={userMedia.audioStreamTrack}
-									key={uid}
-									flipId={uid.toString()}
-									pinnedId={pinnedId}
-									setPinnedId={setPinnedId}
-								></Participant>
+								<PullVideoTrack
+									video={identity.tracks.video}
+									audio={identity.tracks.audio}
+								>
+									{({ videoTrack }) => (
+										<Participant
+											user={identity}
+											isSelf
+											videoTrack={videoTrack}
+											audioTrack={userMedia.audioStreamTrack}
+											key={uid}
+											flipId={uid.toString()}
+											pinnedId={pinnedId}
+											setPinnedId={setPinnedId}
+										></Participant>
+									)}
+								</PullVideoTrack>
 							))}
 					</div>
 					<Toast.Viewport />
