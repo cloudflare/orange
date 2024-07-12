@@ -2,21 +2,29 @@ import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
 import { useMemo, useState } from 'react'
+import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
 import { Icon } from '~/components/Icon/Icon'
+import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
-import usePushedTrack from '~/hooks/usePushedTrack'
 import useRoom from '~/hooks/useRoom'
 import type { RoomContextType } from '~/hooks/useRoomContext'
+import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
+import type { TrackObject } from '~/utils/callsTypes'
 import { getIceServers } from '~/utils/getIceServers.server'
 
 function numberOrUndefined(value: unknown): number | undefined {
 	const num = Number(value)
 	return isNaN(num) ? undefined : num
+}
+
+function trackObjectToString(trackObject?: TrackObject) {
+	if (!trackObject) return undefined
+	return trackObject.sessionId + '/' + trackObject.trackName
 }
 
 export const loader = async ({ context }: LoaderFunctionArgs) => {
@@ -107,6 +115,7 @@ function Room() {
 	const { peer, debugInfo, iceConnectionState } = usePeerConnection({
 		apiExtraParams,
 		iceServers,
+		apiBase: '/api/calls',
 	})
 
 	const scaleResolutionDownBy = useMemo(() => {
@@ -117,18 +126,44 @@ function Room() {
 		return Math.max(smallestDimension / maxWebcamQualityLevel, 1)
 	}, [maxWebcamQualityLevel, userMedia.videoStreamTrack])
 
-	const pushedVideoTrack = usePushedTrack(peer, userMedia.videoStreamTrack, {
-		maxFramerate: maxWebcamFramerate,
-		maxBitrate: maxWebcamBitrate,
-		scaleResolutionDownBy,
-	})
-	const pushedAudioTrack = usePushedTrack(peer, userMedia.audioStreamTrack, {
-		priority: 'high',
-	})
-	const pushedScreenSharingTrack = usePushedTrack(
-		peer,
-		userMedia.screenShareVideoTrack
+	const videoEncodingParams = useStablePojo<RTCRtpEncodingParameters[]>([
+		{
+			maxFramerate: maxWebcamFramerate,
+			maxBitrate: maxWebcamBitrate,
+			scaleResolutionDownBy,
+		},
+	])
+	const videoTrackEncodingParams$ =
+		useStateObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
+	const pushedVideoTrack$ = useMemo(
+		() => peer.pushTrack(userMedia.videoTrack$, videoTrackEncodingParams$),
+		[videoTrackEncodingParams$]
 	)
+
+	const pushedVideoTrack = useSubscribedState(pushedVideoTrack$)
+
+	const pushedAudioTrack$ = useMemo(
+		() =>
+			peer.pushTrack(
+				userMedia.publicAudioTrack$,
+				of<RTCRtpEncodingParameters[]>([
+					{
+						networkPriority: 'high',
+					},
+				])
+			),
+		[]
+	)
+	const pushedAudioTrack = useSubscribedState(pushedAudioTrack$)
+
+	const pushedScreenSharingTrack$ = useMemo(() => {
+		return userMedia.screenShareVideoTrack$.pipe(
+			switchMap((track) =>
+				track ? from(peer.pushTrack(of(track))) : of(undefined)
+			)
+		)
+	}, [peer, userMedia.screenShareVideoTrack$])
+	const pushedScreenSharingTrack = useSubscribedState(pushedScreenSharingTrack$)
 
 	const context: RoomContextType = {
 		joined,
@@ -142,9 +177,9 @@ function Room() {
 		iceConnectionState,
 		room,
 		pushedTracks: {
-			video: pushedVideoTrack,
-			audio: pushedAudioTrack,
-			screenshare: pushedScreenSharingTrack,
+			video: trackObjectToString(pushedVideoTrack),
+			audio: trackObjectToString(pushedAudioTrack),
+			screenshare: trackObjectToString(pushedScreenSharingTrack),
 		},
 	}
 

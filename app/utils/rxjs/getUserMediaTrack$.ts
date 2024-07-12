@@ -46,7 +46,6 @@ export function getUserMediaTrack$(
 							const cleanupRef = { current: () => {} }
 							acquireTrack(subscriber, device, constraints, cleanupRef)
 							return () => {
-								console.log('🛑 Errored or no subscribers, stopping...')
 								cleanupRef.current()
 							}
 						})
@@ -80,7 +79,7 @@ function acquireTrack(
 					: mediaStream.getAudioTracks()[0]
 			if (await trackIsHealthy(track)) {
 				const cleanup = () => {
-					console.log('Cleaning up...')
+					console.log('🛑 Stopping track')
 					track.stop()
 					document.removeEventListener('visibilitychange', onVisibleHandler)
 				}

@@ -1,42 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { PeerDebugInfo } from '~/utils/Peer.client'
-import Peer from '~/utils/Peer.client'
+import { RxjsPeer, type PeerConfig } from '~/utils/rxjs/RxjsPeer.client'
+import { useSubscribedState } from './rxjsHooks'
 import { useStablePojo } from './useStablePojo'
 
-export const usePeerConnection = (config: {
-	apiExtraParams?: string
-	iceServers?: RTCIceServer[]
-}) => {
-	const [peer, setPeer] = useState<Peer | null>(null)
-	const [debugInfo, setDebugInfo] = useState<PeerDebugInfo>()
+export const usePeerConnection = (config: PeerConfig) => {
+	const stableConfig = useStablePojo(config)
+	const peer = useMemo(() => new RxjsPeer(stableConfig), [stableConfig])
+	const peerConnection = useSubscribedState(peer.peerConnection$)
+
+	const [debugInfo, _setDebugInfo] = useState<PeerDebugInfo>()
 	const [iceConnectionState, setIceConnectionState] =
 		useState<RTCIceConnectionState>('new')
 
-	const stableConfig = useStablePojo(config)
-
 	useEffect(() => {
-		const p = new Peer(stableConfig)
-		setPeer(p)
-		const debugHandler = () => {
-			setDebugInfo(p.getDebugInfo())
-		}
+		if (!peerConnection) return
+		setIceConnectionState(peerConnection.iceConnectionState)
+		// const debugHandler = () => {
+		// 	setDebugInfo(p.getDebugInfo())
+		// }
 		const iceConnectionStateChangeHandler = () => {
-			setIceConnectionState(p.pc.iceConnectionState)
+			setIceConnectionState(peerConnection.iceConnectionState)
 		}
-		p.pc.addEventListener(
+		peerConnection.addEventListener(
 			'iceconnectionstatechange',
 			iceConnectionStateChangeHandler
 		)
-		p.history.addEventListener('logentry', debugHandler)
+		// p.history.addEventListener('logentry', debugHandler)
 		return () => {
-			p.history.removeEventListener('logentry', debugHandler)
-			p.pc.removeEventListener(
+			// p.history.removeEventListener('logentry', debugHandler)
+			peerConnection.removeEventListener(
 				'connectionstatechange',
 				iceConnectionStateChangeHandler
 			)
-			p.destroy()
+			// p.destroy()
 		}
-	}, [stableConfig])
+	}, [peerConnection])
 
 	return { peer, debugInfo, iceConnectionState }
 }

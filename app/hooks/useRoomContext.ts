@@ -1,8 +1,8 @@
 import { useOutletContext } from '@remix-run/react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { UserMedia } from '~/hooks/useUserMedia'
-import type Peer from '~/utils/Peer.client'
 import type { PeerDebugInfo } from '~/utils/Peer.client'
+import type { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
 import type useRoom from './useRoom'
 
 export type RoomContextType = {
@@ -12,7 +12,7 @@ export type RoomContextType = {
 	joined: boolean
 	setJoined: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
-	peer: Peer | null
+	peer: RxjsPeer
 	peerDebugInfo?: PeerDebugInfo
 	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
