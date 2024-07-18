@@ -58,6 +58,28 @@ export class RxjsPeer {
 					}
 				})
 
+				let iceTimeout = -1
+				peerConnection.addEventListener('iceconnectionstatechange', () => {
+					clearTimeout(iceTimeout)
+					if (
+						peerConnection.iceConnectionState === 'failed' ||
+						peerConnection.iceConnectionState === 'closed'
+					) {
+						console.debug(
+							`💥 Peer iceConnectionState is ${peerConnection.iceConnectionState}`
+						)
+						subscribe.next(setup())
+					} else if (peerConnection.iceConnectionState === 'disconnected') {
+						const timeoutSeconds = 3
+						iceTimeout = window.setTimeout(() => {
+							console.debug(
+								`💥 Peer iceConnectionState was ${peerConnection.iceConnectionState} for more than ${timeoutSeconds} seconds`
+							)
+							subscribe.next(setup())
+						}, timeoutSeconds * 1000)
+					}
+				})
+
 				// TODO: Remove this
 				Object.assign(window, {
 					explode: () => {
