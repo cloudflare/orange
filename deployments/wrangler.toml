@@ -3,7 +3,8 @@ name = "orange-meets"
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
-compatibility_date = "2022-04-05"
+compatibility_date = "2024-06-20"
+compatibility_flags = ["nodejs_compat"]
 
 [site]
   bucket = "./public"
