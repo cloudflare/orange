@@ -60,14 +60,16 @@ export function getPacketLossStats$(
 			})
 
 			if (inboundPacketsReceived > 0) {
-				const packetLossPercentage = inboundPacketsLost / inboundPacketsReceived
+				const packetLossPercentage =
+					inboundPacketsLost / (inboundPacketsReceived + inboundPacketsLost)
 				inboundPacketLossPercentageEwma.insert(
 					Math.max(0, packetLossPercentage)
 				)
 			}
 
 			if (outboundPacketsSent > 0) {
-				const packetLossPercentage = outboundPacketsLost / outboundPacketsSent
+				const packetLossPercentage =
+					outboundPacketsLost / (outboundPacketsSent + outboundPacketsLost)
 				outboundPacketLossPercentageEwma.insert(
 					Math.max(0, packetLossPercentage)
 				)
