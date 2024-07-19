@@ -25,6 +25,17 @@ export const AudioStream: FC<AudioStreamProps> = ({
 		audio.srcObject = mediaStream
 	}, [])
 
+	const resetSrcObject = () => {
+		const audio = ref.current
+		const mediaStream = mediaStreamRef.current
+		if (!audio || !mediaStream) return
+		// need to set srcObject again in Chrome and call play() again for Safari
+		// https://www.youtube.com/live/Tkx3OGrwVk8?si=K--P_AzNnAGrjraV&t=2533
+		// calling play() this way to make Chrome happy otherwise it throws an error
+		audio.addEventListener('canplay', () => audio.play(), { once: true })
+		audio.srcObject = mediaStream
+	}
+
 	return (
 		<>
 			<audio ref={ref} autoPlay />
@@ -33,8 +44,14 @@ export const AudioStream: FC<AudioStreamProps> = ({
 					key={track}
 					track={track}
 					mediaStream={mediaStreamRef.current}
-					onTrackAdded={onTrackAdded}
-					onTrackRemoved={onTrackRemoved}
+					onTrackAdded={(metadata, track) => {
+						onTrackAdded(metadata, track)
+						resetSrcObject()
+					}}
+					onTrackRemoved={(metadata, track) => {
+						onTrackRemoved(metadata, track)
+						resetSrcObject()
+					}}
 				/>
 			))}
 		</>
