@@ -33,7 +33,7 @@ export default function Index() {
 	return (
 		<div className="flex flex-col items-center justify-center h-full p-4 mx-auto">
 			<div className="flex-1"></div>
-			<div className="space-y-6">
+			<div className="space-y-6 md:min-w-96">
 				<div>
 					<h1 className="text-3xl font-bold">🍊 Orange Meets</h1>
 					<div className="flex items-center justify-between gap-3">
@@ -71,7 +71,10 @@ export default function Index() {
 					<summary className="text-zinc-500 dark:text-zinc-400">
 						Or join a room
 					</summary>
-					<Form className="flex items-end w-full gap-4 pt-4" method="post">
+					<Form
+						className="flex items-end gap-4 md:justify-between items-end w-full pt-4"
+						method="post"
+					>
 						<div className="space-y-2">
 							<Label htmlFor="room">Room name</Label>
 							<Input name="room" id="room" required />
