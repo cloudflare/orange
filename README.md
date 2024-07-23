@@ -55,6 +55,10 @@ wrangler login
 ```sh
 wrangler secret put CALLS_APP_SECRET
 ```
+or to programmatically set the secret, run:
+```sh
+echo REPLACE_WITH_YOUR_SECRET | wrangler secret put CALLS_APP_SECRET
+```
 
 4. Then you can run
 
