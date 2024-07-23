@@ -35,6 +35,7 @@ To customise these variables, place replacement values in `.dev.vars` (for devel
 ## Development
 
 ```sh
+npm install
 npm run dev
 ```
 
