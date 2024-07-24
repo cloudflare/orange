@@ -32,18 +32,16 @@ export const ReportBugDialog: FC<ReportBugDialogProps> = ({ onOpenChange }) => {
 	)
 }
 
-const ReportBugForm: FC = () => {
+const ReportBugForm: FC<{}> = () => {
 	const { Form, data, state } = useFetcher()
-	const { room, peerDebugInfo } = useRoomContext()
+	const { room, roomHistory } = useRoomContext()
 	const { roomName } = useParams()
-
-	const { roomState, identity } = room
+	const { identity } = room
 
 	const info: BugReportInfo = {
-		roomState,
 		roomName,
 		identity,
-		peerDebugInfo,
+		roomHistory,
 		url: typeof location !== 'undefined' ? location.href : undefined,
 	}
 

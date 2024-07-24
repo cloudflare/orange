@@ -36,7 +36,9 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	return json({
 		username,
 		bugReportsEnabled: Boolean(
-			context.env.FEEDBACK_QUEUE && context.env.FEEDBACK_URL
+			context.env.FEEDBACK_URL &&
+				context.env.FEEDBACK_QUEUE &&
+				context.env.FEEDBACK_STORAGE
 		),
 		mode: context.mode,
 	})

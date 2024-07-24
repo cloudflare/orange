@@ -12,6 +12,7 @@ import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
 import type { RoomContextType } from '~/hooks/useRoomContext'
+import { useRoomHistory } from '~/hooks/useRoomHistory'
 import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
 import type { TrackObject } from '~/utils/callsTypes'
@@ -36,6 +37,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 			MAX_WEBCAM_FRAMERATE,
 			MAX_WEBCAM_BITRATE,
 			MAX_WEBCAM_QUALITY_LEVEL,
+			MAX_API_HISTORY,
 		},
 	} = context
 
@@ -45,12 +47,15 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		traceLink: TRACE_LINK,
 		apiExtraParams: API_EXTRA_PARAMS,
 		iceServers: await getIceServers(context.env),
-		feedbackEnabled:
-			context.env.FEEDBACK_QUEUE !== undefined &&
-			context.env.FEEDBACK_URL !== undefined,
+		feedbackEnabled: Boolean(
+			context.env.FEEDBACK_URL &&
+				context.env.FEEDBACK_QUEUE &&
+				context.env.FEEDBACK_STORAGE
+		),
 		maxWebcamFramerate: numberOrUndefined(MAX_WEBCAM_FRAMERATE),
 		maxWebcamBitrate: numberOrUndefined(MAX_WEBCAM_BITRATE),
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),
+		maxApiHistory: numberOrUndefined(MAX_API_HISTORY),
 	})
 }
 
@@ -108,15 +113,18 @@ function Room() {
 		maxWebcamBitrate = 1_200_000,
 		maxWebcamFramerate = 24,
 		maxWebcamQualityLevel = 1080,
+		maxApiHistory = 100,
 	} = useLoaderData<typeof loader>()
 
 	const userMedia = useUserMedia(mode)
 	const room = useRoom({ roomName, userMedia })
-	const { peer, debugInfo, iceConnectionState } = usePeerConnection({
+	const { peer, iceConnectionState } = usePeerConnection({
+		maxApiHistory,
 		apiExtraParams,
 		iceServers,
 		apiBase: '/api/calls',
 	})
+	const roomHistory = useRoomHistory(peer, room)
 
 	const scaleResolutionDownBy = useMemo(() => {
 		const videoStreamTrack = userMedia.videoStreamTrack
@@ -173,7 +181,7 @@ function Room() {
 		userDirectoryUrl,
 		feedbackEnabled,
 		peer,
-		peerDebugInfo: debugInfo,
+		roomHistory,
 		iceConnectionState,
 		room,
 		pushedTracks: {

@@ -15,20 +15,36 @@ import {
 	withLatestFrom,
 } from 'rxjs'
 import invariant from 'tiny-invariant'
-import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 import type {
 	RenegotiationResponse,
 	TrackObject,
 	TracksResponse,
 } from '../callsTypes'
+import { History } from '../History'
+import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 
 export interface PeerConfig {
 	apiExtraParams?: string
 	iceServers?: RTCIceServer[]
 	apiBase: string
+	maxApiHistory?: number
 }
 
+export type ApiHistoryEntry =
+	| {
+			type: 'request'
+			method: string
+			endpoint: string
+			body: unknown
+	  }
+	| {
+			type: 'response'
+			endpoint: string
+			body: unknown
+	  }
+
 export class RxjsPeer {
+	history: History<ApiHistoryEntry>
 	peerConnection$: Observable<RTCPeerConnection>
 	session$: Observable<{
 		peerConnection: RTCPeerConnection
@@ -39,6 +55,7 @@ export class RxjsPeer {
 
 	constructor(config: PeerConfig) {
 		this.config = config
+		this.history = new History<ApiHistoryEntry>(config.maxApiHistory)
 		this.peerConnection$ = new Observable<RTCPeerConnection>((subscribe) => {
 			let peerConnection: RTCPeerConnection
 			const setup = () => {
@@ -151,15 +168,13 @@ export class RxjsPeer {
 		const { apiBase } = this.config
 		// create an offer and set it as the local description
 		await peerConnection.setLocalDescription(await peerConnection.createOffer())
-		const { sessionId, sessionDescription } = await fetch(
-			`${apiBase}/sessions/new?SESSION`,
-			{
+		const { sessionId, sessionDescription } =
+			await this.fetchWithRecordedHistory(`${apiBase}/sessions/new?SESSION`, {
 				method: 'POST',
 				body: JSON.stringify({
 					sessionDescription: peerConnection.localDescription,
 				}),
-			}
-		).then((res) => res.json() as any)
+			}).then((res) => res.json() as any)
 		const connected = new Promise((res, rej) => {
 			// timeout after 5s
 			setTimeout(rej, 5000)
@@ -185,6 +200,26 @@ export class RxjsPeer {
 		return { peerConnection, sessionId }
 	}
 
+	async fetchWithRecordedHistory(path: string, requestInit?: RequestInit) {
+		this.history.log({
+			endpoint: path,
+			method: requestInit?.method ?? 'get',
+			type: 'request',
+			body:
+				typeof requestInit?.body === 'string'
+					? JSON.parse(requestInit.body)
+					: undefined,
+		})
+		const response = await fetch(path, requestInit)
+		const responseBody = await response.clone().json()
+		this.history.log({
+			endpoint: path,
+			type: 'response',
+			body: responseBody,
+		})
+		return response
+	}
+
 	#pushTrackInBulk(
 		peerConnection: RTCPeerConnection,
 		transceiver: RTCRtpTransceiver,
@@ -205,21 +240,22 @@ export class RxjsPeer {
 								await peerConnection.createOffer()
 							)
 
-							const response = await fetch(
+							const requestBody = {
+								sessionDescription: {
+									sdp: peerConnection.localDescription?.sdp,
+									type: 'offer',
+								},
+								tracks: tracks.map(({ trackName, transceiver }) => ({
+									trackName,
+									mid: transceiver.mid,
+									location: 'local',
+								})),
+							}
+							const response = await this.fetchWithRecordedHistory(
 								`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PUSHING`,
 								{
 									method: 'POST',
-									body: JSON.stringify({
-										sessionDescription: {
-											sdp: peerConnection.localDescription?.sdp,
-											type: 'offer',
-										},
-										tracks: tracks.map(({ trackName, transceiver }) => ({
-											trackName,
-											mid: transceiver.mid,
-											location: 'local',
-										})),
-									}),
+									body: JSON.stringify(requestBody),
 								}
 							).then((res) => res.json() as Promise<TracksResponse>)
 							invariant(response.tracks !== undefined)
@@ -346,15 +382,16 @@ export class RxjsPeer {
 				pulledTrackPromise = this.pullTrackDispatcher
 					.doBulkRequest(trackData, (tracks) =>
 						this.taskScheduler.schedule(async () => {
-							const newTrackResponse: TracksResponse = await fetch(
-								`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PULLING`,
-								{
-									method: 'POST',
-									body: JSON.stringify({
-										tracks,
-									}),
-								}
-							).then((res) => res.json() as Promise<TracksResponse>)
+							const newTrackResponse: TracksResponse =
+								await this.fetchWithRecordedHistory(
+									`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PULLING`,
+									{
+										method: 'POST',
+										body: JSON.stringify({
+											tracks,
+										}),
+									}
+								).then((res) => res.json() as Promise<TracksResponse>)
 							if (newTrackResponse.errorCode) {
 								throw new Error(newTrackResponse.errorDescription)
 							}
@@ -386,18 +423,19 @@ export class RxjsPeer {
 								const answer = await peerConnection.createAnswer()
 								await peerConnection.setLocalDescription(answer)
 
-								const renegotiationResponse = await fetch(
-									`${this.config.apiBase}/sessions/${sessionId}/renegotiate`,
-									{
-										method: 'PUT',
-										body: JSON.stringify({
-											sessionDescription: {
-												type: 'answer',
-												sdp: peerConnection.currentLocalDescription?.sdp,
-											},
-										}),
-									}
-								).then((res) => res.json() as Promise<RenegotiationResponse>)
+								const renegotiationResponse =
+									await this.fetchWithRecordedHistory(
+										`${this.config.apiBase}/sessions/${sessionId}/renegotiate`,
+										{
+											method: 'PUT',
+											body: JSON.stringify({
+												sessionDescription: {
+													type: 'answer',
+													sdp: peerConnection.currentLocalDescription?.sdp,
+												},
+											}),
+										}
+									).then((res) => res.json() as Promise<RenegotiationResponse>)
 								if (renegotiationResponse.errorCode)
 									throw new Error(renegotiationResponse.errorDescription)
 							}
@@ -481,7 +519,7 @@ export class RxjsPeer {
 			},
 			force: false,
 		}
-		const response = await fetch(
+		const response = await this.fetchWithRecordedHistory(
 			`${apiBase}/sessions/${sessionId}/tracks/close`,
 			{
 				method: 'PUT',
