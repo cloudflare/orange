@@ -49,7 +49,7 @@ export const Participant = forwardRef<
 		useDeadPulledTrackMonitor(
 			user.tracks.video,
 			user.transceiverSessionId,
-			user.tracks.videoEnabled,
+			!!user.tracks.video,
 			videoTrack,
 			user.name
 		)
@@ -57,7 +57,7 @@ export const Participant = forwardRef<
 		useDeadPulledTrackMonitor(
 			user.tracks.audio,
 			user.transceiverSessionId,
-			user.tracks.audioEnabled,
+			!!user.tracks.audio,
 			audioTrack,
 			user.name
 		)
@@ -84,50 +84,53 @@ export const Participant = forwardRef<
 								: 'relative max-w-[--participant-max-width] rounded-xl'
 						)}
 					>
-						<div
-							className={cn(
-								'absolute inset-0 h-full w-full grid place-items-center'
-							)}
-						>
-							<div className="h-[2em] w-[2em] grid place-items-center text-4xl md:text-6xl 2xl:text-8xl relative">
-								{data?.photob64 ? (
-									<div>
-										<AudioGlow
-											className="absolute inset-0 w-full h-full rounded-full"
-											audioTrack={audioTrack}
-											type="box"
-										></AudioGlow>
-										<img
-											className="rounded-full"
-											src={`data:image/png;base64,${data.photob64}`}
-											alt={data.displayName}
-										/>
-									</div>
-								) : (
-									<span className="relative grid w-full h-full uppercase rounded-full place-items-center bg-zinc-500">
-										{user.speaking && (
-											<AudioGlow
-												type="text"
-												className="absolute uppercase"
-												audioTrack={audioTrack}
-											>
-												{user.name.charAt(0)}
-											</AudioGlow>
-										)}
-										{user.name.charAt(0)}
-									</span>
+						{!isScreenShare && (
+							<div
+								className={cn(
+									'absolute inset-0 h-full w-full grid place-items-center'
 								)}
+							>
+								<div className="h-[2em] w-[2em] grid place-items-center text-4xl md:text-6xl 2xl:text-8xl relative">
+									{data?.photob64 ? (
+										<div>
+											<AudioGlow
+												className="absolute inset-0 w-full h-full rounded-full"
+												audioTrack={audioTrack}
+												type="box"
+											></AudioGlow>
+											<img
+												className="rounded-full"
+												src={`data:image/png;base64,${data.photob64}`}
+												alt={data.displayName}
+											/>
+										</div>
+									) : (
+										<span className="relative grid w-full h-full uppercase rounded-full place-items-center bg-zinc-500">
+											{user.speaking && (
+												<AudioGlow
+													type="text"
+													className="absolute uppercase"
+													audioTrack={audioTrack}
+												>
+													{user.name.charAt(0)}
+												</AudioGlow>
+											)}
+											{user.name.charAt(0)}
+										</span>
+									)}
+								</div>
 							</div>
-						</div>
+						)}
 						<VideoSrcObject
 							className={cn(
 								'absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity',
-								isSelf && '-scale-x-100',
+								isSelf && !isScreenShare && '-scale-x-100',
 								{
 									'opacity-100': isScreenShare
 										? user.tracks.screenShareEnabled
 										: user.tracks.videoEnabled,
-								}
+								},
+								isSelf && isScreenShare && 'opacity-75'
 							)}
 							videoTrack={videoTrack}
 						/>

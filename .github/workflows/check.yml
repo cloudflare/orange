@@ -1,0 +1,24 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  prerelease:
+    timeout-minutes: 5
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - run: npm ci
+      - run: npm run build
+
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:ci

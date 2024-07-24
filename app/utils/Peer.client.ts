@@ -207,12 +207,12 @@ export default class Peer {
 			setTimeout(() => resolve(true), iceGathertingTimeout)
 			if (this.params.iceTrickleEnabled) {
 				// if ice trickle enabled, gathering is ready when it gets the first candidate
-				this.pc.addEventListener('icecandidate', (e) => {
+				this.pc.addEventListener('icecandidate', (_e) => {
 					resolve(true)
 					// send ICE trickle update here
 				})
 			}
-			this.pc.onicegatheringstatechange = (ev) => {
+			this.pc.onicegatheringstatechange = (_ev) => {
 				if (this.pc.iceGatheringState === 'complete') {
 					resolve(true)
 				}
@@ -432,8 +432,8 @@ export default class Peer {
 						let trackPromises = response.tracks.map((track) => {
 							if (track.mid) {
 								return this.#resolveTrack(track.mid)
-							}
-						})
+							} else return undefined
+						}) // todo: should this be filtered to remove undefined?
 						if (response.requiresImmediateRenegotiation) {
 							await this.pc.setRemoteDescription(
 								new RTCSessionDescription(response.sessionDescription)

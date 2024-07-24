@@ -1,42 +1,36 @@
-import { useEffect, useState } from 'react'
-import type { PeerDebugInfo } from '~/utils/Peer.client'
-import Peer from '~/utils/Peer.client'
+import { useEffect, useMemo, useState } from 'react'
+import { RxjsPeer, type PeerConfig } from '~/utils/rxjs/RxjsPeer.client'
+import { useSubscribedState } from './rxjsHooks'
 import { useStablePojo } from './useStablePojo'
 
-export const usePeerConnection = (config: {
-	apiExtraParams?: string
-	iceServers?: RTCIceServer[]
-}) => {
-	const [peer, setPeer] = useState<Peer | null>(null)
-	const [debugInfo, setDebugInfo] = useState<PeerDebugInfo>()
+export const usePeerConnection = (config: PeerConfig) => {
+	const stableConfig = useStablePojo(config)
+	const peer = useMemo(() => new RxjsPeer(stableConfig), [stableConfig])
+	const peerConnection = useSubscribedState(peer.peerConnection$)
+
 	const [iceConnectionState, setIceConnectionState] =
 		useState<RTCIceConnectionState>('new')
 
-	const stableConfig = useStablePojo(config)
-
 	useEffect(() => {
-		const p = new Peer(stableConfig)
-		setPeer(p)
-		const debugHandler = () => {
-			setDebugInfo(p.getDebugInfo())
-		}
+		if (!peerConnection) return
+		setIceConnectionState(peerConnection.iceConnectionState)
 		const iceConnectionStateChangeHandler = () => {
-			setIceConnectionState(p.pc.iceConnectionState)
+			setIceConnectionState(peerConnection.iceConnectionState)
 		}
-		p.pc.addEventListener(
+		peerConnection.addEventListener(
 			'iceconnectionstatechange',
 			iceConnectionStateChangeHandler
 		)
-		p.history.addEventListener('logentry', debugHandler)
 		return () => {
-			p.history.removeEventListener('logentry', debugHandler)
-			p.pc.removeEventListener(
+			peerConnection.removeEventListener(
 				'connectionstatechange',
 				iceConnectionStateChangeHandler
 			)
-			p.destroy()
 		}
-	}, [stableConfig])
+	}, [peerConnection])
 
-	return { peer, debugInfo, iceConnectionState }
+	return {
+		peer,
+		iceConnectionState,
+	}
 }

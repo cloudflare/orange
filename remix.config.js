@@ -4,8 +4,10 @@ module.exports = {
 	ignoredRouteFiles: ['**/.*'],
 	server: './server.ts',
 	serverConditions: ['worker'],
-	serverDependenciesToBundle: [/^(?!__STATIC_CONTENT_MANIFEST).*$/],
-	serverMainFields: ['browser', 'module', 'main'],
+	serverDependenciesToBundle: [
+		/^(?!__STATIC_CONTENT_MANIFEST|cloudflare:workers).*$/,
+	],
+	serverMainFields: ['workerd', 'browser', 'module', 'main'],
 	serverMinify: true,
 	serverModuleFormat: 'esm',
 	serverPlatform: 'neutral',

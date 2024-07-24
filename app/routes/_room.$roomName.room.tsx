@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { useLoaderData, useNavigate, useParams } from '@remix-run/react'
+import { nanoid } from 'nanoid'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
@@ -34,7 +35,11 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
 	return json({
 		username,
-		bugReportsEnabled: Boolean(context.FEEDBACK_QUEUE && context.FEEDBACK_URL),
+		bugReportsEnabled: Boolean(
+			context.env.FEEDBACK_URL &&
+				context.env.FEEDBACK_QUEUE &&
+				context.env.FEEDBACK_STORAGE
+		),
 		mode: context.mode,
 	})
 }
@@ -50,7 +55,7 @@ function useGridDebugControls(
 ) {
 	const [enabled, setEnabled] = useState(defaultEnabled)
 	const [fakeUsers, setFakeUsers] = useState<string[]>(
-		Array.from({ length: initialCount }).map(() => crypto.randomUUID())
+		Array.from({ length: initialCount }).map(() => nanoid())
 	)
 
 	useEffect(() => {
@@ -71,9 +76,7 @@ function useGridDebugControls(
 		() =>
 			enabled ? (
 				<>
-					<Button
-						onClick={() => setFakeUsers((fu) => [...fu, crypto.randomUUID()])}
-					>
+					<Button onClick={() => setFakeUsers((fu) => [...fu, nanoid(14)])}>
 						<Icon type="PlusIcon" />
 					</Button>
 					<Button
@@ -121,7 +124,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		userMedia,
 		peer,
 		pushedTracks,
-		room: { otherUsers, signal, identity },
+		room: { otherUsers, websocket, identity },
 	} = useRoomContext()
 
 	const { GridDebugControls, fakeUsers } = useGridDebugControls({
@@ -148,7 +151,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	useBroadcastStatus({
 		userMedia,
 		peer,
-		signal,
+		websocket,
 		identity,
 		pushedTracks,
 		raisedHand,
@@ -229,6 +232,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 								<Participant
 									user={identity}
 									flipId={'identity user screenshare'}
+									isSelf
 									isScreenShare
 									videoTrack={userMedia.screenShareVideoTrack}
 									pinnedId={pinnedId}
@@ -273,16 +277,23 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 							userMedia.audioStreamTrack &&
 							userMedia.videoStreamTrack &&
 							fakeUsers.map((uid) => (
-								<Participant
-									user={identity}
-									isSelf
-									videoTrack={userMedia.videoStreamTrack}
-									audioTrack={userMedia.audioStreamTrack}
-									key={uid}
-									flipId={uid.toString()}
-									pinnedId={pinnedId}
-									setPinnedId={setPinnedId}
-								></Participant>
+								<PullVideoTrack
+									video={identity.tracks.video}
+									audio={identity.tracks.audio}
+								>
+									{({ videoTrack }) => (
+										<Participant
+											user={identity}
+											isSelf
+											videoTrack={videoTrack}
+											audioTrack={userMedia.audioStreamTrack}
+											key={uid}
+											flipId={uid.toString()}
+											pinnedId={pinnedId}
+											setPinnedId={setPinnedId}
+										></Participant>
+									)}
+								</PullVideoTrack>
 							))}
 					</div>
 					<Toast.Viewport />

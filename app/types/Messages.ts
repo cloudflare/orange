@@ -29,10 +29,6 @@ export type ServerMessage =
 			error?: string
 	  }
 	| {
-			type: 'identity'
-			id: string
-	  }
-	| {
 			type: 'directMessage'
 			from: string
 			message: string
@@ -40,12 +36,9 @@ export type ServerMessage =
 	| {
 			type: 'muteMic'
 	  }
-
-export type MessageFromServer = {
-	from: string
-	timestamp: number
-	message: ServerMessage
-}
+	| {
+			type: 'partyserver-pong'
+	  }
 
 export type ClientMessage =
 	| {
@@ -65,5 +58,5 @@ export type ClientMessage =
 			type: 'userLeft'
 	  }
 	| {
-			type: 'heartBeat'
+			type: 'partyserver-ping'
 	  }

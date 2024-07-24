@@ -1,5 +1,4 @@
 import type { FC } from 'react'
-import { useAudioInputDeviceId } from '~/hooks/globalPersistedState'
 import useMediaDevices from '~/hooks/useMediaDevices'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { errorMessageMap } from '~/hooks/useUserMedia'
@@ -7,10 +6,9 @@ import { Option, Select } from './Select'
 
 export const AudioInputSelector: FC<{ id?: string }> = ({ id }) => {
 	const audioInputDevices = useMediaDevices((d) => d.kind === 'audioinput')
-	const [audioDeviceId, setAudioDeviceId] = useAudioInputDeviceId()
 
 	const {
-		userMedia: { audioUnavailableReason },
+		userMedia: { audioUnavailableReason, audioDeviceId, setAudioDeviceId },
 	} = useRoomContext()
 
 	if (audioUnavailableReason) {

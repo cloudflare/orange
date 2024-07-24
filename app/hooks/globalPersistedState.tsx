@@ -14,7 +14,7 @@ function createGlobalPersistedState<T>(key: string, defaultValue: T) {
 
 		useEffect(() => {
 			setLocalStorageState(globalState)
-		}, [globalState])
+		}, [globalState, setLocalStorageState])
 
 		return [localStorageState, setGlobalState] as const
 	}

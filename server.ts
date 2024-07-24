@@ -12,6 +12,8 @@ import manifestJSON from '__STATIC_CONTENT_MANIFEST'
 import { mode } from '~/utils/mode'
 import { queue } from './app/queue'
 
+import type { Env } from '~/types/Env'
+
 const baseRemixHandler = createRequestHandler(build, mode)
 
 export const remixHandler = (request: Request, env: AppLoadContext) => {
@@ -99,10 +101,10 @@ export { queue } from './app/queue'
 const kvAssetHandler = createKvAssetHandler(JSON.parse(manifestJSON))
 
 export default {
-	async fetch(request: Request, env: any, ctx: any) {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const assetResponse = await kvAssetHandler(request, env, ctx, build)
 		if (assetResponse) return assetResponse
-		return remixHandler(request, env)
+		return remixHandler(request, { env, mode })
 	},
 	queue,
 }

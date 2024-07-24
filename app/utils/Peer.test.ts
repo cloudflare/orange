@@ -1,3 +1,4 @@
+/* eslint-disable no-loop-func */
 import { expect, test } from 'vitest'
 import { BulkRequestDispatcher, FIFOScheduler } from './Peer.utils'
 
@@ -97,7 +98,7 @@ test('bulkRequestBatchCopy', async () => {
 	setTimeout(() => {
 		expect(requestSent).eq(false)
 		// this is the ultimate test: bulkCopy of the first request shoudn't include 42
-		dispatcher.doBulkRequest(42, async (bulkCopy: number[]) => {})
+		dispatcher.doBulkRequest(42, async (_bulkCopy: number[]) => {})
 	}, 0)
 	// wait for the completion
 	await new Promise((r) => setTimeout(r, 100))

@@ -1,6 +1,9 @@
 import { redirect } from '@remix-run/cloudflare'
+import { nanoid } from 'nanoid'
 
 export const loader = async () => {
-	const roomName = crypto.randomUUID().split('-')[0]
-	return redirect('/' + roomName.toString().replace(/ /g, '-'))
+	// we use this path if someone clicks the link
+	// to create a new room before the js has loaded
+	const roomName = nanoid(8)
+	return redirect('/' + roomName)
 }

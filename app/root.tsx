@@ -42,7 +42,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	}
 
 	const defaultResponse = json({
-		userDirectoryUrl: context.USER_DIRECTORY_URL,
+		userDirectoryUrl: context.env.USER_DIRECTORY_URL,
 	})
 
 	// we only care about verifying token freshness if request was a user
@@ -174,7 +174,7 @@ const Document: FC<{ children?: ReactNode }> = ({ children }) => {
 	)
 }
 
-export const ErrorBoundary = ({}) => {
+export const ErrorBoundary = () => {
 	return (
 		<Document>
 			<div className="grid h-full place-items-center">
