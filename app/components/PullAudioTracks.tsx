@@ -1,6 +1,5 @@
 import type { FC, ReactNode } from 'react'
-import { createContext, useContext } from 'react'
-import usePulledTracks from '~/hooks/usePulledTracks'
+import { createContext, useContext, useState } from 'react'
 import { AudioStream } from './AudioStream'
 
 interface PullAudioTracksProps {
@@ -14,13 +13,23 @@ export const PullAudioTracks: FC<PullAudioTracksProps> = ({
 	audioTracks,
 	children,
 }) => {
-	const audioTrackMap = usePulledTracks(audioTracks)
+	const [audioTrackMap, setAudioTrackMap] = useState<
+		Record<string, MediaStreamTrack>
+	>({})
 
 	return (
 		<AudioTrackContext.Provider value={audioTrackMap}>
-			{Object.entries(audioTrackMap).map(([trackKey, mediaStreamTrack]) => (
-				<AudioStream key={trackKey} mediaStreamTrack={mediaStreamTrack} />
-			))}
+			<AudioStream
+				tracksToPull={audioTracks}
+				onTrackAdded={(id, track) =>
+					setAudioTrackMap({ ...audioTrackMap, [id]: track })
+				}
+				onTrackRemoved={(id) => {
+					const update = { ...audioTrackMap }
+					delete update[id]
+					setAudioTrackMap(update)
+				}}
+			/>
 			{children}
 		</AudioTrackContext.Provider>
 	)

@@ -1,38 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import Toast, { Root } from '~/components/Toast'
+import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useConditionForAtLeast } from '~/hooks/useConditionForAtLeast'
-import type Peer from '~/utils/Peer.client'
+import { getPacketLossStats$ } from '~/utils/rxjs/getPacketLossStats$'
 import { useRoomContext } from '../hooks/useRoomContext'
 import { Icon } from './Icon/Icon'
 
-export function usePacketLossInformation(): Partial<
-	ReturnType<typeof Peer.prototype.getDebugInfo>
-> {
+function useStats() {
 	const { peer } = useRoomContext()
-	const [debugInfo, setDebugInfo] = useState(peer?.getDebugInfo())
+	const stats$ = useMemo(
+		() => getPacketLossStats$(peer.peerConnection$),
+		[peer.peerConnection$]
+	)
+	const stats = useSubscribedState(stats$, {
+		inboundPacketLossPercentage: 0,
+		outboundPacketLossPercentage: 0,
+	})
 
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setDebugInfo(peer?.getDebugInfo())
-		}, 1000)
-
-		return () => {
-			clearInterval(interval)
-		}
-	}, [peer])
-
-	return debugInfo ?? {}
+	return stats
 }
 
 export function HighPacketLossWarningsToast() {
 	const { inboundPacketLossPercentage, outboundPacketLossPercentage } =
-		usePacketLossInformation()
+		useStats()
 
 	const hasIssues = useConditionForAtLeast(
 		inboundPacketLossPercentage !== undefined &&
 			outboundPacketLossPercentage !== undefined &&
-			inboundPacketLossPercentage > 0.01 &&
-			outboundPacketLossPercentage > 0.01,
+			(inboundPacketLossPercentage > 0.01 ||
+				outboundPacketLossPercentage > 0.01),
 		3000
 	)
 

@@ -18,9 +18,7 @@ function Rxjs() {
 	const client = useMemo(
 		() =>
 			new RxjsPeer({
-				apiBase: `https://rtc.live.cloudflare.com/v1/apps`,
-				appId: 'APP_ID',
-				token: 'APP_TOKEN',
+				apiBase: `/api/calls`,
 			}),
 		[]
 	)

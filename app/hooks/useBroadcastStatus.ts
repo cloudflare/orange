@@ -1,15 +1,16 @@
 import { useEffect } from 'react'
 import { useUnmount } from 'react-use'
 import type { ClientMessage, User } from '~/types/Messages'
-import type Peer from '~/utils/Peer.client'
 
 import type PartySocket from 'partysocket'
+import type { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
+import { useSubscribedState } from './rxjsHooks'
 import type { RoomContextType } from './useRoomContext'
 import type { UserMedia } from './useUserMedia'
 
 interface Config {
 	userMedia: UserMedia
-	peer: Peer | null
+	peer: RxjsPeer
 	identity?: User
 	websocket: PartySocket
 	pushedTracks: RoomContextType['pushedTracks']
@@ -28,18 +29,19 @@ export default function useBroadcastStatus({
 }: Config) {
 	const { audioEnabled, videoEnabled, screenShareEnabled } = userMedia
 	const { audio, video, screenshare } = pushedTracks
+	const { sessionId } = useSubscribedState(peer.session$) ?? {}
 
 	const id = identity?.id
 	const name = identity?.name
 	useEffect(() => {
 		if (id && name) {
-			const user = {
+			const user: User = {
 				id,
 				name,
 				joined: true,
 				raisedHand,
 				speaking,
-				transceiverSessionId: peer?.sessionId,
+				transceiverSessionId: sessionId,
 				tracks: {
 					audioEnabled,
 					videoEnabled,
@@ -71,7 +73,7 @@ export default function useBroadcastStatus({
 		id,
 		name,
 		websocket,
-		peer?.sessionId,
+		sessionId,
 		audio,
 		video,
 		screenshare,
@@ -93,7 +95,7 @@ export default function useBroadcastStatus({
 						joined: false,
 						raisedHand,
 						speaking,
-						transceiverSessionId: peer?.sessionId,
+						transceiverSessionId: sessionId,
 						tracks: {},
 					},
 				} satisfies ClientMessage)

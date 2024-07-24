@@ -1,48 +1,47 @@
 import type { ReactElement } from 'react'
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
+import { of, switchMap } from 'rxjs'
+import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
-import keepTrying from '~/utils/keepTrying'
+import type { TrackObject } from '~/utils/callsTypes'
 import { usePulledAudioTrack } from './PullAudioTracks'
 
 interface PullTracksProps {
-	audio?: string
 	video?: string
+	audio?: string
 	children: (props: {
-		audioTrack?: MediaStreamTrack
 		videoTrack?: MediaStreamTrack
+		audioTrack?: MediaStreamTrack
 	}) => ReactElement
 }
 
 export const PullVideoTrack = ({ video, audio, children }: PullTracksProps) => {
 	const { peer } = useRoomContext()
-
-	const [videoTrack, setVideoTrack] = useState<MediaStreamTrack>()
 	const audioTrack = usePulledAudioTrack(audio)
 
-	useEffect(() => {
-		if (!video || !peer) return
-		let mounted = true
-		const cancel = keepTrying(() => {
-			const [sessionId, trackName] = video.split('/')
-			// backward compatibility: ResourceID -> TrackObject
-			return peer
-				.pullTrack({ location: 'remote', sessionId, trackName })
-				.then((track) => {
-					if (mounted) setVideoTrack(track)
-				})
-		})
-		return () => {
-			cancel()
-			mounted = false
-		}
-	}, [peer, video])
+	const [sessionId, trackName] = video?.split('/') ?? []
+	const trackObject = useMemo(
+		() =>
+			sessionId && trackName
+				? ({
+						trackName,
+						sessionId,
+						location: 'remote',
+					} satisfies TrackObject)
+				: undefined,
+		[sessionId, trackName]
+	)
 
-	useEffect(() => {
-		if (videoTrack && peer)
-			return () => {
-				peer.closeTrack(videoTrack)
-			}
-	}, [videoTrack, peer])
-
+	const trackObject$ = useStateObservable(trackObject)
+	const pulledTrack$ = useMemo(
+		() =>
+			trackObject$.pipe(
+				switchMap((track) =>
+					track ? peer.pullTrack(of(track)) : of(undefined)
+				)
+			),
+		[peer, trackObject$]
+	)
+	const videoTrack = useSubscribedState(pulledTrack$)
 	return children({ videoTrack, audioTrack })
 }

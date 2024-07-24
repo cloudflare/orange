@@ -1,21 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useLocalStorage, useUnmount } from 'react-use'
-import {
-	catchError,
-	combineLatest,
-	of,
-	shareReplay,
-	switchMap,
-	tap,
-} from 'rxjs'
+import { useLocalStorage } from 'react-use'
+import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { blackCanvasStreamTrack } from '~/utils/blackCanvasStreamTrack'
 import blurVideoTrack from '~/utils/blurVideoTrack'
-import { createEmptyAudioTrack } from '~/utils/createEmptyAudioTrack'
-import keyInObject from '~/utils/keyInObject'
 import type { Mode } from '~/utils/mode'
 import noiseSuppression from '~/utils/noiseSuppression'
 import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
+import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
 import { useStateObservable, useSubscribedState } from './rxjsHooks'
 
@@ -41,14 +33,18 @@ export default function useUserMedia(mode: Mode) {
 	)
 	const [audioEnabled, setAudioEnabled] = useState(mode === 'production')
 	const [videoEnabled, setVideoEnabled] = useState(true)
-	const [screenShareStream, setScreenShareStream] = useState<MediaStream>()
 	const [screenShareEnabled, setScreenShareEnabled] = useState(false)
 	const [videoUnavailableReason, setVideoUnavailableReason] =
 		useState<UserMediaError>()
 	const [audioUnavailableReason, setAudioUnavailableReason] =
 		useState<UserMediaError>()
-	const [screenshareUnavailableReason, setScreenshareUnavailableReason] =
-		useState<UserMediaError>()
+
+	const turnMicOff = () => setAudioEnabled(false)
+	const turnMicOn = () => setAudioEnabled(true)
+	const turnCameraOn = () => setVideoEnabled(true)
+	const turnCameraOff = () => setVideoEnabled(false)
+	const startScreenShare = () => setScreenShareEnabled(true)
+	const endScreenShare = () => setScreenShareEnabled(false)
 
 	const blurVideo$ = useStateObservable(blurVideo)
 	const videoEnabled$ = useStateObservable(videoEnabled)
@@ -68,8 +64,7 @@ export default function useUserMedia(mode: Mode) {
 													: 'UnknownError'
 											)
 										},
-									}),
-									catchError(() => of(undefined))
+									})
 								)
 							: of(blackCanvasStreamTrack())
 					)
@@ -87,14 +82,7 @@ export default function useUserMedia(mode: Mode) {
 		[videoEnabled$, blurVideo$]
 	)
 	const videoTrack = useSubscribedState(videoTrack$)
-
-	const turnMicOff = () => {
-		setAudioEnabled(false)
-	}
-
-	const turnMicOn = async () => {
-		setAudioEnabled(true)
-	}
+	const videoDeviceId = videoTrack?.getSettings().deviceId
 
 	const suppressNoiseEnabled$ = useStateObservable(suppressNoise)
 	const audioTrack$ = useMemo(() => {
@@ -109,8 +97,7 @@ export default function useUserMedia(mode: Mode) {
 								: 'UnknownError'
 						)
 					},
-				}),
-				catchError(() => of(undefined))
+				})
 			),
 			suppressNoiseEnabled$,
 		]).pipe(
@@ -123,52 +110,70 @@ export default function useUserMedia(mode: Mode) {
 			})
 		)
 	}, [suppressNoiseEnabled$])
-
-	useUnmount(() => {
-		screenShareStream?.getTracks().forEach((t) => t.stop())
-	})
-
-	const turnCameraOn = () => {
-		setVideoEnabled(true)
-	}
-
-	const turnCameraOff = () => {
-		setVideoEnabled(false)
-	}
-
-	const startScreenShare = () => {
-		navigator.mediaDevices
-			.getDisplayMedia()
-			.then((ms) => {
-				ms.getVideoTracks().forEach((track) => {
-					if ('contentHint' in track) {
-						// optimize for legibility in shared screen
-						track.contentHint = 'text'
-					}
+	const mutedAudioTrack$ = useMemo(() => {
+		return combineLatest([
+			getUserMediaTrack$('audioinput').pipe(
+				tap({
+					next: (track) => {
+						track.enabled = false
+					},
+					error: (e) => {
+						invariant(e instanceof Error)
+						setAudioUnavailableReason(
+							e.name in errorMessageMap
+								? (e.name as UserMediaError)
+								: 'UnknownError'
+						)
+					},
 				})
-				setScreenShareStream(ms)
-				setScreenshareUnavailableReason(undefined)
-				ms.getVideoTracks()[0].addEventListener('ended', () => {
-					setScreenShareStream(undefined)
-					setScreenShareEnabled(false)
+			),
+			suppressNoiseEnabled$,
+		]).pipe(
+			switchMap(([track, suppressNoise]) =>
+				of(suppressNoise && track ? noiseSuppression(track) : track)
+			),
+			shareReplay({
+				refCount: true,
+				bufferSize: 1,
+			})
+		)
+	}, [suppressNoiseEnabled$])
+	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
+	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
+	const audioEnabled$ = useStateObservable(audioEnabled)
+	const publicAudioTrack$ = useMemo(
+		() =>
+			combineLatest([audioEnabled$, audioTrack$, mutedAudioTrack$]).pipe(
+				map(([enabled, alwaysOnTrack, mutedTrack]) =>
+					enabled ? alwaysOnTrack : mutedTrack
+				),
+				shareReplay({
+					refCount: true,
+					bufferSize: 1,
 				})
-				setScreenShareEnabled(true)
-			})
-			.catch((e: Error) => {
-				setScreenShareEnabled(false)
-				invariant(keyInObject(errorMessageMap, e.name))
-				setScreenshareUnavailableReason(e.name)
-			})
-	}
+			),
+		[audioEnabled$, audioTrack$, mutedAudioTrack$]
+	)
+	const audioStreamTrack = useSubscribedState(publicAudioTrack$)
 
-	const endScreenShare = () => {
-		if (screenShareStream)
-			screenShareStream.getTracks().forEach((t) => t.stop())
-		setScreenShareEnabled(false)
-		setScreenShareStream(undefined)
-	}
-
-	const screenShareVideoTrack = screenShareStream?.getVideoTracks()[0]
+	const screenShareVideoTrack$ = useMemo(
+		() =>
+			screenShareEnabled
+				? getScreenshare$({ contentHint: 'text' }).pipe(
+						tap({
+							next: (ms) => {
+								if (ms === undefined) {
+									setScreenShareEnabled(false)
+								}
+							},
+							finalize: () => setScreenShareEnabled(false),
+						}),
+						map((ms) => ms?.getVideoTracks()[0])
+					)
+				: of(undefined),
+		[screenShareEnabled]
+	)
+	const screenShareVideoTrack = useSubscribedState(screenShareVideoTrack$)
 
 	const setVideoDeviceId = (deviceId: string) =>
 		navigator.mediaDevices.enumerateDevices().then((devices) => {
@@ -182,39 +187,36 @@ export default function useUserMedia(mode: Mode) {
 			if (device) prependDeviceToPrioritizeList(device)
 		})
 
-	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
-	const mutedAudioStreamTrack = useMemo(() => createEmptyAudioTrack(), [])
-	const videoDeviceId = videoTrack?.getSettings().deviceId
-	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
-
 	return {
 		turnMicOn,
 		turnMicOff,
-		audioStreamTrack: audioEnabled
-			? alwaysOnAudioStreamTrack
-			: mutedAudioStreamTrack,
+		audioStreamTrack,
 		audioMonitorStreamTrack: alwaysOnAudioStreamTrack,
 		audioEnabled,
 		audioUnavailableReason,
-		turnCameraOn,
-		turnCameraOff,
-		videoStreamTrack: videoTrack,
-		videoEnabled,
-		videoUnavailableReason,
-		startScreenShare,
-		endScreenShare,
-		screenShareVideoTrack,
-		screenShareEnabled,
-		screenshareUnavailableReason,
+		publicAudioTrack$,
+		privateAudioTrack$: audioTrack$,
 		audioDeviceId,
 		setAudioDeviceId,
+
 		setVideoDeviceId,
 		videoDeviceId,
+		turnCameraOn,
+		turnCameraOff,
+		videoEnabled,
+		videoUnavailableReason,
 		blurVideo,
 		setBlurVideo,
 		suppressNoise,
 		setSuppressNoise,
 		videoTrack$,
+		videoStreamTrack: videoTrack,
+
+		startScreenShare,
+		endScreenShare,
+		screenShareVideoTrack,
+		screenShareEnabled,
+		screenShareVideoTrack$,
 	}
 }
 

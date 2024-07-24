@@ -1,5 +1,11 @@
 export class History<T> extends EventTarget {
 	entries: T[] = []
+	private limit: number
+
+	constructor(limit: number = Infinity) {
+		super()
+		this.limit = Math.max(1, limit) // Ensure the limit is at least 1
+	}
 
 	addEventListener(
 		type: 'logentry',
@@ -24,6 +30,9 @@ export class History<T> extends EventTarget {
 	}
 
 	log(entry: T) {
+		if (this.entries.length >= this.limit) {
+			this.entries.shift() // Remove the oldest entry
+		}
 		this.entries.push(entry)
 		this.dispatchEvent(new CustomEvent('logentry'))
 	}

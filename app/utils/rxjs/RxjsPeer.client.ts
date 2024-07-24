@@ -2,10 +2,11 @@ import {
 	Observable,
 	combineLatest,
 	distinctUntilChanged,
-	filter,
 	from,
 	fromEvent,
 	map,
+	of,
+	retry,
 	share,
 	shareReplay,
 	switchMap,
@@ -14,20 +15,36 @@ import {
 	withLatestFrom,
 } from 'rxjs'
 import invariant from 'tiny-invariant'
-import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 import type {
 	RenegotiationResponse,
 	TrackObject,
 	TracksResponse,
 } from '../callsTypes'
+import { History } from '../History'
+import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 
-interface PeerConfig {
-	appId: string
-	token: string
+export interface PeerConfig {
+	apiExtraParams?: string
+	iceServers?: RTCIceServer[]
 	apiBase: string
+	maxApiHistory?: number
 }
 
+export type ApiHistoryEntry =
+	| {
+			type: 'request'
+			method: string
+			endpoint: string
+			body: unknown
+	  }
+	| {
+			type: 'response'
+			endpoint: string
+			body: unknown
+	  }
+
 export class RxjsPeer {
+	history: History<ApiHistoryEntry>
 	peerConnection$: Observable<RTCPeerConnection>
 	session$: Observable<{
 		peerConnection: RTCPeerConnection
@@ -36,32 +53,54 @@ export class RxjsPeer {
 	peerConnectionState$: Observable<RTCPeerConnectionState>
 	config: PeerConfig
 
-	authHeaders() {
-		return {
-			Authorization: `Bearer ${this.config.token}`,
-		}
-	}
-
 	constructor(config: PeerConfig) {
 		this.config = config
+		this.history = new History<ApiHistoryEntry>(config.maxApiHistory)
 		this.peerConnection$ = new Observable<RTCPeerConnection>((subscribe) => {
 			let peerConnection: RTCPeerConnection
 			const setup = () => {
 				peerConnection?.close()
-				peerConnection = createPeerConnection()
+				peerConnection = createPeerConnection({
+					iceServers: config.iceServers,
+				})
 				peerConnection.addEventListener('connectionstatechange', () => {
 					if (
 						peerConnection.connectionState === 'failed' ||
 						peerConnection.connectionState === 'closed'
 					) {
+						console.debug(
+							`💥 Peer connectionState is ${peerConnection.connectionState}`
+						)
 						subscribe.next(setup())
+					}
+				})
+
+				let iceTimeout = -1
+				peerConnection.addEventListener('iceconnectionstatechange', () => {
+					clearTimeout(iceTimeout)
+					if (
+						peerConnection.iceConnectionState === 'failed' ||
+						peerConnection.iceConnectionState === 'closed'
+					) {
+						console.debug(
+							`💥 Peer iceConnectionState is ${peerConnection.iceConnectionState}`
+						)
+						subscribe.next(setup())
+					} else if (peerConnection.iceConnectionState === 'disconnected') {
+						const timeoutSeconds = 3
+						iceTimeout = window.setTimeout(() => {
+							console.debug(
+								`💥 Peer iceConnectionState was ${peerConnection.iceConnectionState} for more than ${timeoutSeconds} seconds`
+							)
+							subscribe.next(setup())
+						}, timeoutSeconds * 1000)
 					}
 				})
 
 				// TODO: Remove this
 				Object.assign(window, {
 					explode: () => {
-						console.debug('💥 Closing connection')
+						console.debug('💥 Manually exploding connection')
 						peerConnection.close()
 						peerConnection.dispatchEvent(new Event('connectionstatechange'))
 					},
@@ -75,7 +114,12 @@ export class RxjsPeer {
 			return () => {
 				peerConnection.close()
 			}
-		})
+		}).pipe(
+			shareReplay({
+				bufferSize: 1,
+				refCount: true,
+			})
+		)
 
 		this.session$ = this.peerConnection$.pipe(
 			// TODO: Convert the promise based session creation here
@@ -121,36 +165,31 @@ export class RxjsPeer {
 
 	async createSession(peerConnection: RTCPeerConnection) {
 		console.debug('🆕 creating new session')
-		const { appId, apiBase, token } = this.config
+		const { apiBase } = this.config
 		// create an offer and set it as the local description
 		await peerConnection.setLocalDescription(await peerConnection.createOffer())
-		const { sessionId, sessionDescription } = await fetch(
-			`${apiBase}/${appId}/sessions/new`,
-			{
+		const { sessionId, sessionDescription } =
+			await this.fetchWithRecordedHistory(`${apiBase}/sessions/new?SESSION`, {
 				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
 				body: JSON.stringify({
 					sessionDescription: peerConnection.localDescription,
 				}),
-			}
-		).then((res) => res.json() as any)
+			}).then((res) => res.json() as any)
 		const connected = new Promise((res, rej) => {
 			// timeout after 5s
 			setTimeout(rej, 5000)
-			const iceConnectionStateChangeHandler = () => {
-				if (peerConnection.iceConnectionState === 'connected') {
+			const connectionStateChangeHandler = () => {
+				if (peerConnection.connectionState === 'connected') {
 					peerConnection.removeEventListener(
-						'iceconnectionstatechange',
-						iceConnectionStateChangeHandler
+						'connectionstatechange',
+						connectionStateChangeHandler
 					)
 					res(undefined)
 				}
 			}
 			peerConnection.addEventListener(
-				'iceconnectionstatechange',
-				iceConnectionStateChangeHandler
+				'connectionstatechange',
+				connectionStateChangeHandler
 			)
 		})
 
@@ -159,6 +198,26 @@ export class RxjsPeer {
 		// Wait until the peer connection's iceConnectionState is "connected"
 		await connected
 		return { peerConnection, sessionId }
+	}
+
+	async fetchWithRecordedHistory(path: string, requestInit?: RequestInit) {
+		this.history.log({
+			endpoint: path,
+			method: requestInit?.method ?? 'get',
+			type: 'request',
+			body:
+				typeof requestInit?.body === 'string'
+					? JSON.parse(requestInit.body)
+					: undefined,
+		})
+		const response = await fetch(path, requestInit)
+		const responseBody = await response.clone().json()
+		this.history.log({
+			endpoint: path,
+			type: 'response',
+			body: responseBody,
+		})
+		return response
 	}
 
 	#pushTrackInBulk(
@@ -181,22 +240,22 @@ export class RxjsPeer {
 								await peerConnection.createOffer()
 							)
 
-							const response = await fetch(
-								`${this.config.apiBase}/${this.config.appId}/sessions/${sessionId}/tracks/new`,
+							const requestBody = {
+								sessionDescription: {
+									sdp: peerConnection.localDescription?.sdp,
+									type: 'offer',
+								},
+								tracks: tracks.map(({ trackName, transceiver }) => ({
+									trackName,
+									mid: transceiver.mid,
+									location: 'local',
+								})),
+							}
+							const response = await this.fetchWithRecordedHistory(
+								`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PUSHING`,
 								{
 									method: 'POST',
-									headers: this.authHeaders(),
-									body: JSON.stringify({
-										sessionDescription: {
-											sdp: peerConnection.localDescription?.sdp,
-											type: 'offer',
-										},
-										tracks: tracks.map(({ trackName, transceiver }) => ({
-											trackName,
-											mid: transceiver.mid,
-											location: 'local',
-										})),
-									}),
+									body: JSON.stringify(requestBody),
 								}
 							).then((res) => res.json() as Promise<TracksResponse>)
 							invariant(response.tracks !== undefined)
@@ -238,7 +297,10 @@ export class RxjsPeer {
 		})
 	}
 
-	pushTrack(track$: Observable<MediaStreamTrack>): Observable<TrackObject> {
+	pushTrack(
+		track$: Observable<MediaStreamTrack>,
+		encodings$: Observable<RTCRtpEncodingParameters[]> = of([])
+	): Observable<TrackObject> {
 		// we want a single id for this connection, but we need to wait for
 		// the first track to show up before we can proceed, so we
 		const stableId$ = track$.pipe(
@@ -253,6 +315,7 @@ export class RxjsPeer {
 					direction: 'sendonly',
 				})
 				console.debug('🌱 creating transceiver!')
+
 				return {
 					transceiver,
 					stableId,
@@ -277,8 +340,19 @@ export class RxjsPeer {
 			)
 		)
 
-		return combineLatest([pushedTrackData$, transceiver$, track$]).pipe(
-			tap(([_trackData, { transceiver }, track]) => {
+		return combineLatest([
+			pushedTrackData$,
+			transceiver$,
+			track$,
+			encodings$,
+		]).pipe(
+			tap(([_trackData, { transceiver }, track, encodings]) => {
+				const parameters = transceiver.sender.getParameters()
+				encodings.forEach((encoding, i) => {
+					const existing = parameters.encodings[i]
+					parameters.encodings[i] = { ...existing, ...encoding }
+				})
+				transceiver.sender.setParameters(parameters)
 				if (transceiver.sender.transport !== null) {
 					console.debug('♻︎ replacing track')
 					transceiver.sender.replaceTrack(track)
@@ -298,7 +372,7 @@ export class RxjsPeer {
 		trackData: TrackObject
 	): Observable<MediaStreamTrack> {
 		let mid = ''
-		return new Observable((subscribe) => {
+		return new Observable<MediaStreamTrack>((subscribe) => {
 			let pulledTrackPromise: Promise<unknown>
 			// we're doing this in a timeout so that we can bail if the observable
 			// is unsubscribed from immediately after subscribing. This will prevent
@@ -308,16 +382,16 @@ export class RxjsPeer {
 				pulledTrackPromise = this.pullTrackDispatcher
 					.doBulkRequest(trackData, (tracks) =>
 						this.taskScheduler.schedule(async () => {
-							const newTrackResponse: TracksResponse = await fetch(
-								`${this.config.apiBase}/${this.config.appId}/sessions/${sessionId}/tracks/new`,
-								{
-									method: 'POST',
-									headers: this.authHeaders(),
-									body: JSON.stringify({
-										tracks,
-									}),
-								}
-							).then((res) => res.json() as Promise<TracksResponse>)
+							const newTrackResponse: TracksResponse =
+								await this.fetchWithRecordedHistory(
+									`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PULLING`,
+									{
+										method: 'POST',
+										body: JSON.stringify({
+											tracks,
+										}),
+									}
+								).then((res) => res.json() as Promise<TracksResponse>)
 							if (newTrackResponse.errorCode) {
 								throw new Error(newTrackResponse.errorDescription)
 							}
@@ -349,19 +423,19 @@ export class RxjsPeer {
 								const answer = await peerConnection.createAnswer()
 								await peerConnection.setLocalDescription(answer)
 
-								const renegotiationResponse = await fetch(
-									`${this.config.apiBase}/${this.config.appId}/sessions/${sessionId}/renegotiate`,
-									{
-										method: 'PUT',
-										body: JSON.stringify({
-											sessionDescription: {
-												type: 'answer',
-												sdp: peerConnection.currentLocalDescription?.sdp,
-											},
-										}),
-										headers: this.authHeaders(),
-									}
-								).then((res) => res.json() as Promise<RenegotiationResponse>)
+								const renegotiationResponse =
+									await this.fetchWithRecordedHistory(
+										`${this.config.apiBase}/sessions/${sessionId}/renegotiate`,
+										{
+											method: 'PUT',
+											body: JSON.stringify({
+												sessionDescription: {
+													type: 'answer',
+													sdp: peerConnection.currentLocalDescription?.sdp,
+												},
+											}),
+										}
+									).then((res) => res.json() as Promise<RenegotiationResponse>)
 								if (renegotiationResponse.errorCode)
 									throw new Error(renegotiationResponse.errorDescription)
 							}
@@ -397,7 +471,7 @@ export class RxjsPeer {
 					}
 				})
 			}
-		})
+		}).pipe(retry(2))
 	}
 
 	pullTrack(trackData$: Observable<TrackObject>): Observable<MediaStreamTrack> {
@@ -409,14 +483,13 @@ export class RxjsPeer {
 				distinctUntilChanged((x, y) => JSON.stringify(x) === JSON.stringify(y))
 			),
 		]).pipe(
-			// avoid re-pulling if track data changed before connection state is connected
-			// should only really be necessary if pulling a track that was pushed locally
-			filter(
-				([{ peerConnection }]) => peerConnection.connectionState === 'connected'
-			),
-			switchMap(([{ peerConnection, sessionId }, trackData]) =>
-				this.#pullTrackInBulk(peerConnection, sessionId, trackData)
-			)
+			switchMap(([{ peerConnection, sessionId }, trackData]) => {
+				return this.#pullTrackInBulk(peerConnection, sessionId, trackData)
+			}),
+			shareReplay({
+				refCount: true,
+				bufferSize: 1,
+			})
 		)
 	}
 
@@ -426,7 +499,7 @@ export class RxjsPeer {
 		sessionId: string
 	) {
 		// TODO: Close tracks in bulk
-		const { appId, token, apiBase } = this.config
+		const { apiBase } = this.config
 		const transceiver = peerConnection
 			.getTransceivers()
 			.find((t) => t.mid === mid)
@@ -446,14 +519,11 @@ export class RxjsPeer {
 			},
 			force: false,
 		}
-		const response = await fetch(
-			`${apiBase}/${appId}/sessions/${sessionId}/tracks/close`,
+		const response = await this.fetchWithRecordedHistory(
+			`${apiBase}/sessions/${sessionId}/tracks/close`,
 			{
 				method: 'PUT',
 				body: JSON.stringify(requestBody),
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
 			}
 		).then((res) => res.json() as Promise<TracksResponse>)
 		await peerConnection.setRemoteDescription(

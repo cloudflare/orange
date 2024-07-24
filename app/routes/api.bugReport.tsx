@@ -1,33 +1,44 @@
 import type { ActionFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import invariant from 'tiny-invariant'
+import type { RoomHistory } from '~/hooks/useRoomHistory'
 import type { ChatCard } from '~/types/GoogleChatApi'
-import type { RoomState, User } from '~/types/Messages'
-import type { PeerDebugInfo } from '~/utils/Peer.client'
+import type { User } from '~/types/Messages'
 import { RELEASE } from '~/utils/constants'
-import populateTraceLink from '~/utils/populateTraceLink'
 
 export type BugReportInfo = {
-	roomState: RoomState
 	roomName?: string
 	identity?: User
-	peerDebugInfo?: PeerDebugInfo
+	roomHistory?: RoomHistory
 	url?: string
 }
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-	if (!context.env.FEEDBACK_URL || !context.env.FEEDBACK_QUEUE) {
+	if (
+		!context.env.FEEDBACK_URL ||
+		!context.env.FEEDBACK_STORAGE ||
+		!context.env.FEEDBACK_QUEUE
+	) {
 		throw new Response('not found', { status: 404 })
 	}
+	const requestUrl = new URL(request.url)
 	const formData = await request.formData()
 	const info: BugReportInfo = JSON.parse(String(formData.get('info')))
-	const { roomState, identity, roomName, peerDebugInfo, url } = info
+	const { identity, roomName, roomHistory, url } = info
 	const description = formData.get('description')
 	invariant(typeof description === 'string')
 	const userAgent = request.headers.get('User-Agent')
 	invariant(typeof userAgent === 'string')
 	invariant(roomName)
 	invariant(url)
+
+	const debugInfoId = crypto.randomUUID()
+	if (context.env.FEEDBACK_STORAGE) {
+		await context.env.FEEDBACK_STORAGE.put(
+			debugInfoId,
+			JSON.stringify(roomHistory, null, 2)
+		)
+	}
 
 	const { hostname } = new URL(url)
 
@@ -88,50 +99,26 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 							collapsible: false,
 						},
 						{
-							header: 'Users',
-							collapsible: true,
+							header: 'Debug Info',
 							widgets: [
 								{
 									buttonList: {
-										buttons: roomState.users.map((u) => ({
-											text: u.name,
-											onClick: {
-												openLink: {
-													url:
-														populateTraceLink(
-															u.transceiverSessionId ?? '',
-															context.env.TRACE_LINK
-														) ?? '',
+										buttons: [
+											{
+												text: 'View JSON',
+												onClick: {
+													openLink: {
+														url:
+															requestUrl.origin +
+															`/api/debugInfo?id=${debugInfoId}`,
+													},
 												},
 											},
-										})),
+										],
 									},
 								},
 							],
-						},
-						{
-							header: 'Room state',
-							collapsible: true,
-							uncollapsibleWidgetsCount: 0,
-							widgets: [
-								{
-									decoratedText: {
-										text: JSON.stringify(roomState),
-									},
-								},
-							],
-						},
-						{
-							header: 'Peer Debug Info',
-							collapsible: true,
-							uncollapsibleWidgetsCount: 0,
-							widgets: [
-								{
-									decoratedText: {
-										text: JSON.stringify(peerDebugInfo),
-									},
-								},
-							],
+							collapsible: false,
 						},
 					],
 				},

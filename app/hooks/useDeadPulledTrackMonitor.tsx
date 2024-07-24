@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DeadTrackInfo } from '~/routes/api.deadTrack'
 import populateTraceLink from '~/utils/populateTraceLink'
+import { useSubscribedState } from './rxjsHooks'
 import { useRoomContext } from './useRoomContext'
 
 export function useDeadPulledTrackMonitor(
@@ -12,12 +13,14 @@ export function useDeadPulledTrackMonitor(
 ) {
 	const [deadTrack, setDeadTrack] = useState(false)
 	const { peer, traceLink, room, feedbackEnabled } = useRoomContext()
+	const peerConnection = useSubscribedState(peer.peerConnection$)
 	const timeoutRef = useRef(-1)
 
 	useEffect(() => {
-		if (!peer || !track || !enabled || deadTrack || !feedbackEnabled) return
+		if (!peerConnection || !track || !enabled || deadTrack || !feedbackEnabled)
+			return
 		timeoutRef.current = window.setTimeout(() => {
-			peer.pc.getStats(track).then((report) => {
+			peerConnection.getStats(track).then((report) => {
 				// this means component has unmounted
 				if (timeoutRef.current === -1) return
 				const stat = [...report.values()].find(
@@ -37,8 +40,8 @@ export function useDeadPulledTrackMonitor(
 	}, [deadTrack, enabled, feedbackEnabled, peer, track])
 
 	useEffect(() => {
-		if (!peer?.sessionId || !deadTrack || !feedbackEnabled) return
-		const pullSessionTrace = populateTraceLink(peer.sessionId, traceLink)
+		if (!sessionId || !deadTrack || !feedbackEnabled) return
+		const pullSessionTrace = populateTraceLink(sessionId, traceLink)
 		const [pushedSessionId, trackId] = trackInfo?.split('/') ?? []
 		const pushedSessionTrace = populateTraceLink(pushedSessionId, traceLink)
 
@@ -57,9 +60,10 @@ export function useDeadPulledTrackMonitor(
 		}
 	}, [
 		deadTrack,
+		peerConnection,
 		feedbackEnabled,
 		name,
-		peer?.sessionId,
+		sessionId,
 		room.identity?.name,
 		sessionId,
 		traceLink,
