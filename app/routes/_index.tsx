@@ -72,7 +72,7 @@ export default function Index() {
 						Or join a room
 					</summary>
 					<Form
-						className="flex items-end gap-4 md:justify-between items-end w-full pt-4"
+						className="grid items-end gap-4 grid-cols-[1fr_auto] w-full pt-4"
 						method="post"
 					>
 						<div className="space-y-2">
