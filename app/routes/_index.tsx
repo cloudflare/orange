@@ -33,7 +33,7 @@ export default function Index() {
 	return (
 		<div className="flex flex-col items-center justify-center h-full p-4 mx-auto">
 			<div className="flex-1"></div>
-			<div className="space-y-6 md:min-w-96">
+			<div className="space-y-6 sm:min-w-96">
 				<div>
 					<h1 className="text-3xl font-bold">🍊 Orange Meets</h1>
 					<div className="flex items-center justify-between gap-3">
