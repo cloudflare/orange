@@ -2,6 +2,7 @@ import { useOutletContext } from '@remix-run/react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { UserMedia } from '~/hooks/useUserMedia'
 import type { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
+import type { useConnectionStats } from './useConnectionStats'
 import type useRoom from './useRoom'
 import type { useRoomHistory } from './useRoomHistory'
 
@@ -21,6 +22,7 @@ export type RoomContextType = {
 		audio?: string
 		screenshare?: string
 	}
+	connectionStats: ReturnType<typeof useConnectionStats>
 }
 
 export function useRoomContext() {

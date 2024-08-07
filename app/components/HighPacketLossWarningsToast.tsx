@@ -1,28 +1,15 @@
-import { useMemo } from 'react'
 import Toast, { Root } from '~/components/Toast'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useConditionForAtLeast } from '~/hooks/useConditionForAtLeast'
-import { getPacketLossStats$ } from '~/utils/rxjs/getPacketLossStats$'
-import { useRoomContext } from '../hooks/useRoomContext'
+import { useRoomContext } from '~/hooks/useRoomContext'
 import { Icon } from './Icon/Icon'
 
-function useStats() {
-	const { peer } = useRoomContext()
-	const stats$ = useMemo(
-		() => getPacketLossStats$(peer.peerConnection$),
-		[peer.peerConnection$]
-	)
-	const stats = useSubscribedState(stats$, {
-		inboundPacketLossPercentage: 0,
-		outboundPacketLossPercentage: 0,
-	})
-
-	return stats
-}
-
 export function HighPacketLossWarningsToast() {
-	const { inboundPacketLossPercentage, outboundPacketLossPercentage } =
-		useStats()
+	const {
+		connectionStats: {
+			inboundPacketLossPercentage,
+			outboundPacketLossPercentage,
+		},
+	} = useRoomContext()
 
 	const hasIssues = useConditionForAtLeast(
 		inboundPacketLossPercentage !== undefined &&

@@ -63,6 +63,10 @@ export class ChatRoom extends Server<Env> {
 				videoEnabled: false,
 				screenShareEnabled: false,
 			},
+			connectionInformation: {
+				inboundPacketLoss: 0,
+				outboundPacketLoss: 0,
+			},
 		}
 
 		connection.setState(user)

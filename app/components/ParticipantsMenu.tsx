@@ -6,6 +6,7 @@ import populateTraceLink from '~/utils/populateTraceLink'
 import { cn } from '~/utils/style'
 import { AudioIndicator } from './AudioIndicator'
 import { Button } from './Button'
+import { ConnectionInformation } from './ConnectionInformation'
 import { Dialog, DialogContent, DialogOverlay, Portal, Trigger } from './Dialog'
 import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
@@ -40,6 +41,7 @@ const UserListItem: FC<{
 					<AudioIndicator audioTrack={audioTrack} />
 				</div>
 			)}
+			<ConnectionInformation user={user} />
 			<MuteUserButton user={user} />
 		</li>
 	)
@@ -93,7 +95,6 @@ export const ParticipantsDialog: FC<ParticipantDialogProps> = ({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			{children}
-
 			<Portal>
 				<DialogOverlay />
 				<DialogContent>

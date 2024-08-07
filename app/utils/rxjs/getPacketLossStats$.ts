@@ -18,7 +18,7 @@ export function getPacketLossStats$(
 ) {
 	const inboundPacketLossPercentageEwma = new Ewma(2000, 0)
 	const outboundPacketLossPercentageEwma = new Ewma(2000, 0)
-	return combineLatest([peerConnection$, interval(1000)]).pipe(
+	return combineLatest([peerConnection$, interval(3000)]).pipe(
 		switchMap(([peerConnection]) => peerConnection.getStats()),
 		pairwise(),
 		map(([previousStatsReport, newStatsReport]) => {

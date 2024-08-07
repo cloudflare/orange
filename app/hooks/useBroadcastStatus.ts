@@ -14,6 +14,7 @@ interface Config {
 	identity?: User
 	websocket: PartySocket
 	pushedTracks: RoomContextType['pushedTracks']
+	connectionStats: RoomContextType['connectionStats']
 	raisedHand: boolean
 	speaking: boolean
 }
@@ -26,6 +27,7 @@ export default function useBroadcastStatus({
 	pushedTracks,
 	raisedHand,
 	speaking,
+	connectionStats,
 }: Config) {
 	const { audioEnabled, videoEnabled, screenShareEnabled } = userMedia
 	const { audio, video, screenshare } = pushedTracks
@@ -49,6 +51,10 @@ export default function useBroadcastStatus({
 					video,
 					audio,
 					screenshare,
+				},
+				connectionInformation: {
+					inboundPacketLoss: connectionStats.inboundPacketLossPercentage,
+					outboundPacketLoss: connectionStats.outboundPacketLossPercentage,
 				},
 			}
 
@@ -82,6 +88,8 @@ export default function useBroadcastStatus({
 		screenShareEnabled,
 		raisedHand,
 		speaking,
+		connectionStats.inboundPacketLossPercentage,
+		connectionStats.outboundPacketLossPercentage,
 	])
 
 	useUnmount(() => {
@@ -97,6 +105,10 @@ export default function useBroadcastStatus({
 						speaking,
 						transceiverSessionId: sessionId,
 						tracks: {},
+						connectionInformation: {
+							inboundPacketLoss: 0,
+							outboundPacketLoss: 0,
+						},
 					},
 				} satisfies ClientMessage)
 			)

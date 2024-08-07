@@ -13,6 +13,10 @@ export type User = {
 		screenshare?: string
 		screenShareEnabled?: boolean
 	}
+	connectionInformation: {
+		inboundPacketLoss: number
+		outboundPacketLoss: number
+	}
 }
 
 export type RoomState = {

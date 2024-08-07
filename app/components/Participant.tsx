@@ -10,6 +10,7 @@ import { cn } from '~/utils/style'
 import { AudioGlow } from './AudioGlow'
 import { AudioIndicator } from './AudioIndicator'
 import { Button } from './Button'
+import { ConnectionInformation } from './ConnectionInformation'
 import { HoverFade } from './HoverFade'
 import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
@@ -169,16 +170,19 @@ export const Participant = forwardRef<
 								)}
 							</div>
 						)}
-						{data?.displayName && user.transceiverSessionId && (
-							<OptionalLink
-								className="absolute m-2 leading-none text-shadow left-1 bottom-1"
-								href={populateTraceLink(user.transceiverSessionId, traceLink)}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								{data.displayName}
-							</OptionalLink>
-						)}
+						<div className="absolute m-2 left-1 bottom-1 flex gap-2 items-center">
+							<ConnectionInformation user={user} />
+							{data?.displayName && user.transceiverSessionId && (
+								<OptionalLink
+									className="leading-none text-shadow"
+									href={populateTraceLink(user.transceiverSessionId, traceLink)}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									{data.displayName}
+								</OptionalLink>
+							)}
+						</div>
 						<div className="absolute top-0 right-0 flex gap-4 p-4">
 							{user.raisedHand && (
 								<Tooltip content="Hand is raised">
