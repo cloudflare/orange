@@ -44,13 +44,25 @@ export default function useRoom({
 		},
 	})
 
+	useEffect(() => {
+		function onBeforeUnload() {
+			websocket.send(
+				JSON.stringify({ type: 'userLeft' } satisfies ClientMessage)
+			)
+		}
+		window.addEventListener('beforeunload', onBeforeUnload)
+		return () => {
+			window.removeEventListener('beforeunload', onBeforeUnload)
+		}
+	}, [websocket])
+
 	// setup a simple ping pong
 	useEffect(() => {
 		const interval = setInterval(() => {
 			websocket.send(
 				JSON.stringify({ type: 'partyserver-ping' } satisfies ClientMessage)
 			)
-		}, 10000)
+		}, 5000)
 
 		return () => clearInterval(interval)
 	}, [websocket])
