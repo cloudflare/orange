@@ -125,26 +125,32 @@ export class ChatRoom extends Server<Env> {
 					break
 
 				case 'muteUser':
-					for (const otherConnection of this.getConnections<User>()) {
-						if (otherConnection.id === data.id) {
-							otherConnection.setState({
-								...otherConnection.state!,
-								tracks: {
-									...otherConnection.state!.tracks,
-									audioEnabled: false,
-								},
-							})
-							this.sendMessage(otherConnection, {
-								type: 'muteMic',
-							})
+					{
+						let mutedUser = false
+						for (const otherConnection of this.getConnections<User>()) {
+							if (otherConnection.id === data.id) {
+								otherConnection.setState({
+									...otherConnection.state!,
+									tracks: {
+										...otherConnection.state!.tracks,
+										audioEnabled: false,
+									},
+								})
+								this.sendMessage(otherConnection, {
+									type: 'muteMic',
+								})
 
-							this.broadcastState()
-							break
+								this.broadcastState()
+								mutedUser = true
+								break
+							}
+						}
+						if (!mutedUser) {
+							console.warn(
+								`User with id "${data.id}" not found, cannot mute user from "${connection.state!.name}"`
+							)
 						}
 					}
-					console.warn(
-						`User with id "${data.id}" not found, cannot mute user from "${connection.state!.name}"`
-					)
 
 					break
 				case 'partyserver-ping':
