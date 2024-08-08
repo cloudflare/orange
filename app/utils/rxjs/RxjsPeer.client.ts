@@ -166,13 +166,17 @@ export class RxjsPeer {
 	async createSession(peerConnection: RTCPeerConnection) {
 		console.debug('🆕 creating new session')
 		const { apiBase } = this.config
-		// create an offer and set it as the local description
-		await peerConnection.setLocalDescription(await peerConnection.createOffer())
+		// create an offer
+		const offer = await peerConnection.createOffer()
+		// Turn on Opus DTX to save bandwidth
+		offer.sdp = offer.sdp!.replace('useinbandfec=1', 'usedtx=1;useinbandfec=1')
+		// And set the offer as the local description
+		await peerConnection.setLocalDescription(offer)
 		const { sessionId, sessionDescription } =
 			await this.fetchWithRecordedHistory(`${apiBase}/sessions/new?SESSION`, {
 				method: 'POST',
 				body: JSON.stringify({
-					sessionDescription: peerConnection.localDescription,
+					sessionDescription: offer,
 				}),
 			}).then((res) => res.json() as any)
 		const connected = new Promise((res, rej) => {
@@ -236,13 +240,19 @@ export class RxjsPeer {
 				pushedTrackPromise = this.pushTrackDispatcher
 					.doBulkRequest({ trackName, transceiver }, (tracks) =>
 						this.taskScheduler.schedule(async () => {
-							await peerConnection.setLocalDescription(
-								await peerConnection.createOffer()
+							// create an offer
+							const offer = await peerConnection.createOffer()
+							// Turn on Opus DTX to save bandwidth
+							offer.sdp = offer.sdp!.replace(
+								'useinbandfec=1',
+								'usedtx=1;useinbandfec=1'
 							)
+							// And set the offer as the local description
+							await peerConnection.setLocalDescription(offer)
 
 							const requestBody = {
 								sessionDescription: {
-									sdp: peerConnection.localDescription?.sdp,
+									sdp: offer.sdp,
 									type: 'offer',
 								},
 								tracks: tracks.map(({ trackName, transceiver }) => ({
