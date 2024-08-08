@@ -3,7 +3,7 @@ import invariant from 'tiny-invariant'
 
 const proxiedUrl = (url: string, appId: string) => {
 	const previousUrl = new URL(url)
-	const proxyUrl = new URL('https://rtc.live.cloudflare.com')
+	const proxyUrl = new URL('http://localhost:8888')
 	proxyUrl.pathname = previousUrl.pathname.replace(
 		'/api/calls',
 		`/v1/apps/${appId}`
