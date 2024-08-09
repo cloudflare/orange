@@ -169,7 +169,7 @@ export class RxjsPeer {
 		// create an offer
 		const offer = await peerConnection.createOffer()
 		// Turn on Opus DTX to save bandwidth
-		offer.sdp = offer.sdp!.replace('useinbandfec=1', 'usedtx=1;useinbandfec=1')
+		offer.sdp = offer.sdp?.replace('useinbandfec=1', 'usedtx=1;useinbandfec=1')
 		// And set the offer as the local description
 		await peerConnection.setLocalDescription(offer)
 		const { sessionId, sessionDescription } =
@@ -243,7 +243,7 @@ export class RxjsPeer {
 							// create an offer
 							const offer = await peerConnection.createOffer()
 							// Turn on Opus DTX to save bandwidth
-							offer.sdp = offer.sdp!.replace(
+							offer.sdp = offer.sdp?.replace(
 								'useinbandfec=1',
 								'usedtx=1;useinbandfec=1'
 							)
@@ -520,7 +520,12 @@ export class RxjsPeer {
 			return
 		}
 		transceiver.direction = 'inactive'
-		await peerConnection.setLocalDescription(await peerConnection.createOffer())
+		// create an offer
+		const offer = await peerConnection.createOffer()
+		// Turn on Opus DTX to save bandwidth
+		offer.sdp = offer.sdp?.replace('useinbandfec=1', 'usedtx=1;useinbandfec=1')
+		// And set the offer as the local description
+		await peerConnection.setLocalDescription(offer)
 		const requestBody = {
 			tracks: [{ mid: transceiver.mid }],
 			sessionDescription: {
