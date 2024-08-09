@@ -145,7 +145,7 @@ function Room() {
 		useStateObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
 		() => peer.pushTrack(userMedia.videoTrack$, videoTrackEncodingParams$),
-		[videoTrackEncodingParams$]
+		[peer, userMedia.videoTrack$, videoTrackEncodingParams$]
 	)
 
 	const pushedVideoTrack = useSubscribedState(pushedVideoTrack$)
@@ -160,7 +160,7 @@ function Room() {
 					},
 				])
 			),
-		[]
+		[peer, userMedia.publicAudioTrack$]
 	)
 	const pushedAudioTrack = useSubscribedState(pushedAudioTrack$)
 

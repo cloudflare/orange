@@ -5,7 +5,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "remix build",
-		"lint": "prettier --check . && eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
+		"lint": "prettier --check . && eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint --max-warnings=0 .",
 		"dev": "remix dev --manual -c \"npm start\"",
 		"start": "wrangler dev ./build/index.js",
 		"prebuild": "npm run clean",

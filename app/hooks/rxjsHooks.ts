@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { BehaviorSubject, Observable } from 'rxjs'
+import type { Observable } from 'rxjs'
+import { BehaviorSubject } from 'rxjs'
 
 export function useSubscribedState<T>(observable: Observable<T>): T | undefined
 export function useSubscribedState<T>(
