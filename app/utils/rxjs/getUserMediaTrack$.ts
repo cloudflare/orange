@@ -1,6 +1,6 @@
+import type { Subscriber } from 'rxjs'
 import {
 	Observable,
-	Subscriber,
 	combineLatest,
 	concat,
 	distinctUntilChanged,
