@@ -1,9 +1,9 @@
-import { forwardRef } from 'react'
+import { forwardRef, type ComponentProps } from 'react'
 import { cn } from '~/utils/style'
 
 export const TextArea = forwardRef<
 	HTMLTextAreaElement,
-	React.JSX.IntrinsicElements['textarea']
+	ComponentProps<'textarea'>
 >(({ className, ...rest }, ref) => (
 	<textarea
 		ref={ref}

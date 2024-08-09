@@ -30,6 +30,14 @@ module.exports = {
 				argsIgnorePattern: '^_',
 			},
 		],
+		'@typescript-eslint/no-misused-promises': [
+			'error',
+			{
+				checksConditionals: true,
+				checksVoidReturn: false,
+				checksSpreads: true,
+			},
+		],
 	},
 	root: true,
 }

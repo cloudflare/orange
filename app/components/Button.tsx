@@ -1,6 +1,6 @@
 import type { LinkProps } from '@remix-run/react'
 import { Link } from '@remix-run/react'
-import { forwardRef } from 'react'
+import { forwardRef, type ComponentProps } from 'react'
 import { cn } from '~/utils/style'
 
 const displayTypeMap = {
@@ -26,7 +26,7 @@ const displayTypeMap = {
 	],
 }
 
-export type ButtonProps = Omit<React.JSX.IntrinsicElements['button'], 'ref'> & {
+export type ButtonProps = ComponentProps<'button'> & {
 	displayType?: keyof typeof displayTypeMap
 }
 

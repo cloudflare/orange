@@ -62,7 +62,6 @@ export default async function blurVideoTrack(
 	let t = -1
 	async function tick() {
 		await drawBlur()
-		// eslint-disable-next-line @typescript-eslint/no-misused-promises
 		t = window.setTimeout(tick, 1000 / 30) // 30fps
 	}
 
