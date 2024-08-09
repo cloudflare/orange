@@ -3,16 +3,22 @@ import type { FC, ReactNode } from 'react'
 
 interface TooltipProps {
 	open?: boolean
+	onOpenChange?: (open: boolean) => void
 	content?: ReactNode
 	children: ReactNode
 }
 
-export const Tooltip: FC<TooltipProps> = ({ children, content, open }) => {
+export const Tooltip: FC<TooltipProps> = ({
+	children,
+	content,
+	open,
+	onOpenChange,
+}) => {
 	if (content === undefined) return <>{children}</>
 
 	return (
 		<RadixTooltip.Provider>
-			<RadixTooltip.Root open={open}>
+			<RadixTooltip.Root open={open} onOpenChange={onOpenChange}>
 				<RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
 				<RadixTooltip.Portal>
 					<RadixTooltip.Content className="bg-zinc-100 dark:bg-zinc-600 text-sm px-2 py-1 drop-shadow-md dark:drop-shadow-none rounded">

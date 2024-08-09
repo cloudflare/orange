@@ -125,6 +125,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		peer,
 		pushedTracks,
 		room: { otherUsers, websocket, identity },
+		connectionStats,
 	} = useRoomContext()
 
 	const { GridDebugControls, fakeUsers } = useGridDebugControls({
@@ -156,6 +157,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		pushedTracks,
 		raisedHand,
 		speaking,
+		connectionStats,
 	})
 
 	useSounds(otherUsers)

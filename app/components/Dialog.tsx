@@ -31,8 +31,8 @@ export const DialogContent = forwardRef<
 			'dark:shadow-none'
 		)}
 	>
-		{props.children}
 		<DialogClose />
+		{props.children}
 	</RadixDialog.DialogContent>
 ))
 

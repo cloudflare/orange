@@ -8,6 +8,7 @@ import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
 import { Icon } from '~/components/Icon/Icon'
 import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
+import { useConnectionStats } from '~/hooks/useConnectionStats'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
@@ -172,6 +173,7 @@ function Room() {
 		)
 	}, [peer, userMedia.screenShareVideoTrack$])
 	const pushedScreenSharingTrack = useSubscribedState(pushedScreenSharingTrack$)
+	const connectionStats = useConnectionStats(peer)
 
 	const context: RoomContextType = {
 		joined,
@@ -184,6 +186,7 @@ function Room() {
 		roomHistory,
 		iceConnectionState,
 		room,
+		connectionStats,
 		pushedTracks: {
 			video: trackObjectToString(pushedVideoTrack),
 			audio: trackObjectToString(pushedAudioTrack),
