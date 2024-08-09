@@ -32,7 +32,7 @@ export const ReportBugDialog: FC<ReportBugDialogProps> = ({ onOpenChange }) => {
 	)
 }
 
-const ReportBugForm: FC<{}> = () => {
+const ReportBugForm: FC = () => {
 	const { Form, data, state } = useFetcher()
 	const { room, roomHistory } = useRoomContext()
 	const { roomName } = useParams()

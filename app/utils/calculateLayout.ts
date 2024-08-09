@@ -8,7 +8,7 @@ interface Layout {
 function possibleLayouts(count: number) {
 	const max = Math.ceil(Math.sqrt(count))
 
-	let layouts: Layout[] = [{ rows: max, cols: max }]
+	const layouts: Layout[] = [{ rows: max, cols: max }]
 
 	for (let rows = 1; rows < max; rows++) {
 		layouts.push({

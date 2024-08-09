@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function trackIsHealthy(
 	track: MediaStreamTrack
 ): Promise<boolean> {

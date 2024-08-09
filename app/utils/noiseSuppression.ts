@@ -119,6 +119,8 @@ class NoiseSuppressionEffect {
 		this._audioDestination?.disconnect()
 		this._noiseSuppressorNode?.disconnect()
 		this._audioSource?.disconnect()
-		this._audioContext?.close()
+		this._audioContext?.close().catch((error) => {
+			console.error('Error closing audio context:', error)
+		})
 	}
 }

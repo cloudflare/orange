@@ -1,5 +1,6 @@
 import { json } from 'react-router'
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export const loader = async () => {
 	return json({
 		name: 'Orange Meets',

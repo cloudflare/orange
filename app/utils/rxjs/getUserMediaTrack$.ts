@@ -81,6 +81,7 @@ function acquireTrack(
 				const cleanup = () => {
 					console.log('🛑 Stopping track')
 					track.stop()
+					// eslint-disable-next-line @typescript-eslint/no-misused-promises
 					document.removeEventListener('visibilitychange', onVisibleHandler)
 				}
 				const onVisibleHandler = async () => {
@@ -91,6 +92,7 @@ function acquireTrack(
 					cleanup()
 					acquireTrack(subscriber, device, constraints, cleanupRef)
 				}
+				// eslint-disable-next-line @typescript-eslint/no-misused-promises
 				document.addEventListener('visibilitychange', onVisibleHandler)
 				cleanupRef.current = cleanup
 				subscriber.next(track)

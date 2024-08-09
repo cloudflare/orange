@@ -23,7 +23,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 	}
 	const requestUrl = new URL(request.url)
 	const formData = await request.formData()
-	const info: BugReportInfo = JSON.parse(String(formData.get('info')))
+	const info = JSON.parse(String(formData.get('info'))) as BugReportInfo
 	const { identity, roomName, roomHistory, url } = info
 	const description = formData.get('description')
 	invariant(typeof description === 'string')

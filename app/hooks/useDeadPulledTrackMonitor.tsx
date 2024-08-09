@@ -37,7 +37,7 @@ export function useDeadPulledTrackMonitor(
 			// reset this to -1 for the check above
 			timeoutRef.current = -1
 		}
-	}, [deadTrack, enabled, feedbackEnabled, peer, track])
+	}, [deadTrack, enabled, feedbackEnabled, peer, peerConnection, track])
 
 	useEffect(() => {
 		if (!sessionId || !deadTrack || !feedbackEnabled) return
@@ -56,7 +56,7 @@ export function useDeadPulledTrackMonitor(
 			fetch('/api/deadTrack', {
 				method: 'POST',
 				body: JSON.stringify(info),
-			})
+			}).catch(console.error)
 		}
 	}, [
 		deadTrack,
@@ -65,7 +65,6 @@ export function useDeadPulledTrackMonitor(
 		name,
 		sessionId,
 		room.identity?.name,
-		sessionId,
 		traceLink,
 		trackInfo,
 	])

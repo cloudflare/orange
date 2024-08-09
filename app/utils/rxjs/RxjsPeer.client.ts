@@ -174,7 +174,12 @@ export class RxjsPeer {
 				body: JSON.stringify({
 					sessionDescription: peerConnection.localDescription,
 				}),
-			}).then((res) => res.json() as any)
+			}).then((res) =>
+				res.json<{
+					sessionId: string
+					sessionDescription: RTCSessionDescription
+				}>()
+			)
 		const connected = new Promise((res, rej) => {
 			// timeout after 5s
 			setTimeout(rej, 5000)
@@ -257,7 +262,7 @@ export class RxjsPeer {
 									method: 'POST',
 									body: JSON.stringify(requestBody),
 								}
-							).then((res) => res.json() as Promise<TracksResponse>)
+							).then((res) => res.json<TracksResponse>())
 							invariant(response.tracks !== undefined)
 							if (!response.errorCode) {
 								await peerConnection.setRemoteDescription(
@@ -287,12 +292,27 @@ export class RxjsPeer {
 
 			return () => {
 				clearTimeout(timeout)
-				pushedTrackPromise?.then(() => {
-					this.taskScheduler.schedule(async () => {
-						console.debug('🔚 Closing pushed track ', trackName)
-						return this.closeTrack(peerConnection, transceiver.mid, sessionId)
-					})
-				})
+				pushedTrackPromise?.then(
+					() => {
+						this.taskScheduler
+							.schedule(async () => {
+								console.debug('🔚 Closing pushed track ', trackName)
+								return this.closeTrack(
+									peerConnection,
+									transceiver.mid,
+									sessionId
+								)
+							})
+							.catch((err) => {
+								console.error('Error closing pushed track')
+								console.error(err)
+							})
+					},
+					(err) => {
+						console.error('Error closing pushed track')
+						console.error(err)
+					}
+				)
 			}
 		})
 	}
@@ -391,7 +411,7 @@ export class RxjsPeer {
 											tracks,
 										}),
 									}
-								).then((res) => res.json() as Promise<TracksResponse>)
+								).then((res) => res.json<TracksResponse>())
 							if (newTrackResponse.errorCode) {
 								throw new Error(newTrackResponse.errorDescription)
 							}
@@ -435,7 +455,7 @@ export class RxjsPeer {
 												},
 											}),
 										}
-									).then((res) => res.json() as Promise<RenegotiationResponse>)
+									).then((res) => res.json<RenegotiationResponse>())
 								if (renegotiationResponse.errorCode)
 									throw new Error(renegotiationResponse.errorDescription)
 							}
@@ -525,7 +545,7 @@ export class RxjsPeer {
 				method: 'PUT',
 				body: JSON.stringify(requestBody),
 			}
-		).then((res) => res.json() as Promise<TracksResponse>)
+		).then((res) => res.json<TracksResponse>())
 		await peerConnection.setRemoteDescription(
 			new RTCSessionDescription(response.sessionDescription)
 		)

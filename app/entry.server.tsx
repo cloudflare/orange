@@ -10,7 +10,7 @@ export default function handleRequest(
 	remixContext: EntryContext
 ) {
 	try {
-		let markup = renderToString(
+		const markup = renderToString(
 			<RemixServer context={remixContext} url={request.url} />
 		).replace(
 			'__CLIENT_ENV__',

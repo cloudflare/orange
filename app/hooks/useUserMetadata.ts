@@ -13,7 +13,7 @@ export function useUserMetadata(email: string) {
 	const { userDirectoryUrl } = useOutletContext<{ userDirectoryUrl?: string }>()
 	const search = new URLSearchParams({ email })
 
-	const key = `${userDirectoryUrl}?${search}`
+	const key = `${userDirectoryUrl}?${search.toString()}`
 
 	const initialData: UserMetadata = {
 		displayName: email,
@@ -29,7 +29,7 @@ export function useUserMetadata(email: string) {
 			if (
 				response.headers.get('Content-Type')?.startsWith('application/json')
 			) {
-				const parsedData: UserMetadata = (await response.json()) as any
+				const parsedData = await response.json<UserMetadata>()
 				return {
 					...parsedData,
 					displayName: `${parsedData.firstName} ${parsedData.lastName}`,

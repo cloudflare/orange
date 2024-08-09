@@ -30,7 +30,7 @@ export default async function blurVideoTrack(
 	const mediaStream = new MediaStream()
 	mediaStream.addTrack(originalVideoStreamTrack)
 	video.srcObject = mediaStream
-	video.play()
+	video.play().catch(console.error)
 	await loaded
 
 	const canvas = document.createElement('canvas')
@@ -62,11 +62,12 @@ export default async function blurVideoTrack(
 	let t = -1
 	async function tick() {
 		await drawBlur()
+		// eslint-disable-next-line @typescript-eslint/no-misused-promises
 		t = window.setTimeout(tick, 1000 / 30) // 30fps
 	}
 
 	await drawBlur()
-	tick()
+	tick().catch(console.error)
 
 	blurredTrack.stop = () => {
 		clearTimeout(t)

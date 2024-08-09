@@ -3,7 +3,7 @@ import { cn } from '~/utils/style'
 
 export const Input = forwardRef<
 	HTMLInputElement,
-	JSX.IntrinsicElements['input']
+	React.JSX.IntrinsicElements['input']
 >(({ className, ...rest }, ref) => (
 	<input
 		className={cn(
