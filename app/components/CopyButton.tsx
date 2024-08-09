@@ -26,9 +26,15 @@ export const CopyButton: FC<CopyButtonProps> = () => {
 			<Button
 				displayType="secondary"
 				onClick={() => {
-					navigator.clipboard.writeText(roomUrl)
-					setCopied(true)
-					reset()
+					navigator.clipboard.writeText(roomUrl).then(
+						() => {
+							setCopied(true)
+							reset()
+						},
+						(err) => {
+							console.error('Failed to copy to clipboard', err)
+						}
+					)
 				}}
 			>
 				<Icon

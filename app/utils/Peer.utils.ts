@@ -13,7 +13,7 @@ export class FIFOScheduler {
 			this.#schedulerChain = this.#schedulerChain.then(async () => {
 				try {
 					resolve(await task())
-				} catch (error: any) {
+				} catch (error) {
 					reject(error)
 				}
 			})
@@ -48,7 +48,7 @@ export class BulkRequestDispatcher<RequestEntryParams, BulkResponse> {
 		}
 		// save the current batch list reference in the function scope because this.#currentBatch could be reset if
 		// the batch limit is reached
-		let batch = this.#currentBatch
+		const batch = this.#currentBatch
 		this.#currentBulkResponse = new Promise((resolve, reject) => {
 			//   script
 			//     |
@@ -66,8 +66,8 @@ export class BulkRequestDispatcher<RequestEntryParams, BulkResponse> {
 				// callers will wait for a new response promise
 				this.#currentBulkResponse = null
 				// we cut here to make the bulk request
-				let batchCopy = batch.splice(0, batch.length)
-				let p = bulkRequestFunc(batchCopy)
+				const batchCopy = batch.splice(0, batch.length)
+				const p = bulkRequestFunc(batchCopy)
 				p.then((r) => {
 					resolve(r)
 				}).catch((err) => {

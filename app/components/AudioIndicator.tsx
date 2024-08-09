@@ -17,7 +17,7 @@ export const AudioIndicator: FC<AudioIndicatorProps> = ({ audioTrack }) => {
 				style={
 					{
 						'--scale': Math.max(minSize, audioLevel + scaleModifier),
-					} as any
+					} as React.CSSProperties
 				}
 			></div>
 			<div
@@ -27,7 +27,7 @@ export const AudioIndicator: FC<AudioIndicatorProps> = ({ audioTrack }) => {
 				style={
 					{
 						'--scale': Math.max(minSize, audioLevel + scaleModifier),
-					} as any
+					} as React.CSSProperties
 				}
 			></div>
 		</div>

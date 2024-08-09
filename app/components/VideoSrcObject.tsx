@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useRef } from 'react'
 import { cn } from '~/utils/style'
 
 export type VideoSrcObjectProps = Omit<
-	JSX.IntrinsicElements['video'],
+	React.JSX.IntrinsicElements['video'],
 	'ref'
 > & {
 	videoTrack?: MediaStreamTrack
@@ -29,6 +29,7 @@ export const VideoSrcObject = forwardRef<HTMLVideoElement, VideoSrcObjectProps>(
 		}, [videoTrack])
 
 		return (
+			// eslint-disable-next-line jsx-a11y/media-has-caption
 			<video
 				className={cn('bg-zinc-700', className)}
 				ref={(v) => {

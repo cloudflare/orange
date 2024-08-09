@@ -51,10 +51,11 @@ describe('root loader', () => {
 		})
 
 		try {
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
 			await loader({ request, context: { env: {} } as any, params: {} })
 		} catch (e) {
 			if (!(e instanceof Response)) throw e
-			var response = e
+			const response = e
 			expect(response.status).toBe(302)
 			expect(response.headers.get('Location')).toBe(url.toString())
 			expect(response.headers.get('Set-Cookie')).toBe(
@@ -89,6 +90,8 @@ describe('root loader', () => {
 
 		const response = await loader({
 			request,
+
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
 			context: { env: {} } as any,
 			params: {},
 		})
@@ -118,6 +121,7 @@ describe('root loader', () => {
 
 		const response = await loader({
 			request,
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
 			context: { env: {} } as any,
 			params: {},
 		})
@@ -131,6 +135,7 @@ describe('root loader', () => {
 		try {
 			const response = await loader({
 				request,
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
 				context: { env: {} } as any,
 				params: {},
 			})
@@ -156,6 +161,7 @@ describe('root loader', () => {
 		try {
 			const response = await loader({
 				request,
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
 				context: { env: {} } as any,
 				params: {},
 			})

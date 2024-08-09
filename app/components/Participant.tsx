@@ -19,7 +19,7 @@ import { VideoSrcObject } from './VideoSrcObject'
 
 export const Participant = forwardRef<
 	HTMLDivElement,
-	JSX.IntrinsicElements['div'] & {
+	React.JSX.IntrinsicElements['div'] & {
 		flipId: string
 		isScreenShare?: boolean
 		user: User

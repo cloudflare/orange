@@ -29,6 +29,7 @@ export const AudioInputSelector: FC<{ id?: string }> = ({ id }) => {
 
 	return (
 		<div className="max-w-[40ch]">
+			{/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
 			<Select id={id} value={audioDeviceId} onValueChange={setAudioDeviceId}>
 				{audioInputDevices.map((d) => (
 					<Option key={d.deviceId} value={d.deviceId}>

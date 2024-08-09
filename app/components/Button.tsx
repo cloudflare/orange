@@ -26,7 +26,7 @@ const displayTypeMap = {
 	],
 }
 
-export type ButtonProps = Omit<JSX.IntrinsicElements['button'], 'ref'> & {
+export type ButtonProps = Omit<React.JSX.IntrinsicElements['button'], 'ref'> & {
 	displayType?: keyof typeof displayTypeMap
 }
 
@@ -59,7 +59,6 @@ export const ButtonLink = forwardRef<
 		displayType?: keyof typeof displayTypeMap
 	}
 >(({ className, displayType = 'primary', ...rest }, ref) => (
-	// eslint-disable-next-line jsx-a11y/anchor-has-content
 	<Link
 		className={cn(
 			'inline-block',

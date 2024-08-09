@@ -27,6 +27,7 @@ export default function SetUsername() {
 					<label htmlFor="username">Enter your display name</label>
 					<Input
 						autoComplete="off"
+						// eslint-disable-next-line jsx-a11y/no-autofocus
 						autoFocus
 						required
 						type="text"

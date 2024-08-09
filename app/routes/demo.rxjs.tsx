@@ -111,6 +111,7 @@ function Audio(props: { audioTrack$: Observable<MediaStreamTrack | null> }) {
 		}
 	})
 
+	// eslint-disable-next-line jsx-a11y/media-has-caption
 	return <audio className="h-full w-full" ref={ref} autoPlay playsInline />
 }
 

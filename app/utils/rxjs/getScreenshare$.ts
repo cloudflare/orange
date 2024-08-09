@@ -3,10 +3,10 @@ import invariant from 'tiny-invariant'
 
 export function getScreenshare$({ contentHint }: { contentHint: string }) {
 	return new Observable<MediaStream | undefined>((subscribe) => {
-		let cleanup: Function = () => {}
+		let cleanup = () => {}
 		// do this in a setTimeout that we can cancel
 		// so it will play nicely with React strict mode
-		let timeout = setTimeout(() => {
+		const timeout = setTimeout(() => {
 			navigator.mediaDevices
 				.getDisplayMedia()
 				.then((ms) => {

@@ -32,12 +32,19 @@ export const AudioStream: FC<AudioStreamProps> = ({
 		// need to set srcObject again in Chrome and call play() again for Safari
 		// https://www.youtube.com/live/Tkx3OGrwVk8?si=K--P_AzNnAGrjraV&t=2533
 		// calling play() this way to make Chrome happy otherwise it throws an error
-		audio.addEventListener('canplay', () => audio.play(), { once: true })
+		audio.addEventListener(
+			'canplay',
+			() => {
+				audio.play().catch(console.error)
+			},
+			{ once: true }
+		)
 		audio.srcObject = mediaStream
 	}
 
 	return (
 		<>
+			{/* eslint-disable-next-line jsx-a11y/media-has-caption */}
 			<audio ref={ref} autoPlay />
 			{tracksToPull.map((track) => (
 				<AudioTrack
@@ -98,7 +105,7 @@ function AudioTrack({
 			mediaStream.removeTrack(audioTrack)
 			onTrackRemovedRef.current(track, audioTrack)
 		}
-	}, [audioTrack])
+	}, [audioTrack, mediaStream, track])
 
 	return null
 }

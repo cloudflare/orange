@@ -1,10 +1,10 @@
-/* eslint-disable no-loop-func */
+ 
 import { expect, test } from 'vitest'
 import { BulkRequestDispatcher, FIFOScheduler } from './Peer.utils'
 
 test('schedule', async () => {
-	let scheduler = new FIFOScheduler()
-	let list: number[] = []
+	const scheduler = new FIFOScheduler()
+	const list: number[] = []
 	scheduler.schedule(async () => {
 		list.push(1)
 	})
@@ -21,12 +21,12 @@ test('schedule', async () => {
 test('taskError', async () => {
 	const err1 = 'error'
 	const ok = 'ok'
-	let scheduler = new FIFOScheduler()
+	const scheduler = new FIFOScheduler()
 
-	let p1 = scheduler.schedule(async () => {
+	const p1 = scheduler.schedule(async () => {
 		throw new Error(err1)
 	})
-	let p2 = scheduler.schedule(async () => {
+	const p2 = scheduler.schedule(async () => {
 		return ok
 	})
 	try {
@@ -38,7 +38,7 @@ test('taskError', async () => {
 })
 
 test('bulkRequest', async () => {
-	let dispatcher: BulkRequestDispatcher<number, void> =
+	const dispatcher: BulkRequestDispatcher<number, void> =
 		new BulkRequestDispatcher()
 
 	let requestSent = false
@@ -55,7 +55,7 @@ test('bulkRequest', async () => {
 })
 
 test('bulkRequestWithLimit', async () => {
-	let dispatcher: BulkRequestDispatcher<number, void> =
+	const dispatcher: BulkRequestDispatcher<number, void> =
 		new BulkRequestDispatcher(2)
 
 	let requests = 0
@@ -79,7 +79,7 @@ test('bulkRequestWithLimit', async () => {
 
 test('bulkRequestBatchCopy', async () => {
 	// test goal: bulkCopy shoud have only the items accumulated until the bulk request is started
-	let dispatcher: BulkRequestDispatcher<number, void> =
+	const dispatcher: BulkRequestDispatcher<number, void> =
 		new BulkRequestDispatcher()
 
 	let requestSent = false

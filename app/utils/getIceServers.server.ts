@@ -16,11 +16,10 @@ export async function getIceServers({
 			},
 		}
 	)
-		.then(
-			(res) =>
-				res.json() as Promise<{
-					iceServers: RTCIceServer
-				}>
+		.then((res) =>
+			res.json<{
+				iceServers: RTCIceServer
+			}>()
 		)
 		.then(({ iceServers }) => [iceServers])
 }

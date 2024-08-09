@@ -14,7 +14,7 @@ export default function useIsSpeaking(mediaStreamTrack?: MediaStreamTrack) {
 	useEffect(() => {
 		isSpeakingRef.current = isSpeaking
 		const interval = window.setInterval(() => {
-			// state is already in sync — do nothing
+			// state is already in sync — do nothing
 			if (isSpeaking === isSpeakingRef.current) {
 				return
 			}
