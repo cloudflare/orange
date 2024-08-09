@@ -35,6 +35,7 @@ To customise these variables, place replacement values in `.dev.vars` (for devel
 ## Development
 
 ```sh
+npm install
 npm run dev
 ```
 
@@ -54,6 +55,12 @@ wrangler login
 
 ```sh
 wrangler secret put CALLS_APP_SECRET
+```
+
+or to programmatically set the secret, run:
+
+```sh
+echo REPLACE_WITH_YOUR_SECRET | wrangler secret put CALLS_APP_SECRET
 ```
 
 4. Then you can run

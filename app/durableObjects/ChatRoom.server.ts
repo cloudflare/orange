@@ -34,9 +34,9 @@ export class ChatRoom extends Server<Env> {
 			)
 		)
 
-		if (!this.ctx.storage.getAlarm()) {
+		if (!(await this.ctx.storage.getAlarm())) {
 			// start the alarm to broadcast state every 30 seconds
-			this.ctx.storage.setAlarm(30000)
+			this.ctx.storage.setAlarm(Date.now() + 30000)
 		}
 
 		// cleaning out storage used by older versions of this code
@@ -74,16 +74,29 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	broadcastState() {
-		this.broadcast(
-			JSON.stringify({
-				type: 'roomState',
-				state: {
-					users: [...this.getConnections<User>()]
-						.map((connection) => connection.state)
-						.filter((x) => !!x),
-				},
-			} satisfies ServerMessage)
-		)
+		let didSomeoneQuit = false
+		const roomStateMessage = {
+			type: 'roomState',
+			state: {
+				users: [...this.getConnections<User>()]
+					.map((connection) => connection.state)
+					.filter((x) => !!x),
+			},
+		} satisfies ServerMessage
+
+		for (const connection of this.getConnections<User>()) {
+			try {
+				connection.send(JSON.stringify(roomStateMessage))
+			} catch (err) {
+				connection.close(1011, 'Failed to broadcast state')
+				didSomeoneQuit = true
+			}
+		}
+
+		if (didSomeoneQuit) {
+			// broadcast again to remove the user who quit
+			this.broadcastState()
+		}
 	}
 
 	async onMessage(
@@ -100,7 +113,8 @@ export class ChatRoom extends Server<Env> {
 
 			switch (data.type) {
 				case 'userLeft':
-					// TODO: ??
+					connection.close(1000, 'User left')
+					this.broadcastState()
 					break
 				case 'userUpdate':
 					connection.setState(data.user)
@@ -125,26 +139,32 @@ export class ChatRoom extends Server<Env> {
 					break
 
 				case 'muteUser':
-					for (const otherConnection of this.getConnections<User>()) {
-						if (otherConnection.id === data.id) {
-							otherConnection.setState({
-								...otherConnection.state!,
-								tracks: {
-									...otherConnection.state!.tracks,
-									audioEnabled: false,
-								},
-							})
-							this.sendMessage(otherConnection, {
-								type: 'muteMic',
-							})
+					{
+						let mutedUser = false
+						for (const otherConnection of this.getConnections<User>()) {
+							if (otherConnection.id === data.id) {
+								otherConnection.setState({
+									...otherConnection.state!,
+									tracks: {
+										...otherConnection.state!.tracks,
+										audioEnabled: false,
+									},
+								})
+								this.sendMessage(otherConnection, {
+									type: 'muteMic',
+								})
 
-							this.broadcastState()
-							break
+								this.broadcastState()
+								mutedUser = true
+								break
+							}
+						}
+						if (!mutedUser) {
+							console.warn(
+								`User with id "${data.id}" not found, cannot mute user from "${connection.state!.name}"`
+							)
 						}
 					}
-					console.warn(
-						`User with id "${data.id}" not found, cannot mute user from "${connection.state!.name}"`
-					)
 
 					break
 				case 'partyserver-ping':
@@ -170,7 +190,11 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	onClose() {
-		this.broadcastState()
+		// while it makes sense to broadcast immediately on close,
+		// it's possible that the websocket just closed for an instant
+		//  and will reconnect momentarily.
+		// so let's just let the alarm handler do the broadcasting.
+		// this.broadcastState()
 	}
 
 	onError(): void | Promise<void> {
@@ -181,6 +205,6 @@ export class ChatRoom extends Server<Env> {
 		// technically we don't need to broadcast state on an alarm,
 		// but let's keep it for a while and see if it's useful
 		this.broadcastState()
-		this.ctx.storage.setAlarm(30000)
+		this.ctx.storage.setAlarm(Date.now() + 30000)
 	}
 }
