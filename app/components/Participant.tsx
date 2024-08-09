@@ -1,5 +1,5 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import { forwardRef, useEffect } from 'react'
+import { forwardRef, useEffect, type ComponentProps } from 'react'
 import { Flipped } from 'react-flip-toolkit'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -19,7 +19,7 @@ import { VideoSrcObject } from './VideoSrcObject'
 
 export const Participant = forwardRef<
 	HTMLDivElement,
-	React.JSX.IntrinsicElements['div'] & {
+	ComponentProps<'div'> & {
 		flipId: string
 		isScreenShare?: boolean
 		user: User

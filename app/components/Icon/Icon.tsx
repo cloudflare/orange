@@ -26,7 +26,7 @@ import {
 	WifiIcon,
 	XCircleIcon,
 } from '@heroicons/react/20/solid'
-import type { FC } from 'react'
+import type { ComponentProps, FC } from 'react'
 import { cn } from '~/utils/style'
 import { MicrophoneSlashIcon } from './custom/MicrophoneSlashIcon'
 
@@ -64,9 +64,11 @@ interface IconProps {
 	type: keyof typeof iconMap
 }
 
-export const Icon: FC<
-	IconProps & Omit<React.JSX.IntrinsicElements['svg'], 'ref'>
-> = ({ type, className, ...rest }) => {
+export const Icon: FC<IconProps & ComponentProps<'svg'>> = ({
+	type,
+	className,
+	...rest
+}) => {
 	const Component = iconMap[type]
 	return <Component className={cn('h-[1em]', className)} {...rest} />
 }

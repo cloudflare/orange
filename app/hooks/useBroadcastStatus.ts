@@ -52,8 +52,7 @@ export default function useBroadcastStatus({
 				},
 			}
 
-			// eslint-disable-next-line no-inner-declarations
-			function sendUserUpdate() {
+			const sendUserUpdate = () => {
 				websocket.send(
 					JSON.stringify({
 						type: 'userUpdate',

@@ -1,8 +1,6 @@
-import type { FC } from 'react'
+import type { ComponentProps, FC } from 'react'
 
-export const MicrophoneSlashIcon: FC<React.JSX.IntrinsicElements['svg']> = (
-	props
-) => {
+export const MicrophoneSlashIcon: FC<ComponentProps<'svg'>> = (props) => {
 	return (
 		<svg
 			aria-hidden="true"
