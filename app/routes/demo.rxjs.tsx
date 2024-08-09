@@ -1,6 +1,7 @@
 import type { ComponentProps, ElementRef } from 'react'
 import { useMemo, useRef, useState } from 'react'
-import { Observable, map, shareReplay } from 'rxjs'
+import type { Observable } from 'rxjs'
+import { map, shareReplay } from 'rxjs'
 import { useObservableEffect, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useIsServer } from '~/hooks/useIsServer'
 import { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'

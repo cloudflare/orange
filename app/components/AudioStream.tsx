@@ -98,7 +98,7 @@ function AudioTrack({
 			mediaStream.removeTrack(audioTrack)
 			onTrackRemovedRef.current(track, audioTrack)
 		}
-	}, [audioTrack])
+	}, [audioTrack, mediaStream, track])
 
 	return null
 }

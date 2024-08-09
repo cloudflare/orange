@@ -1,11 +1,5 @@
-import {
-	combineLatest,
-	interval,
-	map,
-	Observable,
-	pairwise,
-	switchMap,
-} from 'rxjs'
+import type { Observable } from 'rxjs'
+import { combineLatest, interval, map, pairwise, switchMap } from 'rxjs'
 import Ewma from '~/utils/ewma'
 
 export interface PacketLossStats {

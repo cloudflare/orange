@@ -278,6 +278,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 							userMedia.videoStreamTrack &&
 							fakeUsers.map((uid) => (
 								<PullVideoTrack
+									key={identity.id}
 									video={identity.tracks.video}
 									audio={identity.tracks.audio}
 								>

@@ -1,4 +1,5 @@
-import { BehaviorSubject, Observable, merge, of } from 'rxjs'
+import type { Observable } from 'rxjs'
+import { BehaviorSubject, merge, of } from 'rxjs'
 
 export interface GetDeviceListOptions {
 	prioritizeList?: Array<Partial<MediaDeviceInfo>>
