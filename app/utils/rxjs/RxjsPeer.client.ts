@@ -87,7 +87,10 @@ export class RxjsPeer {
 						)
 						subscribe.next(setup())
 					} else if (peerConnection.iceConnectionState === 'disconnected') {
-						const timeoutSeconds = 3
+						// TODO: we should start to inspect the connection stats from here on for
+						// any other signs of trouble to guide what to do next (instead of just hoping
+						// for the best like we do here for now)
+						const timeoutSeconds = 7
 						iceTimeout = window.setTimeout(() => {
 							console.debug(
 								`💥 Peer iceConnectionState was ${peerConnection.iceConnectionState} for more than ${timeoutSeconds} seconds`
