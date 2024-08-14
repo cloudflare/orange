@@ -169,41 +169,12 @@ export class RxjsPeer {
 	async createSession(peerConnection: RTCPeerConnection) {
 		console.debug('🆕 creating new session')
 		const { apiBase } = this.config
-		// create an offer
-		const offer = await peerConnection.createOffer()
-		// Turn on Opus DTX to save bandwidth
-		offer.sdp = offer.sdp?.replace('useinbandfec=1', 'usedtx=1;useinbandfec=1')
-		// And set the offer as the local description
-		await peerConnection.setLocalDescription(offer)
-		const { sessionId, sessionDescription } =
-			await this.fetchWithRecordedHistory(`${apiBase}/sessions/new?SESSION`, {
+		const { sessionId } = await this.fetchWithRecordedHistory(
+			`${apiBase}/sessions/new?SESSION`,
+			{
 				method: 'POST',
-				body: JSON.stringify({
-					sessionDescription: offer,
-				}),
-			}).then((res) => res.json() as any)
-		const connected = new Promise((res, rej) => {
-			// timeout after 5s
-			setTimeout(rej, 5000)
-			const connectionStateChangeHandler = () => {
-				if (peerConnection.connectionState === 'connected') {
-					peerConnection.removeEventListener(
-						'connectionstatechange',
-						connectionStateChangeHandler
-					)
-					res(undefined)
-				}
 			}
-			peerConnection.addEventListener(
-				'connectionstatechange',
-				connectionStateChangeHandler
-			)
-		})
-
-		// Once both local and remote descriptions are set, the ICE process begins
-		await peerConnection.setRemoteDescription(sessionDescription)
-		// Wait until the peer connection's iceConnectionState is "connected"
-		await connected
+		).then((res) => res.json() as any)
 		return { peerConnection, sessionId }
 	}
 
@@ -276,6 +247,7 @@ export class RxjsPeer {
 								await peerConnection.setRemoteDescription(
 									new RTCSessionDescription(response.sessionDescription)
 								)
+								await connected(peerConnection)
 							}
 
 							return {
@@ -449,8 +421,11 @@ export class RxjsPeer {
 											}),
 										}
 									).then((res) => res.json() as Promise<RenegotiationResponse>)
-								if (renegotiationResponse.errorCode)
+								if (renegotiationResponse.errorCode) {
 									throw new Error(renegotiationResponse.errorDescription)
+								} else {
+									await connected(peerConnection)
+								}
 							}
 
 							return { trackMap }
@@ -582,4 +557,31 @@ async function resolveTrack(
 
 		peerConnection.addEventListener('track', handler)
 	})
+}
+
+async function connected(peerConnection: RTCPeerConnection) {
+	if (peerConnection.connectionState !== 'connected') {
+		const connected = new Promise((res, rej) => {
+			// timeout after 5s
+			setTimeout(rej, 5000)
+			const connectionStateChangeHandler = () => {
+				if (peerConnection.connectionState === 'connected') {
+					peerConnection.removeEventListener(
+						'connectionstatechange',
+						connectionStateChangeHandler
+					)
+					res(undefined)
+				}
+			}
+			peerConnection.addEventListener(
+				'connectionstatechange',
+				connectionStateChangeHandler,
+				{
+					once: true,
+				}
+			)
+		})
+
+		await connected
+	}
 }
