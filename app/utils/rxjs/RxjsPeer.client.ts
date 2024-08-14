@@ -279,7 +279,7 @@ export class RxjsPeer {
 					})
 				})
 			}
-		})
+		}).pipe(retry(2))
 	}
 
 	pushTrack(
