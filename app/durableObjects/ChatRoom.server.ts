@@ -40,7 +40,7 @@ export class ChatRoom extends Server<Env> {
 		)
 
 		// cleaning out storage used by older versions of this code
-		this.ctx.storage.delete('sessions').catch(() => {
+		await this.ctx.storage.delete('sessions').catch(() => {
 			console.warn('Failed to delete old sessions storage')
 		})
 		// We can remove this line later
@@ -72,7 +72,7 @@ export class ChatRoom extends Server<Env> {
 		}
 
 		// store the user's data in storage
-		await this.ctx.storage.put(`session-${connection.id}`, JSON.stringify(user))
+		await this.ctx.storage.put(`session-${connection.id}`, user)
 
 		await this.broadcastRoomState()
 	}
@@ -125,19 +125,18 @@ export class ChatRoom extends Server<Env> {
 			switch (data.type) {
 				case 'userLeft': {
 					connection.close(1000, 'User left')
-					this.ctx.storage.delete(`session-${connection.id}`).catch(() => {
-						console.warn(
-							`Failed to delete session session-${connection.id} on userLeft`
-						)
-					})
+					await this.ctx.storage
+						.delete(`session-${connection.id}`)
+						.catch(() => {
+							console.warn(
+								`Failed to delete session session-${connection.id} on userLeft`
+							)
+						})
 					await this.broadcastRoomState()
 					break
 				}
 				case 'userUpdate': {
-					this.ctx.storage.put(
-						`session-${connection.id}`,
-						JSON.stringify(data.user)
-					)
+					this.ctx.storage.put(`session-${connection.id}`, data.user)
 					await this.broadcastRoomState()
 					break
 				}
@@ -172,14 +171,13 @@ export class ChatRoom extends Server<Env> {
 							const otherUser = await this.ctx.storage.get<User>(
 								`session-${data.id}`
 							)
-							this.ctx.storage.put(`session-${data.id}`, {
+							await this.ctx.storage.put(`session-${data.id}`, {
 								...otherUser!,
 								tracks: {
 									...otherUser!.tracks,
 									audioEnabled: false,
 								},
 							})
-							//
 							this.sendMessage(otherConnection, {
 								type: 'muteMic',
 							})
@@ -237,9 +235,19 @@ export class ChatRoom extends Server<Env> {
 		// this.broadcastState()
 	}
 
+	async cleanupOldConnections() {
+		const connections = [...this.getConnections()]
+		const sessionsToCleanUp = await this.ctx.storage.list<User>()
+		connections.forEach((connection) =>
+			sessionsToCleanUp.delete(`session-${connection.id}`)
+		)
+		return this.ctx.storage
+			.delete([...sessionsToCleanUp.keys()])
+			.catch(() => console.warn('Failed to clean up orphaned sessions'))
+	}
+
 	async alarm(): Promise<void> {
-		// technically we don't need to broadcast state on an alarm,
-		// but let's keep it for a while and see if it's useful
+		await this.cleanupOldConnections()
 		await this.broadcastRoomState()
 		if ([...this.getConnections()].length !== 0) {
 			this.ctx.storage.setAlarm(Date.now() + 30000)
