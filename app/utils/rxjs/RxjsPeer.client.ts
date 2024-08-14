@@ -248,7 +248,7 @@ export class RxjsPeer {
 								await peerConnection.setRemoteDescription(
 									new RTCSessionDescription(response.sessionDescription)
 								)
-								await connected(peerConnection)
+								await peerConnectionIsConnected(peerConnection)
 							}
 
 							return {
@@ -425,7 +425,7 @@ export class RxjsPeer {
 								if (renegotiationResponse.errorCode) {
 									throw new Error(renegotiationResponse.errorDescription)
 								} else {
-									await connected(peerConnection)
+									await peerConnectionIsConnected(peerConnection)
 								}
 							}
 
@@ -560,26 +560,30 @@ async function resolveTrack(
 	})
 }
 
-async function connected(peerConnection: RTCPeerConnection) {
+async function peerConnectionIsConnected(peerConnection: RTCPeerConnection) {
 	if (peerConnection.connectionState !== 'connected') {
 		const connected = new Promise((res, rej) => {
 			// timeout after 5s
-			setTimeout(rej, 5000)
+			const timeout = setTimeout(() => {
+				peerConnection.removeEventListener(
+					'connectionstatechange',
+					connectionStateChangeHandler
+				)
+				rej()
+			}, 5000)
 			const connectionStateChangeHandler = () => {
 				if (peerConnection.connectionState === 'connected') {
 					peerConnection.removeEventListener(
 						'connectionstatechange',
 						connectionStateChangeHandler
 					)
+					clearTimeout(timeout)
 					res(undefined)
 				}
 			}
 			peerConnection.addEventListener(
 				'connectionstatechange',
-				connectionStateChangeHandler,
-				{
-					once: true,
-				}
+				connectionStateChangeHandler
 			)
 		})
 
