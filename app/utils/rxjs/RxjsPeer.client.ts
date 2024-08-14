@@ -92,6 +92,7 @@ export class RxjsPeer {
 						// for the best like we do here for now)
 						const timeoutSeconds = 7
 						iceTimeout = window.setTimeout(() => {
+							if (peerConnection.iceConnectionState === 'connected') return
 							console.debug(
 								`💥 Peer iceConnectionState was ${peerConnection.iceConnectionState} for more than ${timeoutSeconds} seconds`
 							)
