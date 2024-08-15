@@ -58,17 +58,20 @@ export class ChatRoom extends Server<Env> {
 		const username = await getUsername(ctx.request)
 		assertNonNullable(username)
 
-		const user: User = {
-			id: connection.id,
-			name: username,
-			joined: false,
-			raisedHand: false,
-			speaking: false,
-			tracks: {
-				audioEnabled: false,
-				videoEnabled: false,
-				screenShareEnabled: false,
-			},
+		let user = await this.ctx.storage.get<User>(`session-${connection.id}`)
+		if (user === undefined) {
+			user = {
+				id: connection.id,
+				name: username,
+				joined: false,
+				raisedHand: false,
+				speaking: false,
+				tracks: {
+					audioEnabled: false,
+					videoEnabled: false,
+					screenShareEnabled: false,
+				},
+			}
 		}
 
 		// store the user's data in storage
