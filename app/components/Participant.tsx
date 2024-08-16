@@ -1,15 +1,24 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import { forwardRef, useEffect } from 'react'
+import { forwardRef, useEffect, useMemo } from 'react'
 import { Flipped } from 'react-flip-toolkit'
+import { of } from 'rxjs'
+import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
 import type { User } from '~/types/Messages'
+import isNonNullable from '~/utils/isNonNullable'
 import populateTraceLink from '~/utils/populateTraceLink'
+import { ewma } from '~/utils/rxjs/ewma'
+import { getPacketLoss$ } from '~/utils/rxjs/getPacketLoss$'
 import { cn } from '~/utils/style'
 import { AudioGlow } from './AudioGlow'
 import { AudioIndicator } from './AudioIndicator'
 import { Button } from './Button'
+import {
+	ConnectionIndicator,
+	getConnectionQuality,
+} from './ConnectionIndicator'
 import { HoverFade } from './HoverFade'
 import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
@@ -44,7 +53,7 @@ export const Participant = forwardRef<
 		ref
 	) => {
 		const { data } = useUserMetadata(user.name)
-		const { traceLink } = useRoomContext()
+		const { traceLink, peer } = useRoomContext()
 
 		useDeadPulledTrackMonitor(
 			user.tracks.video,
@@ -69,6 +78,17 @@ export const Participant = forwardRef<
 				setPinnedId(flipId)
 			}
 		}, [flipId, isScreenShare, setPinnedId])
+
+		const packetLoss$ = useMemo(
+			() =>
+				getPacketLoss$(
+					peer.peerConnection$,
+					of([audioTrack, videoTrack].filter(isNonNullable))
+				).pipe(ewma(5000)),
+			[audioTrack, peer.peerConnection$, videoTrack]
+		)
+
+		const packetLoss = useSubscribedState(packetLoss$, 0)
 
 		return (
 			<div
@@ -170,14 +190,19 @@ export const Participant = forwardRef<
 							</div>
 						)}
 						{data?.displayName && user.transceiverSessionId && (
-							<OptionalLink
-								className="absolute m-2 leading-none text-shadow left-1 bottom-1"
-								href={populateTraceLink(user.transceiverSessionId, traceLink)}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								{data.displayName}
-							</OptionalLink>
+							<div className="flex items-center gap-2 absolute m-2 text-shadow left-1 bottom-1">
+								<ConnectionIndicator
+									quality={getConnectionQuality(packetLoss)}
+								/>
+								<OptionalLink
+									className="leading-none"
+									href={populateTraceLink(user.transceiverSessionId, traceLink)}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									{data.displayName}
+								</OptionalLink>
+							</div>
 						)}
 						<div className="absolute top-0 right-0 flex gap-4 p-4">
 							{user.raisedHand && (
