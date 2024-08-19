@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientMessage, RoomState, ServerMessage } from '~/types/Messages'
 import assertNever from '~/utils/assertNever'
 
@@ -13,6 +13,12 @@ export default function useRoom({
 	userMedia: UserMedia
 }) {
 	const [roomState, setRoomState] = useState<RoomState>({ users: [] })
+
+	const userLeftFunctionRef = useRef(() => {})
+
+	useEffect(() => {
+		return () => userLeftFunctionRef.current()
+	}, [])
 
 	const websocket = usePartySocket({
 		party: 'rooms',
@@ -44,11 +50,12 @@ export default function useRoom({
 		},
 	})
 
+	userLeftFunctionRef.current = () =>
+		websocket.send(JSON.stringify({ type: 'userLeft' } satisfies ClientMessage))
+
 	useEffect(() => {
 		function onBeforeUnload() {
-			websocket.send(
-				JSON.stringify({ type: 'userLeft' } satisfies ClientMessage)
-			)
+			userLeftFunctionRef.current()
 		}
 		window.addEventListener('beforeunload', onBeforeUnload)
 		return () => {

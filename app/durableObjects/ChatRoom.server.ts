@@ -225,17 +225,13 @@ export class ChatRoom extends Server<Env> {
 	onClose() {
 		// while it makes sense to broadcast immediately on close,
 		// it's possible that the websocket just closed for an instant
-		//  and will reconnect momentarily.
+		// and will reconnect momentarily.
 		// so let's just let the alarm handler do the broadcasting.
-		// this.broadcastState()
+		// this.broadcastRoomState()
 	}
 
 	onError(): void | Promise<void> {
-		// while it makes sense to broadcast immediately on close,
-		// it's possible that the websocket just closed for an instant
-		//  and will reconnect momentarily.
-		// so let's just let the alarm handler do the broadcasting.
-		// this.broadcastState()
+		this.broadcastRoomState()
 	}
 
 	async cleanupOldConnections() {
