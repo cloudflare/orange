@@ -534,10 +534,6 @@ function createPeerConnection(
 ) {
 	const pc = new RTCPeerConnection(configuration)
 
-	pc.addTransceiver('audio', {
-		direction: 'inactive',
-	})
-
 	return pc
 }
 
