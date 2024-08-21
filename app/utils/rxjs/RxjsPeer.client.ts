@@ -60,8 +60,9 @@ export class RxjsPeer {
 			let peerConnection: RTCPeerConnection
 			const setup = () => {
 				peerConnection?.close()
-				peerConnection = createPeerConnection({
+				peerConnection = new RTCPeerConnection({
 					iceServers: config.iceServers,
+					bundlePolicy: 'max-bundle',
 				})
 				peerConnection.addEventListener('connectionstatechange', () => {
 					if (
@@ -524,17 +525,6 @@ export class RxjsPeer {
 			new RTCSessionDescription(response.sessionDescription)
 		)
 	}
-}
-
-function createPeerConnection(
-	configuration: RTCConfiguration = {
-		iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
-		bundlePolicy: 'max-bundle',
-	}
-) {
-	const pc = new RTCPeerConnection(configuration)
-
-	return pc
 }
 
 async function resolveTrack(
