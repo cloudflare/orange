@@ -26,7 +26,11 @@ export function useDeadPulledTrackMonitor(
 				const stat = [...report.values()].find(
 					(s) => s.trackIdentifier === track.id
 				)
-				if (stat?.bytesReceived === 0) {
+				if (
+					peerConnection.connectionState === 'connected' &&
+					peerConnection.iceConnectionState === 'connected' &&
+					stat?.bytesReceived === 0
+				) {
 					setDeadTrack(true)
 				}
 			})
