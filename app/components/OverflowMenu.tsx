@@ -17,6 +17,8 @@ interface OverflowMenuProps {
 export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 	const {
 		room: { otherUsers, identity },
+		dataSaverMode,
+		setDataSaverMode,
 	} = useRoomContext()
 	const [settingsMenuOpen, setSettingMenuOpen] = useState(false)
 	const [bugReportMenuOpen, setBugReportMenuOpen] = useState(false)
@@ -33,6 +35,12 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Portal>
 					<DropdownMenu.Content sideOffset={5}>
+						<DropdownMenu.Item
+							onSelect={() => setDataSaverMode(!dataSaverMode)}
+						>
+							<Icon type="WifiIcon" className="mr-2" />
+							{dataSaverMode ? 'Disable Data Saver' : 'Enable Data Saver'}
+						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							onSelect={() => navigator.clipboard.writeText(roomUrl)}
 						>
