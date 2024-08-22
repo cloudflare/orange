@@ -123,6 +123,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const {
 		userMedia,
 		peer,
+		dataSaverMode,
 		pushedTracks,
 		room: { otherUsers, websocket, identity },
 	} = useRoomContext()
@@ -242,7 +243,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						{actorsOnStage.map((user) => (
 							<Fragment key={user.id}>
 								<PullVideoTrack
-									video={user.tracks.video}
+									video={dataSaverMode ? undefined : user.tracks.video}
 									audio={user.tracks.audio}
 								>
 									{({ videoTrack, audioTrack }) => (
