@@ -10,3 +10,7 @@ node_modules
 .env
 .dev.vars
 .sentryclirc
+
+playwright-report
+test-results
+
