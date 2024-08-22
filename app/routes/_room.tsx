@@ -100,6 +100,7 @@ function tryToGetDimensions(videoStreamTrack?: MediaStreamTrack) {
 
 function Room() {
 	const [joined, setJoined] = useState(false)
+	const [dataSaverMode, setDataSaverMode] = useState(false)
 	const { roomName } = useParams()
 	invariant(roomName)
 
@@ -176,6 +177,8 @@ function Room() {
 	const context: RoomContextType = {
 		joined,
 		setJoined,
+		dataSaverMode,
+		setDataSaverMode,
 		traceLink,
 		userMedia,
 		userDirectoryUrl,

@@ -53,7 +53,7 @@ export const Participant = forwardRef<
 		ref
 	) => {
 		const { data } = useUserMetadata(user.name)
-		const { traceLink, peer } = useRoomContext()
+		const { traceLink, peer, dataSaverMode } = useRoomContext()
 
 		useDeadPulledTrackMonitor(
 			user.tracks.video,
@@ -148,7 +148,7 @@ export const Participant = forwardRef<
 								{
 									'opacity-100': isScreenShare
 										? user.tracks.screenShareEnabled
-										: user.tracks.videoEnabled,
+										: user.tracks.videoEnabled && (!dataSaverMode || isSelf),
 								},
 								isSelf && isScreenShare && 'opacity-75'
 							)}

@@ -11,6 +11,8 @@ export type RoomContextType = {
 	userDirectoryUrl?: string
 	joined: boolean
 	setJoined: Dispatch<SetStateAction<boolean>>
+	dataSaverMode: boolean
+	setDataSaverMode: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
 	peer: RxjsPeer
 	iceConnectionState: RTCIceConnectionState
