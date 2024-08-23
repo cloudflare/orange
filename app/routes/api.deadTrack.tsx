@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import type { ChatCard } from '~/types/GoogleChatApi'
+import { RELEASE } from '~/utils/constants'
 
 export type DeadTrackInfo = {
 	pullSessionTrace: string
@@ -23,14 +24,16 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 		pushingUser,
 	} = info
 
+	const { hostname } = new URL(request.url)
+
 	const chatCard: ChatCard = {
 		cardsV2: [
 			{
 				cardId: 'orange-meets-dead-track-card',
 				card: {
 					header: {
-						title: `💀 Dead track detected`,
-						subtitle: `${pullingUser} had issue pulling from ${pushingUser}`,
+						title: `💀 Dead track: ${pullingUser} had issue pulling from ${pushingUser}`,
+						subtitle: `Time: ${new Date().toISOString()} Environment: ${hostname} commit: ${RELEASE}`,
 						imageUrl:
 							'https://developers.google.com/chat/images/quickstart-app-avatar.png',
 						imageType: 'CIRCLE',

@@ -49,7 +49,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 				card: {
 					header: {
 						title: `Feedback from ${identity?.name ?? ''}`,
-						subtitle: `Environment: ${hostname} commit: ${RELEASE}`,
+						subtitle: `Time: ${new Date().toISOString()} Environment: ${hostname} commit: ${RELEASE}`,
 						imageUrl:
 							'https://developers.google.com/chat/images/quickstart-app-avatar.png',
 						imageType: 'CIRCLE',
