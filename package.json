@@ -20,6 +20,7 @@
 		"typecheck:watch": "npm run typecheck -- --watch",
 		"test": "vitest",
 		"test:ci": "vitest --watch false",
+		"test:e2e": "playwright test --headed",
 		"check": "npm run lint && npm run typecheck && npm run test:ci"
 	},
 	"dependencies": {
@@ -61,6 +62,7 @@
 		"@cloudflare/vitest-pool-workers": "^0.4.19",
 		"@cloudflare/workers-types": "^4.20240806.0",
 		"@peculiar/webcrypto": "^1.5.0",
+		"@playwright/test": "^1.46.1",
 		"@remix-run/dev": "2.11.1",
 		"@remix-run/eslint-config": "2.11.1",
 		"@types/react": "^18.3.3",
