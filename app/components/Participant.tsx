@@ -258,7 +258,7 @@ export const Participant = forwardRef<
 								</Tooltip>
 							)}
 						</div>
-						{user.speaking && (
+						{(user.speaking || user.raisedHand) && (
 							<div
 								className={cn(
 									'pointer-events-none absolute inset-0 h-full w-full border-4 border-orange-400',
