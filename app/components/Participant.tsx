@@ -1,7 +1,7 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { forwardRef, useEffect, useMemo } from 'react'
 import { Flipped } from 'react-flip-toolkit'
-import { of } from 'rxjs'
+import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
 import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -26,18 +26,40 @@ import { OptionalLink } from './OptionalLink'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
 
+function useMid(track?: MediaStreamTrack) {
+	const { peer } = useRoomContext()
+	const transceivers$ = useMemo(
+		() =>
+			combineLatest([
+				peer.peerConnection$,
+				peer.peerConnection$.pipe(
+					switchMap((peerConnection) => fromEvent(peerConnection, 'track'))
+				),
+			]).pipe(map(([pc]) => pc.getTransceivers())),
+		[peer.peerConnection$]
+	)
+	const transceivers = useSubscribedState(transceivers$, [])
+	if (!track) return null
+	return transceivers.find(
+		(t) => t.sender.track === track || t.receiver.track === track
+	)?.mid
+}
+
+interface Props {
+	flipId: string
+	isScreenShare?: boolean
+	showDebugInfo?: boolean
+	user: User
+	audioTrack?: MediaStreamTrack
+	videoTrack?: MediaStreamTrack
+	isSelf?: boolean
+	pinnedId?: string
+	setPinnedId: (id?: string) => void
+}
+
 export const Participant = forwardRef<
 	HTMLDivElement,
-	JSX.IntrinsicElements['div'] & {
-		flipId: string
-		isScreenShare?: boolean
-		user: User
-		audioTrack?: MediaStreamTrack
-		videoTrack?: MediaStreamTrack
-		isSelf?: boolean
-		pinnedId?: string
-		setPinnedId: (id?: string) => void
-	}
+	JSX.IntrinsicElements['div'] & Props
 >(
 	(
 		{
@@ -49,11 +71,13 @@ export const Participant = forwardRef<
 			audioTrack,
 			pinnedId,
 			setPinnedId,
+			showDebugInfo,
 		},
 		ref
 	) => {
 		const { data } = useUserMetadata(user.name)
 		const { traceLink, peer, dataSaverMode } = useRoomContext()
+		const peerConnection = useSubscribedState(peer.peerConnection$)
 
 		useDeadPulledTrackMonitor(
 			user.tracks.video,
@@ -89,6 +113,9 @@ export const Participant = forwardRef<
 		)
 
 		const packetLoss = useSubscribedState(packetLoss$, 0)
+
+		const audioMid = useMid(audioTrack)
+		const videoMid = useMid(videoTrack)
 
 		return (
 			<div
@@ -201,6 +228,17 @@ export const Participant = forwardRef<
 									rel="noopener noreferrer"
 								>
 									{data.displayName}
+									{showDebugInfo && peerConnection && (
+										<span className="opacity-50">
+											{' '}
+											{[
+												audioMid && `audio mid: ${audioMid}`,
+												videoMid && `video mid: ${videoMid}`,
+											]
+												.filter(Boolean)
+												.join(' ')}
+										</span>
+									)}
 								</OptionalLink>
 							</div>
 						)}

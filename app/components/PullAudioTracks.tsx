@@ -22,12 +22,17 @@ export const PullAudioTracks: FC<PullAudioTracksProps> = ({
 			<AudioStream
 				tracksToPull={audioTracks}
 				onTrackAdded={(id, track) =>
-					setAudioTrackMap({ ...audioTrackMap, [id]: track })
+					setAudioTrackMap((previous) => ({
+						...previous,
+						[id]: track,
+					}))
 				}
 				onTrackRemoved={(id) => {
-					const update = { ...audioTrackMap }
-					delete update[id]
-					setAudioTrackMap(update)
+					setAudioTrackMap((previous) => {
+						const update = { ...previous }
+						delete update[id]
+						return update
+					})
 				}}
 			/>
 			{children}

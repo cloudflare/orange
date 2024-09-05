@@ -44,19 +44,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	})
 }
 
-function useGridDebugControls(
-	{
-		initialCount,
-		defaultEnabled,
-	}: {
-		initialCount: number
-		defaultEnabled: boolean
-	} = { initialCount: 0, defaultEnabled: false }
-) {
-	const [enabled, setEnabled] = useState(defaultEnabled)
-	const [fakeUsers, setFakeUsers] = useState<string[]>(
-		Array.from({ length: initialCount }).map(() => nanoid())
-	)
+function useDebugEnabled() {
+	const [enabled, setEnabled] = useState(false)
 
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
@@ -71,6 +60,20 @@ function useGridDebugControls(
 			document.removeEventListener('keypress', handler)
 		}
 	}, [enabled])
+
+	return enabled
+}
+
+function useGridDebugControls({
+	initialCount,
+	enabled,
+}: {
+	initialCount: number
+	enabled: boolean
+}) {
+	const [fakeUsers, setFakeUsers] = useState<string[]>(
+		Array.from({ length: initialCount }).map(() => nanoid())
+	)
 
 	const GridDebugControls = useCallback(
 		() =>
@@ -128,8 +131,9 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		room: { otherUsers, websocket, identity },
 	} = useRoomContext()
 
+	const debugEnabled = useDebugEnabled()
 	const { GridDebugControls, fakeUsers } = useGridDebugControls({
-		defaultEnabled: false,
+		enabled: debugEnabled,
 		initialCount: 0,
 	})
 
@@ -224,6 +228,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 								audioTrack={userMedia.audioStreamTrack}
 								pinnedId={pinnedId}
 								setPinnedId={setPinnedId}
+								showDebugInfo={debugEnabled}
 							/>
 						)}
 
@@ -238,6 +243,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 									videoTrack={userMedia.screenShareVideoTrack}
 									pinnedId={pinnedId}
 									setPinnedId={setPinnedId}
+									showDebugInfo={debugEnabled}
 								/>
 							)}
 						{actorsOnStage.map((user) => (
@@ -254,6 +260,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 											audioTrack={audioTrack}
 											pinnedId={pinnedId}
 											setPinnedId={setPinnedId}
+											showDebugInfo={debugEnabled}
 										></Participant>
 									)}
 								</PullVideoTrack>
@@ -267,6 +274,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 												isScreenShare
 												pinnedId={pinnedId}
 												setPinnedId={setPinnedId}
+												showDebugInfo={debugEnabled}
 											/>
 										)}
 									</PullVideoTrack>
@@ -293,6 +301,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 											flipId={uid.toString()}
 											pinnedId={pinnedId}
 											setPinnedId={setPinnedId}
+											showDebugInfo={debugEnabled}
 										></Participant>
 									)}
 								</PullVideoTrack>
