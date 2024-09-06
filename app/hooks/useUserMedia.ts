@@ -111,33 +111,27 @@ export default function useUserMedia(mode: Mode) {
 		)
 	}, [suppressNoiseEnabled$])
 	const mutedAudioTrack$ = useMemo(() => {
-		return combineLatest([
-			getUserMediaTrack$('audioinput').pipe(
-				tap({
-					next: (track) => {
-						track.enabled = false
-					},
-					error: (e) => {
-						invariant(e instanceof Error)
-						setAudioUnavailableReason(
-							e.name in errorMessageMap
-								? (e.name as UserMediaError)
-								: 'UnknownError'
-						)
-					},
-				})
-			),
-			suppressNoiseEnabled$,
-		]).pipe(
-			switchMap(([track, suppressNoise]) =>
-				of(suppressNoise && track ? noiseSuppression(track) : track)
-			),
+		return getUserMediaTrack$('audioinput').pipe(
+			tap({
+				next: (track) => {
+					track.enabled = false
+				},
+				error: (e) => {
+					invariant(e instanceof Error)
+					setAudioUnavailableReason(
+						e.name in errorMessageMap
+							? (e.name as UserMediaError)
+							: 'UnknownError'
+					)
+				},
+			}),
 			shareReplay({
 				refCount: true,
 				bufferSize: 1,
 			})
 		)
-	}, [suppressNoiseEnabled$])
+	}, [])
+
 	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
 	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
 	const audioEnabled$ = useStateObservable(audioEnabled)
