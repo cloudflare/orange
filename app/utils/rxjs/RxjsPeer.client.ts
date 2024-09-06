@@ -1,7 +1,9 @@
 import {
 	Observable,
+	catchError,
 	combineLatest,
 	distinctUntilChanged,
+	filter,
 	from,
 	fromEvent,
 	map,
@@ -50,6 +52,7 @@ export class RxjsPeer {
 		peerConnection: RTCPeerConnection
 		sessionId: string
 	}>
+	sessionError$: Observable<string>
 	peerConnectionState$: Observable<RTCPeerConnectionState>
 	config: PeerConfig
 
@@ -137,6 +140,13 @@ export class RxjsPeer {
 			})
 		)
 
+		this.sessionError$ = this.session$.pipe(
+			catchError((err) =>
+				of(err instanceof Error ? err.message : 'Caught non-error')
+			),
+			filter((value) => typeof value === 'string')
+		)
+
 		this.peerConnectionState$ = this.peerConnection$.pipe(
 			switchMap((peerConnection) =>
 				fromEvent(
@@ -171,12 +181,14 @@ export class RxjsPeer {
 	async createSession(peerConnection: RTCPeerConnection) {
 		console.debug('🆕 creating new session')
 		const { apiBase } = this.config
-		const { sessionId } = await this.fetchWithRecordedHistory(
+		const response = await this.fetchWithRecordedHistory(
 			`${apiBase}/sessions/new?SESSION`,
-			{
-				method: 'POST',
-			}
-		).then((res) => res.json() as any)
+			{ method: 'POST' }
+		)
+		if (response.status > 400) {
+			throw new Error('Error creating Calls session')
+		}
+		const { sessionId } = (await response.json()) as any
 		return { peerConnection, sessionId }
 	}
 
