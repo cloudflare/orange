@@ -13,7 +13,9 @@ import { MicButton } from '~/components/MicButton'
 
 import { SelfView } from '~/components/SelfView'
 import { SettingsButton } from '~/components/SettingsDialog'
+import { Spinner } from '~/components/Spinner'
 import { Tooltip } from '~/components/Tooltip'
+import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { errorMessageMap } from '~/hooks/useUserMedia'
 import getUsername from '~/utils/getUsername.server'
@@ -27,8 +29,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Lobby() {
 	const { roomName } = useParams()
 	const navigate = useNavigate()
-	const { setJoined, userMedia, room } = useRoomContext()
+	const { setJoined, userMedia, room, peer } = useRoomContext()
 	const { videoStreamTrack, audioStreamTrack, audioEnabled } = userMedia
+	const session = useSubscribedState(peer.session$)
+	const sessionError = useSubscribedState(peer.sessionError$)
 
 	const joinedUsers = new Set(
 		room.otherUsers.filter((u) => u.tracks.audio).map((u) => u.name)
@@ -55,21 +59,33 @@ export default function Lobby() {
 						className="aspect-[4/3] w-full"
 						videoTrack={videoStreamTrack}
 					/>
-					{audioStreamTrack && (
-						<div className="absolute left-3 top-3">
-							{audioEnabled ? (
-								<AudioIndicator audioTrack={audioStreamTrack} />
-							) : (
-								<Tooltip content="Mic is turned off">
-									<div className="text-white indication-shadow">
-										<Icon type="micOff" />
-										<VisuallyHidden>Mic is turned off</VisuallyHidden>
-									</div>
-								</Tooltip>
-							)}
-						</div>
-					)}
+
+					<div className="absolute left-3 top-3">
+						{!sessionError && !session?.sessionId ? (
+							<Spinner className="text-zinc-100" />
+						) : (
+							audioStreamTrack && (
+								<>
+									{audioEnabled ? (
+										<AudioIndicator audioTrack={audioStreamTrack} />
+									) : (
+										<Tooltip content="Mic is turned off">
+											<div className="text-white indication-shadow">
+												<Icon type="micOff" />
+												<VisuallyHidden>Mic is turned off</VisuallyHidden>
+											</div>
+										</Tooltip>
+									)}
+								</>
+							)
+						)}
+					</div>
 				</div>
+				{sessionError && (
+					<div className="p-3 rounded-md text-sm text-zinc-800 bg-red-200 dark:text-zinc-200 dark:bg-red-700">
+						{sessionError}
+					</div>
+				)}
 				{(userMedia.audioUnavailableReason ||
 					userMedia.videoUnavailableReason) && (
 					<div className="p-3 rounded-md text-sm text-zinc-800 bg-zinc-200 dark:text-zinc-200 dark:bg-zinc-700">
@@ -123,6 +139,7 @@ export default function Lobby() {
 								// the room without the JS having loaded
 								navigate('room')
 							}}
+							disabled={!session?.sessionId}
 						>
 							Join
 						</Button>
