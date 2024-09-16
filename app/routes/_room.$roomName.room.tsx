@@ -41,6 +41,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 				context.env.FEEDBACK_STORAGE
 		),
 		mode: context.mode,
+		hasDb: Boolean(context.env.DB),
 	})
 }
 
@@ -123,6 +124,7 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
+	const { hasDb } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		peer,
@@ -324,7 +326,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						className="hidden md:block"
 					></ParticipantsButton>
 					<OverflowMenu bugReportsEnabled={bugReportsEnabled} />
-					<LeaveRoomButton />
+					<LeaveRoomButton navigateToFeedbackPage={hasDb} />
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />
