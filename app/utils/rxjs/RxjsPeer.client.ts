@@ -188,8 +188,13 @@ export class RxjsPeer {
 		if (response.status > 400) {
 			throw new Error('Error creating Calls session')
 		}
-		const { sessionId } = (await response.json()) as any
-		return { peerConnection, sessionId }
+
+		try {
+			const { sessionId } = (await response.clone().json()) as any
+			return { peerConnection, sessionId }
+		} catch (error) {
+			throw new Error(response.status + ': ' + (await response.text()))
+		}
 	}
 
 	async fetchWithRecordedHistory(path: string, requestInit?: RequestInit) {
