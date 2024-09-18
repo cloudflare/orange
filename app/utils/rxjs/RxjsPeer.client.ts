@@ -208,6 +208,11 @@ export class RxjsPeer {
 					: undefined,
 		})
 		const response = await fetch(path, requestInit)
+		// handle Access redirect
+		if (response.status === 0) {
+			alert('Access session is expired, reloading page.')
+			location.reload()
+		}
 		const responseBody = await response.clone().json()
 		this.history.log({
 			endpoint: path,
