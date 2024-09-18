@@ -24,6 +24,9 @@
 		"check": "npm run lint && npm run typecheck && npm run test:ci",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:local": "wrangler d1 migrations apply orange-meets-db --local",
+		"db:migrate:development": "wrangler d1 migrations apply orange-meets-db-development -e development --remote",
+		"db:migrate:staging": "wrangler d1 migrations apply orange-meets-db-staging -e staging --remote",
+		"db:migrate:production": "wrangler d1 migrations apply orange-meets-db-production -e production --remote",
 		"db:studio:local": "LOCAL_DB_PATH=$(find .wrangler/state/v3/d1/miniflare-D1DatabaseObject -type f -name '*.sqlite' -print -quit) drizzle-kit studio"
 	},
 	"dependencies": {

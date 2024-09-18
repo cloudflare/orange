@@ -35,6 +35,12 @@ CALLS_APP_ID = "700932c6384d6f4ba19838afa3ab93cd"
  max_batch_size = 10 # optional: defaults to 10
  max_batch_timeout = 5 # optional: defaults to 5 seconds
 
+[[env.production.d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "orange-meets-db-production"
+database_id = "125a3008-0a8a-4ada-a829-7d2eb2ef15bc"
+
+
 [env.development]
 kv_namespaces = [
   { binding = "FEEDBACK_STORAGE", id = "acb3952303514551a17b6fe627fb6953", preview_id = "acb3952303514551a17b6fe627fb6953" }
@@ -57,6 +63,11 @@ CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
  max_batch_size = 10 # optional: defaults to 10
  max_batch_timeout = 5 # optional: defaults to 5 seconds
 
+[[env.development.d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "orange-meets-db-development"
+database_id = "6b0eceef-c836-4ba7-aac2-fa9b6f702e3b"
+
 [env.staging]
 kv_namespaces = [
   { binding = "FEEDBACK_STORAGE", id = "acb3952303514551a17b6fe627fb6953", preview_id = "acb3952303514551a17b6fe627fb6953" }
@@ -78,6 +89,12 @@ CALLS_APP_ID = "9effffd0c077c1115c7d285e55593a9a"
  # If you misspell the name, you will receive an error when attempting to publish your Worker.
  max_batch_size = 10 # optional: defaults to 10
  max_batch_timeout = 5 # optional: defaults to 5 seconds
+
+
+[[env.staging.d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "orange-meets-db-staging"
+database_id = "e9091e61-7e0a-4719-b9cb-3e1c3e95e9fa"
 
 
 [env.public.vars]
