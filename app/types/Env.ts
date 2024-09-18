@@ -15,4 +15,5 @@ export type Env = {
 	MAX_WEBCAM_BITRATE?: string
 	MAX_WEBCAM_QUALITY_LEVEL?: string
 	MAX_API_HISTORY?: string
+	DB?: D1Database
 }

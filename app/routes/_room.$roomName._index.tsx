@@ -20,10 +20,29 @@ import { useRoomContext } from '~/hooks/useRoomContext'
 import { errorMessageMap } from '~/hooks/useUserMedia'
 import getUsername from '~/utils/getUsername.server'
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
 	invariant(username)
-	return json({ username })
+	return json({ username, callsAppId: context.env.CALLS_APP_ID })
+}
+
+let refreshCheckDone = false
+function trackRefreshes() {
+	if (refreshCheckDone) return
+	if (typeof document === 'undefined') return
+
+	const key = `previously loaded`
+	const initialValue = sessionStorage.getItem(key)
+	const refreshed = initialValue !== null
+	sessionStorage.setItem(key, Date.now().toString())
+
+	if (refreshed) {
+		fetch(`/api/reportRefresh`, {
+			method: 'POST',
+		})
+	}
+
+	refreshCheckDone = true
 }
 
 export default function Lobby() {
@@ -33,6 +52,7 @@ export default function Lobby() {
 	const { videoStreamTrack, audioStreamTrack, audioEnabled } = userMedia
 	const session = useSubscribedState(peer.session$)
 	const sessionError = useSubscribedState(peer.sessionError$)
+	trackRefreshes()
 
 	const joinedUsers = new Set(
 		room.otherUsers.filter((u) => u.tracks.audio).map((u) => u.name)
