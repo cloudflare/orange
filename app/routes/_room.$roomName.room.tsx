@@ -130,7 +130,12 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		peer,
 		dataSaverMode,
 		pushedTracks,
-		room: { otherUsers, websocket, identity },
+		room: {
+			otherUsers,
+			websocket,
+			identity,
+			roomState: { meetingId },
+		},
 	} = useRoomContext()
 
 	const debugEnabled = useDebugEnabled()
@@ -326,7 +331,10 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						className="hidden md:block"
 					></ParticipantsButton>
 					<OverflowMenu bugReportsEnabled={bugReportsEnabled} />
-					<LeaveRoomButton navigateToFeedbackPage={hasDb} />
+					<LeaveRoomButton
+						navigateToFeedbackPage={hasDb}
+						meetingId={meetingId}
+					/>
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />

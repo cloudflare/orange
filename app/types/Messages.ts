@@ -16,6 +16,7 @@ export type User = {
 }
 
 export type RoomState = {
+	meetingId?: string
 	users: User[]
 }
 
