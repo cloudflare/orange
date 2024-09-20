@@ -50,7 +50,7 @@ Open up [http://127.0.0.1:8787](http://127.0.0.1:8787) and you should be ready t
 wrangler login
 ```
 
-2. Update the `account_id` and `CALLS_APP_ID` in `wrangler.toml` to use your own Cloudflare Account ID and Calls App ID
+2. Update `CALLS_APP_ID` in `wrangler.toml` to use your own Calls App ID
 
 3. You will also need to set the token as a secret by running:
 
@@ -64,7 +64,9 @@ or to programmatically set the secret, run:
 echo REPLACE_WITH_YOUR_SECRET | wrangler secret put CALLS_APP_SECRET
 ```
 
-4. Then you can run
+4. Optionally, you can also use [Cloudflare's TURN Service](https://developers.cloudflare.com/calls/turn/) by setting the `TURN_SERVICE_ID` variable in `wrangler.toml` and `TURN_SERVICE_TOKEN` secret using `wrangler secret put TURN_SERVICE_TOKEN`
+
+5. Finally you can run the following to deploy
 
 ```sh
 npm run deploy

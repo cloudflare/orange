@@ -207,7 +207,7 @@ export class RxjsPeer {
 					? JSON.parse(requestInit.body)
 					: undefined,
 		})
-		const response = await fetch(path, requestInit)
+		const response = await fetch(path, { ...requestInit, redirect: 'manual' })
 		// handle Access redirect
 		if (response.status === 0) {
 			alert('Access session is expired, reloading page.')
