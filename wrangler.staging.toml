@@ -10,15 +10,17 @@ compatibility_flags = ["nodejs_compat"]
   bucket = "./public"
 
 [[build.upload.rules]]
-  type = "ESModule"
-  globs = ["**/*.js"]
+type = "ESModule"
+globs = ["**/*.js"]
 
-kv_namespaces = [
-  { binding = "FEEDBACK_STORAGE", id = "acb3952303514551a17b6fe627fb6953", preview_id = "acb3952303514551a17b6fe627fb6953" }
-]
-durable_objects.bindings = [
-  { name = "rooms", class_name = "ChatRoom" },
-]
+[[kv_namespaces]] = 
+binding = "FEEDBACK_STORAGE"
+id = "acb3952303514551a17b6fe627fb6953"
+preview_id = "acb3952303514551a17b6fe627fb6953"
+
+[[durable_objects.bindings]] = 
+name = "rooms"
+class_name = "ChatRoom"
 
 [vars]
 CALLS_APP_ID = "9effffd0c077c1115c7d285e55593a9a"

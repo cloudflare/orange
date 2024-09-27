@@ -10,18 +10,17 @@ compatibility_flags = ["nodejs_compat"]
   bucket = "./public"
 
 [[build.upload.rules]]
-  type = "ESModule"
-  globs = ["**/*.js"]
+type = "ESModule"
+globs = ["**/*.js"]
 
 [vars]
 CALLS_APP_ID = "d83fd70c193329ea4f683ffe7b34d056"
 TURN_SERVICE_ID = "46711d6c5759085dd70f599f6190ab94"
 PUBLIC = "true"
 
-[durable_objects]
-bindings = [
-  { name = "rooms", class_name = "ChatRoom", script_name = "orange-meets-public" }
-]
+[[durable_objects.bindings]]
+name = "rooms"
+class_name = "ChatRoom"
 
 # Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.
 [[migrations]]
