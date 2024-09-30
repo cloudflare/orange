@@ -352,7 +352,15 @@ export class ChatRoom extends Server<Env> {
 	async cleanupOldConnections() {
 		const meetingId = await this.getMeetingId()
 		if (!meetingId) log({ eventName: 'meetingIdNotFoundInCleanup' })
+		const websockets = this.ctx.getWebSockets()
 		const connections = [...this.getConnections()]
+		log({
+			eventName: 'cleaningUpConnections',
+			meetingId,
+			connectionsFound: connections.length,
+			websocketsFound: websockets.length,
+			websocketStatuses: websockets.map((w) => w.readyState),
+		})
 		const sessionsToCleanUp = await this.getUsers()
 
 		connections.forEach((connection) =>

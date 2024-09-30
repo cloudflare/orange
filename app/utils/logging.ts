@@ -19,6 +19,13 @@ export type LogEvent =
 			connectionId: string
 	  }
 	| {
+			eventName: 'cleaningUpConnections'
+			meetingId?: string
+			connectionsFound: number
+			websocketsFound: number
+			websocketStatuses: number[]
+	  }
+	| {
 			eventName: 'userTimedOut'
 			meetingId?: string
 			connectionId: string
