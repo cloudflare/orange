@@ -1,42 +1,58 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import type { FC } from 'react'
-import { useState } from 'react'
+import {
+	type ComponentProps,
+	type ElementRef,
+	forwardRef,
+	type ReactNode,
+	useState,
+} from 'react'
 import { useTimeoutFn } from 'react-use'
-import { useRoomUrl } from '~/hooks/useRoomUrl'
 import { Button } from './Button'
 import { Icon } from './Icon/Icon'
-import { Tooltip } from './Tooltip'
 
-interface CopyButtonProps {}
+interface CopyButtonProps extends ComponentProps<'button'> {
+	contentValue: string
+	copiedMessage?: ReactNode
+}
 
-export const CopyButton: FC<CopyButtonProps> = () => {
-	const [copied, setCopied] = useState(false)
+export const CopyButton = forwardRef<ElementRef<'button'>, CopyButtonProps>(
+	(
+		{
+			children = <VisuallyHidden>Copy</VisuallyHidden>,
+			copiedMessage = <VisuallyHidden>Copied!</VisuallyHidden>,
+			contentValue,
+			onClick,
+			...rest
+		},
+		ref
+	) => {
+		const [copied, setCopied] = useState(false)
 
-	const roomUrl = useRoomUrl()
+		const [_isReady, _cancel, reset] = useTimeoutFn(() => {
+			setCopied(false)
+		}, 2000)
 
-	const [_isReady, _cancel, reset] = useTimeoutFn(() => {
-		setCopied(false)
-	}, 2000)
-
-	return (
-		<Tooltip
-			content={copied ? 'Copied!' : 'Copy URL'}
-			open={copied ? true : undefined}
-		>
+		return (
 			<Button
 				displayType="secondary"
-				onClick={() => {
-					navigator.clipboard.writeText(roomUrl)
+				onClick={(e) => {
+					onClick && onClick(e)
+					navigator.clipboard.writeText(contentValue)
 					setCopied(true)
 					reset()
 				}}
+				ref={ref}
+				className="flex items-center gap-2 text-xs"
+				{...rest}
 			>
 				<Icon
 					type={copied ? 'ClipboardDocumentCheckIcon' : 'ClipboardDocumentIcon'}
 					className="text-xl"
 				/>
-				<VisuallyHidden>{copied ? 'Copied!' : 'Copy URL'}</VisuallyHidden>
+				{copied ? copiedMessage : children}
 			</Button>
-		</Tooltip>
-	)
-}
+		)
+	}
+)
+
+CopyButton.displayName = 'CopyButton'

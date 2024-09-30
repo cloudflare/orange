@@ -7,6 +7,7 @@ import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
+import { CopyButton } from '~/components/CopyButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
 import { IceDisconnectedToast } from '~/components/IceDisconnectedToast'
 import { Icon } from '~/components/Icon/Icon'
@@ -335,6 +336,9 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						navigateToFeedbackPage={hasDb}
 						meetingId={meetingId}
 					/>
+					{debugEnabled && meetingId && (
+						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
+					)}
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />
