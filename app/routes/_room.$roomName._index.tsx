@@ -17,6 +17,7 @@ import { Spinner } from '~/components/Spinner'
 import { Tooltip } from '~/components/Tooltip'
 import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
+import { useRoomUrl } from '~/hooks/useRoomUrl'
 import { errorMessageMap } from '~/hooks/useUserMedia'
 import getUsername from '~/utils/getUsername.server'
 
@@ -61,6 +62,8 @@ export default function Lobby() {
 	const audioUnavailableMessage = userMedia.audioUnavailableReason
 		? errorMessageMap[userMedia.audioUnavailableReason]
 		: null
+
+	const roomUrl = useRoomUrl()
 
 	return (
 		<div className="flex flex-col items-center justify-center h-full p-4">
@@ -167,7 +170,9 @@ export default function Lobby() {
 					<MicButton />
 					<CameraButton />
 					<SettingsButton />
-					<CopyButton></CopyButton>
+					<Tooltip content="Copy URL">
+						<CopyButton contentValue={roomUrl}></CopyButton>
+					</Tooltip>
 				</div>
 			</div>
 			<div className="flex flex-col justify-end flex-1">

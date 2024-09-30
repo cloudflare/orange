@@ -7,10 +7,12 @@ import { Tooltip } from './Tooltip'
 
 interface LeaveRoomButtonProps {
 	navigateToFeedbackPage: boolean
+	meetingId?: string
 }
 
 export const LeaveRoomButton: FC<LeaveRoomButtonProps> = ({
 	navigateToFeedbackPage,
+	meetingId,
 }) => {
 	const navigate = useNavigate()
 	return (
@@ -18,7 +20,11 @@ export const LeaveRoomButton: FC<LeaveRoomButtonProps> = ({
 			<Button
 				displayType="danger"
 				onClick={() => {
-					navigate(navigateToFeedbackPage ? '/call-quality-feedback' : '/')
+					const params = new URLSearchParams()
+					if (meetingId) params.set('meetingId', meetingId)
+					navigate(
+						navigateToFeedbackPage ? `/call-quality-feedback?${params}` : '/'
+					)
 				}}
 			>
 				<VisuallyHidden>Leave</VisuallyHidden>

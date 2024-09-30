@@ -7,6 +7,7 @@ import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
+import { CopyButton } from '~/components/CopyButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
 import { IceDisconnectedToast } from '~/components/IceDisconnectedToast'
 import { Icon } from '~/components/Icon/Icon'
@@ -130,7 +131,12 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		peer,
 		dataSaverMode,
 		pushedTracks,
-		room: { otherUsers, websocket, identity },
+		room: {
+			otherUsers,
+			websocket,
+			identity,
+			roomState: { meetingId },
+		},
 	} = useRoomContext()
 
 	const debugEnabled = useDebugEnabled()
@@ -326,7 +332,13 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						className="hidden md:block"
 					></ParticipantsButton>
 					<OverflowMenu bugReportsEnabled={bugReportsEnabled} />
-					<LeaveRoomButton navigateToFeedbackPage={hasDb} />
+					<LeaveRoomButton
+						navigateToFeedbackPage={hasDb}
+						meetingId={meetingId}
+					/>
+					{debugEnabled && meetingId && (
+						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
+					)}
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />

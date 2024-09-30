@@ -51,6 +51,9 @@ new_classes = ["ChatRoom", "RateLimiter"]
 tag = "v2"
 deleted_classes = ["RateLimiter"] 
 
+[observability]
+enabled = true
+
 # The necessary secrets are:
 # - CALLS_APP_SECRET
 # Run `echo <VALUE> | wrangler secret put <NAME>` for each of these

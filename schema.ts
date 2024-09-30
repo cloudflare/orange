@@ -1,7 +1,7 @@
-import type { AppLoadContext } from '@remix-run/cloudflare'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import type { Env } from '~/types/Env'
 
 const metadataColumns = {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -25,10 +25,18 @@ export const AnalyticsSimpleCallFeedback = sqliteTable(
 		...metadataColumns,
 		version: text('version').notNull(),
 		experiencedIssues: integer('experiencedIssues').notNull(),
+		meetingId: text('meetingId').references(() => Meetings.id),
 	}
 )
 
-export function getDb(context: AppLoadContext) {
+export const Meetings = sqliteTable('Meetings', {
+	...metadataColumns,
+	id: text('id').primaryKey(),
+	peakUserCount: integer('userCount').notNull(),
+	ended: text('ended'),
+})
+
+export function getDb(context: { env: Env }) {
 	if (!context.env.DB) {
 		return null
 	}

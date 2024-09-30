@@ -5,12 +5,18 @@ import assertNever from '~/utils/assertNever'
 import { assertNonNullable } from '~/utils/assertNonNullable'
 import getUsername from '~/utils/getUsername.server'
 
+import { eq, sql } from 'drizzle-orm'
+import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import {
 	Server,
 	type Connection,
 	type ConnectionContext,
 	type WSMessage,
 } from 'partyserver'
+import { getDb, Meetings } from 'schema'
+import { log } from '~/utils/logging'
+
+const alarmInterval = 30_000
 
 /**
  * The ChatRoom Durable Object Class
@@ -21,6 +27,15 @@ import {
  * to all others.
  */
 export class ChatRoom extends Server<Env> {
+	env: Env
+	db: DrizzleD1Database<Record<string, never>> | null
+
+	constructor(ctx: DurableObjectState, env: Env) {
+		super(ctx, env)
+		this.env = env
+		this.db = getDb(this)
+	}
+
 	static options = {
 		hibernate: true,
 	}
@@ -31,6 +46,9 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	async onStart(): Promise<void> {
+		const meetingId = await this.getMeetingId()
+		log({ eventName: 'onStart', meetingId })
+		this.db = getDb(this)
 		// TODO: make this a part of partyserver
 		this.ctx.setWebSocketAutoResponse(
 			new WebSocketRequestResponsePair(
@@ -38,13 +56,8 @@ export class ChatRoom extends Server<Env> {
 				JSON.stringify({ type: 'partyserver-pong' })
 			)
 		)
-
-		// cleaning out storage used by older versions of this code
-		await this.ctx.storage.delete('sessions').catch(() => {
-			console.warn('Failed to delete old sessions storage')
-		})
-		// We can remove this line later
 	}
+
 	async onConnect(
 		connection: Connection<User>,
 		ctx: ConnectionContext
@@ -52,14 +65,15 @@ export class ChatRoom extends Server<Env> {
 		// let's start the periodic alarm if it's not already started
 		if (!(await this.ctx.storage.getAlarm())) {
 			// start the alarm to broadcast state every 30 seconds
-			this.ctx.storage.setAlarm(Date.now() + 30000)
+			this.ctx.storage.setAlarm(Date.now() + alarmInterval)
 		}
 
 		const username = await getUsername(ctx.request)
 		assertNonNullable(username)
 
 		let user = await this.ctx.storage.get<User>(`session-${connection.id}`)
-		if (user === undefined) {
+		const foundInStorage = user !== undefined
+		if (!foundInStorage) {
 			user = {
 				id: connection.id,
 				name: username,
@@ -76,22 +90,84 @@ export class ChatRoom extends Server<Env> {
 
 		// store the user's data in storage
 		await this.ctx.storage.put(`session-${connection.id}`, user)
-
+		await this.trackPeakUserCount()
 		await this.broadcastRoomState()
+		const meetingId = await this.getMeetingId()
+		log({
+			eventName: 'onConnect',
+			meetingId,
+			foundInStorage,
+			connectionId: connection.id,
+		})
+	}
+
+	async trackPeakUserCount() {
+		let meetingId = await this.getMeetingId()
+		const meeting = meetingId
+			? await this.getMeeting(meetingId)
+			: await this.createMeeting()
+		await this.cleanupOldConnections()
+		if (this.db) {
+			if (!meeting) return
+			if (meeting.ended !== null) {
+				await this.db
+					.update(Meetings)
+					.set({ ended: null })
+					.where(eq(Meetings.id, meeting.id))
+			}
+
+			const previousCount = meeting.peakUserCount
+			const userCount = (await this.getUsers()).size
+			if (userCount > previousCount) {
+				await this.db
+					.update(Meetings)
+					.set({
+						peakUserCount: userCount,
+					})
+					.where(eq(Meetings.id, meeting.id))
+			}
+		}
+		return meetingId
+	}
+
+	async getMeetingId() {
+		return this.ctx.storage.get<string>('meetingId')
+	}
+
+	async createMeeting() {
+		const meetingId = crypto.randomUUID()
+		await this.ctx.storage.put('meetingId', meetingId)
+		log({ eventName: 'startingMeeting', meetingId })
+		if (this.db) {
+			return this.db
+				.insert(Meetings)
+				.values({
+					id: meetingId,
+					peakUserCount: 1,
+				})
+				.returning()
+				.then(([m]) => m)
+		}
+	}
+
+	async getMeeting(meetingId: string) {
+		if (!this.db) return null
+		const [meeting] = await this.db
+			.select()
+			.from(Meetings)
+			.where(eq(Meetings.id, meetingId))
+
+		return meeting
 	}
 
 	async broadcastRoomState() {
 		let didSomeoneQuit = false
+		const meetingId = await this.getMeetingId()
 		const roomState = {
 			type: 'roomState',
 			state: {
-				users: [
-					...(
-						await this.ctx.storage.list<User>({
-							prefix: 'session-',
-						})
-					).values(),
-				],
+				meetingId,
+				users: [...(await this.getUsers()).values()],
 			},
 		} satisfies ServerMessage
 
@@ -102,6 +178,11 @@ export class ChatRoom extends Server<Env> {
 				connection.send(roomStateMessage)
 			} catch (err) {
 				connection.close(1011, 'Failed to broadcast state')
+				log({
+					eventName: 'errorBroadcastingToUser',
+					meetingId,
+					connectionId: connection.id,
+				})
 				await this.ctx.storage.delete(`session-${connection.id}`)
 				didSomeoneQuit = true
 			}
@@ -118,6 +199,7 @@ export class ChatRoom extends Server<Env> {
 		message: WSMessage
 	): Promise<void> {
 		try {
+			const meetingId = await this.getMeetingId()
 			if (typeof message !== 'string') {
 				console.warn('Received non-string message')
 				return
@@ -135,6 +217,8 @@ export class ChatRoom extends Server<Env> {
 								`Failed to delete session session-${connection.id} on userLeft`
 							)
 						})
+					log({ eventName: 'userLeft', meetingId, connectionId: connection.id })
+
 					await this.broadcastRoomState()
 					break
 				}
@@ -210,46 +294,91 @@ export class ChatRoom extends Server<Env> {
 					break
 				}
 			}
-		} catch (err) {
-			assertError(err)
+		} catch (error) {
+			const meetingId = await this.getMeetingId()
+			log({
+				eventName: 'errorHandlingMessage',
+				meetingId,
+				connectionId: connection.id,
+				error,
+			})
+			assertError(error)
 			// TODO: should this even be here?
 			// Report any exceptions directly back to the client. As with our handleErrors() this
 			// probably isn't what you'd want to do in production, but it's convenient when testing.
 			this.sendMessage(connection, {
 				type: 'error',
-				error: err.stack,
+				error: error.stack,
 			} satisfies ServerMessage)
 		}
 	}
 
-	onClose() {
-		// while it makes sense to broadcast immediately on close,
-		// it's possible that the websocket just closed for an instant
-		// and will reconnect momentarily.
-		// so let's just let the alarm handler do the broadcasting.
-		// this.broadcastRoomState()
+	onError(connection: Connection, error: unknown): void | Promise<void> {
+		return this.getMeetingId().then((meetingId) => {
+			log({
+				eventName: 'onErrorHandler',
+				meetingId,
+				connectionId: connection.id,
+				error,
+			})
+			this.broadcastRoomState()
+		})
 	}
 
-	onError(): void | Promise<void> {
-		this.broadcastRoomState()
+	getUsers() {
+		return this.ctx.storage.list<User>({
+			prefix: 'session-',
+		})
+	}
+
+	async endMeeting(meetingId: string) {
+		log({ eventName: 'endingMeeting', meetingId })
+		await this.ctx.storage.delete('meetingId')
+		if (this.db) {
+			// stamp meeting as ended
+			await this.db
+				.update(Meetings)
+				.set({
+					ended: sql`CURRENT_TIMESTAMP`,
+				})
+				.where(eq(Meetings.id, meetingId))
+		}
 	}
 
 	async cleanupOldConnections() {
+		const meetingId = await this.getMeetingId()
+		if (!meetingId) log({ eventName: 'meetingIdNotFoundInCleanup' })
 		const connections = [...this.getConnections()]
-		const sessionsToCleanUp = await this.ctx.storage.list<User>()
+		const sessionsToCleanUp = await this.getUsers()
+
 		connections.forEach((connection) =>
 			sessionsToCleanUp.delete(`session-${connection.id}`)
 		)
-		return this.ctx.storage
+
+		sessionsToCleanUp.forEach((user) => {
+			log({ eventName: 'userTimedOut', connectionId: user.id, meetingId })
+		})
+
+		await this.ctx.storage
 			.delete([...sessionsToCleanUp.keys()])
 			.catch(() => console.warn('Failed to clean up orphaned sessions'))
+
+		const activeUserCount = (await this.getUsers()).size
+
+		if (meetingId && activeUserCount === 0) {
+			this.endMeeting(meetingId)
+		}
+
+		return activeUserCount
 	}
 
 	async alarm(): Promise<void> {
-		await this.cleanupOldConnections()
+		const meetingId = await this.getMeetingId()
+		log({ eventName: 'alarm', meetingId })
+		const activeUserCount = await this.cleanupOldConnections()
 		await this.broadcastRoomState()
-		if ([...this.getConnections()].length !== 0) {
-			this.ctx.storage.setAlarm(Date.now() + 30000)
+		if (activeUserCount !== 0) {
+			this.ctx.storage.setAlarm(Date.now() + alarmInterval)
 		}
 	}
 }
