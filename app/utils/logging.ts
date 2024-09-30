@@ -41,6 +41,10 @@ export type LogEvent =
 	  }
 	| {
 			eventName: 'onErrorHandler'
+			error: unknown
+	  }
+	| {
+			eventName: 'onErrorHandlerDetails'
 			meetingId?: string
 			connectionId: string
 			error: unknown

@@ -314,9 +314,13 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	onError(connection: Connection, error: unknown): void | Promise<void> {
+		log({
+			eventName: 'onErrorHandler',
+			error,
+		})
 		return this.getMeetingId().then((meetingId) => {
 			log({
-				eventName: 'onErrorHandler',
+				eventName: 'onErrorHandlerDetails',
 				meetingId,
 				connectionId: connection.id,
 				error,
