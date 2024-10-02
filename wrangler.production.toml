@@ -13,12 +13,12 @@ compatibility_flags = ["nodejs_compat"]
 type = "ESModule"
 globs = ["**/*.js"]
 
-[[kv_namespaces]] = 
+[[kv_namespaces]]
 binding = "FEEDBACK_STORAGE"
 id = "301815bba6144355bfda771856ca4614"
 preview_id = "acb3952303514551a17b6fe627fb6953"
 
-[[durable_objects.bindings]] = 
+[[durable_objects.bindings]]
 name = "rooms"
 class_name = "ChatRoom"
 
