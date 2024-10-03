@@ -22,6 +22,7 @@ import type {
 	TrackObject,
 	TracksResponse,
 } from '../callsTypes'
+import { setupReceiverTransform, setupSenderTransform } from '../e2ee'
 import { History } from '../History'
 import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 
@@ -66,6 +67,11 @@ export class RxjsPeer {
 				peerConnection = new RTCPeerConnection({
 					iceServers: config.iceServers,
 					bundlePolicy: 'max-bundle',
+					// Spreading satisfies the type checker without losing
+					// type checking on the rest of the params here
+					...{
+						encodedInsertableStreams: true,
+					},
 				})
 				peerConnection.addEventListener('connectionstatechange', () => {
 					if (
@@ -319,11 +325,13 @@ export class RxjsPeer {
 
 		const transceiver$ = combineLatest([stableId$, this.session$]).pipe(
 			withLatestFrom(track$),
-			map(([[stableId, session], track]) => {
+			switchMap(async ([[stableId, session], track]) => {
 				const transceiver = session.peerConnection.addTransceiver(track, {
 					direction: 'sendonly',
 				})
 				console.debug('🌱 creating transceiver!')
+
+				await setupSenderTransform(transceiver.sender)
 
 				return {
 					transceiver,
@@ -559,6 +567,7 @@ async function resolveTrack(
 		const handler = () => {
 			const transceiver = peerConnection.getTransceivers().find(compare)
 			if (transceiver) {
+				setupReceiverTransform(transceiver.receiver)
 				resolve(transceiver.receiver.track)
 				peerConnection.removeEventListener('track', handler)
 			}
