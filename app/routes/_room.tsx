@@ -7,6 +7,7 @@ import invariant from 'tiny-invariant'
 import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
 import { Icon } from '~/components/Icon/Icon'
+import { Spinner } from '~/components/Spinner'
 import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
@@ -74,9 +75,25 @@ export default function RoomWithPermissions() {
 					</div>
 				}
 			>
-				<Room />
+				<RoomPreparation />
 			</EnsureOnline>
 		</EnsurePermissions>
+	)
+}
+
+function RoomPreparation() {
+	const { mode } = useLoaderData<typeof loader>()
+	const { roomName } = useParams()
+	invariant(roomName)
+	const userMedia = useUserMedia(mode)
+	const room = useRoom({ roomName, userMedia })
+
+	return room.roomState.meetingId ? (
+		<Room room={room} userMedia={userMedia} />
+	) : (
+		<div className="grid place-items-center h-full">
+			<Spinner className="text-gray-500" />
+		</div>
 	)
 }
 
@@ -98,14 +115,18 @@ function tryToGetDimensions(videoStreamTrack?: MediaStreamTrack) {
 	return { height, width }
 }
 
-function Room() {
+interface RoomProps {
+	room: ReturnType<typeof useRoom>
+	userMedia: ReturnType<typeof useUserMedia>
+}
+
+function Room({ room, userMedia }: RoomProps) {
 	const [joined, setJoined] = useState(false)
 	const [dataSaverMode, setDataSaverMode] = useState(false)
 	const { roomName } = useParams()
 	invariant(roomName)
 
 	const {
-		mode,
 		userDirectoryUrl,
 		traceLink,
 		feedbackEnabled,
@@ -117,11 +138,14 @@ function Room() {
 		maxApiHistory = 100,
 	} = useLoaderData<typeof loader>()
 
-	const userMedia = useUserMedia(mode)
-	const room = useRoom({ roomName, userMedia })
+	const params = new URLSearchParams(apiExtraParams)
+
+	invariant(room.roomState.meetingId, 'Meeting ID cannot be missing')
+	params.set('correlationId', room.roomState.meetingId)
+
 	const { peer, iceConnectionState } = usePeerConnection({
 		maxApiHistory,
-		apiExtraParams,
+		apiExtraParams: params.toString(),
 		iceServers,
 		apiBase: '/api/calls',
 	})

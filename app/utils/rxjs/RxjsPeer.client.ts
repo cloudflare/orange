@@ -182,7 +182,7 @@ export class RxjsPeer {
 		console.debug('🆕 creating new session')
 		const { apiBase } = this.config
 		const response = await this.fetchWithRecordedHistory(
-			`${apiBase}/sessions/new?SESSION`,
+			`${apiBase}/sessions/new?CreatingSession&${this.config.apiExtraParams}`,
 			{ method: 'POST' }
 		)
 		if (response.status > 400) {
@@ -260,7 +260,7 @@ export class RxjsPeer {
 								})),
 							}
 							const response = await this.fetchWithRecordedHistory(
-								`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PUSHING`,
+								`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PushingTrack&${this.config.apiExtraParams}`,
 								{
 									method: 'POST',
 									body: JSON.stringify(requestBody),
@@ -393,7 +393,7 @@ export class RxjsPeer {
 						this.taskScheduler.schedule(async () => {
 							const newTrackResponse: TracksResponse =
 								await this.fetchWithRecordedHistory(
-									`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PULLING`,
+									`${this.config.apiBase}/sessions/${sessionId}/tracks/new?PullingTrack&${this.config.apiExtraParams}`,
 									{
 										method: 'POST',
 										body: JSON.stringify({
@@ -434,7 +434,7 @@ export class RxjsPeer {
 
 								const renegotiationResponse =
 									await this.fetchWithRecordedHistory(
-										`${this.config.apiBase}/sessions/${sessionId}/renegotiate`,
+										`${this.config.apiBase}/sessions/${sessionId}/renegotiate?${this.config.apiExtraParams}`,
 										{
 											method: 'PUT',
 											body: JSON.stringify({
@@ -537,7 +537,7 @@ export class RxjsPeer {
 			force: false,
 		}
 		const response = await this.fetchWithRecordedHistory(
-			`${apiBase}/sessions/${sessionId}/tracks/close`,
+			`${apiBase}/sessions/${sessionId}/tracks/close?${this.config.apiExtraParams}`,
 			{
 				method: 'PUT',
 				body: JSON.stringify(requestBody),
