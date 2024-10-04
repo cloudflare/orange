@@ -194,6 +194,23 @@ export class ChatRoom extends Server<Env> {
 		}
 	}
 
+	async onClose(
+		connection: Connection,
+		code: number,
+		reason: string,
+		wasClean: boolean
+	) {
+		const meetingId = await this.getMeetingId()
+		log({
+			eventName: 'onClose',
+			meetingId,
+			connectionId: connection.id,
+			code,
+			reason,
+			wasClean,
+		})
+	}
+
 	async onMessage(
 		connection: Connection<User>,
 		message: WSMessage
