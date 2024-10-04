@@ -14,6 +14,14 @@ export type LogEvent =
 			connectionId: string
 	  }
 	| {
+			eventName: 'onClose'
+			meetingId?: string
+			connectionId: string
+			code: number
+			reason: string
+			wasClean: boolean
+	  }
+	| {
 			eventName: 'userLeft'
 			meetingId?: string
 			connectionId: string
