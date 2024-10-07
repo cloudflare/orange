@@ -4,10 +4,10 @@
 	"private": true,
 	"sideEffects": false,
 	"scripts": {
-		"build": "remix build",
+		"build": "./rust-mls-worker/build.sh && remix build",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint --max-warnings=0 .",
-		"dev": "remix dev --manual -c \"npm start\"",
-		"start": "wrangler dev ./build/index.js ${WRANGLER_ARGS:-}",
+		"dev": "./rust-mls-worker/build.sh && remix dev --manual -c \"npm start\"",
+		"start": "./rust-mls-worker/build.sh && wrangler dev ./build/index.js ${WRANGLER_ARGS:-}",
 		"prebuild": "npm run clean",
 		"clean": "del public/build && del build",
 		"ci-test": "CI=true run-p typecheck test",
