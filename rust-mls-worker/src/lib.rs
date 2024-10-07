@@ -50,6 +50,12 @@ pub async fn processEvent(event: Object) -> Object {
         */
 
         loop {
+            /* Old BYOB reader code
+            // Call reader.read(buf, 0, BUF_LEN) to read into the whole buffer
+            let view = Uint8Array::new_with_byte_offset_and_length(&buf, 0, BUF_LEN);
+            let promise = reader.read_with_array_buffer_view(&view);
+            */
+
             let promise = reader.read();
 
             // Await the call. This will return an object { value, done }, where
