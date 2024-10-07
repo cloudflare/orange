@@ -1,0 +1,41 @@
+[package]
+name = "orange-mls-worker"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.6", optional = true }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.43"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    'console',
+    'Document',
+    'HtmlElement',
+    'HtmlInputElement',
+    'MessageEvent',
+    'Window',
+    'Worker',
+    'RtcTransformEvent',
+    'ReadableStream',
+    'WritableStream',
+    'ReadableStreamGetReaderOptions',
+    'ReadableStreamReaderMode',
+    'ReadableStreamByobReader',
+    'ReadableStreamDefaultReader',
+    'WritableStreamDefaultWriter',
+]
+
+[patch.crates-io.wasm-bindgen]
+git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
+
+[patch.crates-io.web-sys]
+git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
+
+[patch.crates-io.wasm-bindgen-futures]
+git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
