@@ -36,10 +36,6 @@ export class ChatRoom extends Server<Env> {
 		this.db = getDb(this)
 	}
 
-	static options = {
-		hibernate: true,
-	}
-
 	// a small typesafe wrapper around connection.send
 	sendMessage<M extends ServerMessage>(connection: Connection, message: M) {
 		connection.send(JSON.stringify(message))
