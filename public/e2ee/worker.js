@@ -16,12 +16,11 @@ const wasm_is_ready = init_wasm_in_worker();
 onmessage = async (event /* MessageEvent */) => {
   console.log('Worker received message:', event.data)
   await wasm_is_ready; // Need to load WASM before doing anything
-  //const ret = await processEvent(event.data);
-  //self.postMessage(ret);
+  const receivedMessage = await processEvent(event.data);
+  const processedMessage = JSON.stringify(receivedMessage)
 
-  // Process the received message
-  const receivedMessage = event.data
-
+/*
+  const receivedMessage = event.data;
   if (receivedMessage.type === 'encryptStream') {
     console.log('piping from in to out')
     receivedMessage.in.pipeTo(receivedMessage.out)
@@ -32,10 +31,9 @@ onmessage = async (event /* MessageEvent */) => {
     receivedMessage.in.pipeTo(receivedMessage.out)
   }
 
-  const processedMessage = JSON.stringify(receivedMessage)
-
   // Send a message back to the main script
   postMessage('Worker processed: ' + processedMessage)
+*/
 }
 
 postMessage({ type: 'workerReady' })
