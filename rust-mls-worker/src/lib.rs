@@ -65,6 +65,10 @@ pub async fn processEvent(event: Object) -> Object {
             let done_reading = obj_get(&res, &"done".into()).unwrap().as_bool().unwrap();
             let chunk_read: Uint8Array = obj_get(&res, &"value".into()).unwrap().into();
 
+            if chunk_read.length() > 0 {
+                console::log_1(&"Read nontrivial chunk".into());
+            }
+
             // Write the read chunk to the writable stream. This promise returns nothing
             let promise = writer.write_with_chunk(&chunk_read);
             JsFuture::from(promise).await.unwrap();
