@@ -20,7 +20,42 @@ export function getPacketLossStats$(
 			let inboundPacketsLost = 0
 			let outboundPacketsSent = 0
 			let outboundPacketsLost = 0
+			let candidatePairID: any = undefined
+			let remoteCandidateID: any = undefined
+			let remoteAddress: any = undefined
 
+			// Is there a better way than iterating over all reports three times?!
+			newStatsReport.forEach((report) => {
+				console.log('Report type: ' + report.type)
+				if (report.type === 'transport') {
+					candidatePairID = report.selectedCandidatePairId
+				}
+			})
+			if (candidatePairID !== undefined) {
+				newStatsReport.forEach((report) => {
+					if (
+						report.type === 'candidate-pair' &&
+						report.id === candidatePairID
+					) {
+						remoteCandidateID = report.remoteCandidateId
+					}
+				})
+				if (remoteCandidateID !== undefined) {
+					newStatsReport.forEach((report) => {
+						if (
+							report.type === 'remote-candidate' &&
+							report.id === remoteCandidateID
+						) {
+							remoteAddress = report.address
+						}
+					})
+
+					if (remoteAddress !== undefined && remoteAddress !== '141.101.90.0') {
+						// TODO set a flag to indicate that it is not connect to the Calls
+						// anycast address (as expected)
+					}
+				}
+			}
 			newStatsReport.forEach((report) => {
 				const previous = previousStatsReport.get(report.id)
 				if (!previous) return
