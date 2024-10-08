@@ -11,6 +11,8 @@ use web_sys::{
     ReadableStreamGetReaderOptions, ReadableStreamReaderMode, WritableStream,
 };
 
+mod mls_ops;
+
 /// Makes a BYOB reader, i.e., a zero-copy byte reader
 fn make_byob_reader(stream: &ReadableStream) -> ReadableStreamByobReader {
     let options = ReadableStreamGetReaderOptions::new();
