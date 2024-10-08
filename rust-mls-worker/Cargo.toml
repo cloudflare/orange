@@ -8,6 +8,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.6", optional = true }
+openmls = { version = "0.6.0", features = ["js"] }
+openmls_basic_credential = "0.3.0"
+openmls_rust_crypto = "0.3.0"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.43"
 
@@ -35,6 +38,9 @@ features = [
 git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
 
 [patch.crates-io.web-sys]
+git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
+
+[patch.crates-io.js-sys]
 git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
 
 [patch.crates-io.wasm-bindgen-futures]
