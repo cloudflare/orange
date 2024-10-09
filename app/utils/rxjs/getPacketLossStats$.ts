@@ -12,6 +12,7 @@ export function getPacketLossStats$(
 ) {
 	const inboundPacketLossPercentageEwma = new Ewma(2000, 0)
 	const outboundPacketLossPercentageEwma = new Ewma(2000, 0)
+	let anycastWarned = false
 	return combineLatest([peerConnection$, interval(1000)]).pipe(
 		switchMap(([peerConnection]) => peerConnection.getStats()),
 		pairwise(),
@@ -26,6 +27,7 @@ export function getPacketLossStats$(
 
 			newStatsReport.forEach((report) => {
 				const previous = previousStatsReport.get(report.id)
+				if (!previous) return
 
 				if (report.type === 'transport') {
 					candidatePairID = report.selectedCandidatePairId
@@ -41,12 +43,11 @@ export function getPacketLossStats$(
 					console.warn(
 						"PeerConnection doesn't appear to be connected to anycast 141.101.90.0"
 					)
-					if (!previous) {
+					if (!anycastWarned) {
 						alert('You are not connected to CF anycast address')
+						anycastWarned = true
 					}
 				}
-
-				if (!previous) return
 
 				if (report.type === 'inbound-rtp') {
 					inboundPacketsLost += report.packetsLost - previous.packetsLost
