@@ -32,6 +32,8 @@ features = [
     'ReadableStreamByobReader',
     'ReadableStreamDefaultReader',
     'WritableStreamDefaultWriter',
+    'RtcEncodedAudioFrame',
+    'RtcEncodedVideoFrame',
 ]
 
 [patch.crates-io.wasm-bindgen]
