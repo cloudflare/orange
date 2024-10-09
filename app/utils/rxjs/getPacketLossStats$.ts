@@ -20,44 +20,32 @@ export function getPacketLossStats$(
 			let inboundPacketsLost = 0
 			let outboundPacketsSent = 0
 			let outboundPacketsLost = 0
-			let candidatePairID: any = undefined
-			let remoteCandidateID: any = undefined
-			let remoteAddress: any = undefined
+			let candidatePairID: string | undefined = undefined
+			let remoteCandidateID: string | undefined = undefined
+			let remoteAddress: string | undefined = undefined
 
-			// Is there a better way than iterating over all reports three times?!
 			newStatsReport.forEach((report) => {
-				console.log('Report type: ' + report.type)
+				const previous = previousStatsReport.get(report.id)
+
 				if (report.type === 'transport') {
 					candidatePairID = report.selectedCandidatePairId
 				}
-			})
-			if (candidatePairID !== undefined) {
-				newStatsReport.forEach((report) => {
-					if (
-						report.type === 'candidate-pair' &&
-						report.id === candidatePairID
-					) {
-						remoteCandidateID = report.remoteCandidateId
-					}
-				})
-				if (remoteCandidateID !== undefined) {
-					newStatsReport.forEach((report) => {
-						if (
-							report.type === 'remote-candidate' &&
-							report.id === remoteCandidateID
-						) {
-							remoteAddress = report.address
-						}
-					})
-
-					if (remoteAddress !== undefined && remoteAddress !== '141.101.90.0') {
-						// TODO set a flag to indicate that it is not connect to the Calls
-						// anycast address (as expected)
+				if (candidatePairID) {
+					remoteCandidateID =
+						newStatsReport.get(candidatePairID)?.remoteCandidateId
+				}
+				if (remoteCandidateID) {
+					remoteAddress = newStatsReport.get(remoteCandidateID).address
+				}
+				if (remoteAddress !== undefined && remoteAddress !== '141.101.90.0') {
+					console.warn(
+						"PeerConnection doesn't appear to be connected to anycast 141.101.90.0"
+					)
+					if (!previous) {
+						alert('You are not connected to CF anycast address')
 					}
 				}
-			}
-			newStatsReport.forEach((report) => {
-				const previous = previousStatsReport.get(report.id)
+
 				if (!previous) return
 
 				if (report.type === 'inbound-rtp') {
