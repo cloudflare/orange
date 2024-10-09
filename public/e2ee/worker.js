@@ -12,11 +12,38 @@ async function init_wasm_in_worker() {
 }
 const wasm_is_ready = init_wasm_in_worker();
 
+async function jsProcessEvent(event) {
+	const ty = event.type;
+	if (ty === "encryptStream" || ty === "decryptStream") {
+		var read_stream = event.in.getReader();
+		var write_stream = event.out.getWriter();
+
+		while (true) {
+			var { value, done } = await read_stream.read();
+			if (done) {
+				break;
+			} else {
+				if (value instanceof RTCEncodedVideoFrame) {
+					console.log("Read chunk", value);
+					var view = new Uint8Array(value.data);
+					for (var i = 0; i < view.length; i++) {
+						view[i] = 255;
+					}
+				}
+				await write_stream.write(value);
+			}
+		}
+	}
+
+	return {type: "done"};
+}
+
 // This is a thin wrapper around the Rust worker. This forwards all received events to processEvent, and returns the value via self.postMessage
 onmessage = async (event /* MessageEvent */) => {
   console.log('Worker received message:', event.data)
   await wasm_is_ready; // Need to load WASM before doing anything
   const receivedMessage = await processEvent(event.data);
+  //const receivedMessage = await jsProcessEvent(event.data);
   const processedMessage = JSON.stringify(receivedMessage)
 
 /*
