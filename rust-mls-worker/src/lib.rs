@@ -8,25 +8,41 @@ use web_sys::{
         Uint8Array,
     },
     ReadableStream, ReadableStreamByobReader, ReadableStreamDefaultReader,
-    ReadableStreamGetReaderOptions, ReadableStreamReaderMode, WritableStream,
+    ReadableStreamGetReaderOptions, ReadableStreamReaderMode, RtcEncodedAudioFrame,
+    RtcEncodedVideoFrame, WritableStream,
 };
 
 mod mls_ops;
 
-/// Makes a BYOB reader, i.e., a zero-copy byte reader
-fn make_byob_reader(stream: &ReadableStream) -> ReadableStreamByobReader {
-    let options = ReadableStreamGetReaderOptions::new();
-    options.set_mode(ReadableStreamReaderMode::Byob);
-    console::log_1(&"converting reader".into());
-    stream
-        .get_reader_with_options(&options)
-        .dyn_into::<ReadableStreamByobReader>()
-        .unwrap()
+/// Given an `RtcEncodedAudioFrame` or `RtcEncodedVideoFrame`, returns the frame's byte contents
+fn get_frame_data(frame: &JsValue) -> Vec<u8> {
+    if RtcEncodedAudioFrame::instanceof(frame) {
+        let frame: &RtcEncodedAudioFrame = frame.dyn_ref().unwrap();
+        Uint8Array::new(&frame.data()).to_vec()
+    } else if RtcEncodedVideoFrame::instanceof(frame) {
+        let frame: &RtcEncodedVideoFrame = frame.dyn_ref().unwrap();
+        Uint8Array::new(&frame.data()).to_vec()
+    } else {
+        panic!("frame value of unknown type");
+    }
 }
 
-/// Make a normal reader. This is more general than BYOB, and copies all values into a buffer
-fn make_default_reader(stream: &ReadableStream) -> ReadableStreamDefaultReader {
-    ReadableStreamDefaultReader::new(stream).unwrap()
+/// Given an `RtcEncodedAudioFrame` or `RtcEncodedVideoFrame` and a bytestring, sets frame's bytestring
+fn set_frame_data(frame: &JsValue, new_data: &[u8]) {
+    // Copy the new data into an ArrayBuffer
+    let buf = ArrayBuffer::new(new_data.len() as u32);
+    let view = Uint8Array::new(&buf);
+    view.copy_from(new_data);
+
+    if RtcEncodedAudioFrame::instanceof(frame) {
+        let frame: &RtcEncodedAudioFrame = frame.dyn_ref().unwrap();
+        frame.set_data(&buf);
+    } else if RtcEncodedVideoFrame::instanceof(frame) {
+        let frame: &RtcEncodedVideoFrame = frame.dyn_ref().unwrap();
+        frame.set_data(&buf);
+    } else {
+        panic!("frame value of unknown type");
+    }
 }
 
 #[wasm_bindgen]
@@ -38,41 +54,37 @@ pub async fn processEvent(event: Object) -> Object {
     console::log_1(&format!("Received event of type {} from main thread", ty).into());
 
     if ty == "encryptStream" || ty == "decryptStream" {
-        let read_stream: ReadableStream = obj_get(&event, &"in".into()).unwrap().into();
-        let write_stream: WritableStream = obj_get(&event, &"out".into()).unwrap().into();
-        let reader = make_default_reader(&read_stream);
+        let read_stream: ReadableStream =
+            obj_get(&event, &"in".into()).unwrap().dyn_into().unwrap();
+        let write_stream: WritableStream =
+            obj_get(&event, &"out".into()).unwrap().dyn_into().unwrap();
+        let reader = ReadableStreamDefaultReader::new(&read_stream).unwrap();
         let writer = write_stream.get_writer().unwrap();
 
-        /* No need to make a buffer when using a default reader. Save in case we
-           need to use a BYOB reader
-        // Now just read from the reader and write straight to the writer
-        // Make a 10KB buffer
-        const BUF_LEN: u32 = 10_000;
-        let buf = ArrayBuffer::new(BUF_LEN);
-        */
-
         loop {
-            /* Old BYOB reader code
-            // Call reader.read(buf, 0, BUF_LEN) to read into the whole buffer
-            let view = Uint8Array::new_with_byte_offset_and_length(&buf, 0, BUF_LEN);
-            let promise = reader.read_with_array_buffer_view(&view);
-            */
-
             let promise = reader.read();
 
             // Await the call. This will return an object { value, done }, where
             // value is a view containing the new data, and done is a bool indicating
             // that there is nothing left to read
-            let res: Object = JsFuture::from(promise).await.unwrap().into();
+            let res: Object = JsFuture::from(promise).await.unwrap().dyn_into().unwrap();
             let done_reading = obj_get(&res, &"done".into()).unwrap().as_bool().unwrap();
-            let chunk_read: Uint8Array = obj_get(&res, &"value".into()).unwrap().into();
 
-            if chunk_read.length() > 0 {
-                console::log_1(&"Read nontrivial chunk".into());
-            }
+            // Read a frame and get the underlying bytestring
+            let frame = obj_get(&res, &"value".into()).unwrap();
+
+            // Stub for processing the frame data
+            let frame_data = get_frame_data(&frame);
+            let chunk_len = frame_data.len();
+            console::log_1(&format!("Read chunk of size {chunk_len}").into());
+            //let new_frame_data = vec![0u8; frame_data.len() + 100];
+            let new_frame_data = frame_data;
+
+            // Set the new frame data value
+            set_frame_data(&frame, &new_frame_data);
 
             // Write the read chunk to the writable stream. This promise returns nothing
-            let promise = writer.write_with_chunk(&chunk_read);
+            let promise = writer.write_with_chunk(&frame);
             JsFuture::from(promise).await.unwrap();
 
             if done_reading {
