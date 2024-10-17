@@ -63,16 +63,16 @@ export default function useRoom({
 		}
 	}, [websocket])
 
-	// setup a simple ping pong
-	useEffect(() => {
-		const interval = setInterval(() => {
-			websocket.send(
-				JSON.stringify({ type: 'partyserver-ping' } satisfies ClientMessage)
-			)
-		}, 5000)
-
-		return () => clearInterval(interval)
-	}, [websocket])
+	// // setup a simple ping pong
+	// useEffect(() => {
+	// 	const interval = setInterval(() => {
+	// 		websocket.send(
+	// 			JSON.stringify({ type: 'partyserver-ping' } satisfies ClientMessage)
+	// 		)
+	// 	}, 5000)
+	//
+	// 	return () => clearInterval(interval)
+	// }, [websocket])
 
 	const identity = useMemo(
 		() => roomState.users.find((u) => u.id === websocket.id),

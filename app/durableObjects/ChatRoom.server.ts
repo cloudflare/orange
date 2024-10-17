@@ -30,6 +30,8 @@ export class ChatRoom extends Server<Env> {
 	env: Env
 	db: DrizzleD1Database<Record<string, never>> | null
 
+	// static options = { hibernate: true }
+
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env)
 		this.env = env
@@ -46,12 +48,12 @@ export class ChatRoom extends Server<Env> {
 		log({ eventName: 'onStart', meetingId })
 		this.db = getDb(this)
 		// TODO: make this a part of partyserver
-		this.ctx.setWebSocketAutoResponse(
-			new WebSocketRequestResponsePair(
-				JSON.stringify({ type: 'partyserver-ping' }),
-				JSON.stringify({ type: 'partyserver-pong' })
-			)
-		)
+		// this.ctx.setWebSocketAutoResponse(
+		// 	new WebSocketRequestResponsePair(
+		// 		JSON.stringify({ type: 'partyserver-ping' }),
+		// 		JSON.stringify({ type: 'partyserver-pong' })
+		// 	)
+		// )
 	}
 
 	async onConnect(
@@ -170,6 +172,10 @@ export class ChatRoom extends Server<Env> {
 		const roomStateMessage = JSON.stringify(roomState)
 
 		for (const connection of this.getConnections()) {
+			// skip connection if it's not OPEN
+			if (connection.readyState !== WebSocket.OPEN) {
+				continue
+			}
 			try {
 				connection.send(roomStateMessage)
 			} catch (err) {
