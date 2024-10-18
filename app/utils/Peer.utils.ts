@@ -25,10 +25,15 @@ export class BulkRequestDispatcher<RequestEntryParams, BulkResponse> {
 	#currentBatch: RequestEntryParams[]
 	#currentBulkResponse: Promise<BulkResponse> | null
 	#batchSizeLimit: number
-	constructor(batchSizeLimit: number = DefaultBatchSizeLimit) {
+	#minimumBatchSize: number
+	constructor(
+		batchSizeLimit: number = DefaultBatchSizeLimit,
+		minimumBatchSize = 1
+	) {
 		this.#currentBatch = []
 		this.#currentBulkResponse = null
 		this.#batchSizeLimit = batchSizeLimit
+		this.#minimumBatchSize = minimumBatchSize
 	}
 
 	// doBulkRequest will return a bulk response promise.
@@ -50,17 +55,11 @@ export class BulkRequestDispatcher<RequestEntryParams, BulkResponse> {
 		// the batch limit is reached
 		let batch = this.#currentBatch
 		this.#currentBulkResponse = new Promise((resolve, reject) => {
-			//   script
-			//     |
-			//     V
-			// microtasks (Promise)
-			//     |
-			//     V
-			// macrotasks (setTimeout)
-			//
-			// macrotasks are ran in the event loop iteration end, so
-			// we use that moment to make the bulkRequestFunc call
-			setTimeout(() => {
+			const execute = () => {
+				if (this.#currentBatch.length < this.#minimumBatchSize) {
+					console.log('Under minimumBatchSize, skipping for now')
+					return setTimeout(execute, 0)
+				}
 				// When the bulk request happens, the batch list and
 				// the response is reset to start another batch. Coming
 				// callers will wait for a new response promise
@@ -73,7 +72,19 @@ export class BulkRequestDispatcher<RequestEntryParams, BulkResponse> {
 				}).catch((err) => {
 					reject(err)
 				})
-			}, 0)
+			}
+
+			//   script
+			//     |
+			//     V
+			// microtasks (Promise)
+			//     |
+			//     V
+			// macrotasks (setTimeout)
+			//
+			// macrotasks are ran in the event loop iteration end, so
+			// we use that moment to make the bulkRequestFunc call
+			setTimeout(execute, 0)
 		})
 		// This bulk response needs to be processed to extract the the result for the entry
 		return this.#currentBulkResponse

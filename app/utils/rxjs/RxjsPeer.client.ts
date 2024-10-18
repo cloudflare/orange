@@ -166,7 +166,7 @@ export class RxjsPeer {
 			transceiver: RTCRtpTransceiver
 		},
 		{ tracks: TrackObject[] }
-	>(32)
+	>(32, 2)
 	pullTrackDispatcher = new BulkRequestDispatcher<
 		TrackObject,
 		{
