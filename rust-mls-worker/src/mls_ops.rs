@@ -182,11 +182,12 @@ thread_local! {
     static STATE: Arc<Mutex<WorkerState>> = Arc::new(Mutex::new(WorkerState::default()));
 }
 
-pub fn new_state(uid: Vec<u8>) {
+pub fn new_state(uid: &str) {
+    let uid_bytes = uid.as_bytes().to_vec();
     STATE
         .try_with(|mutex| {
             let mut state = mutex.lock().expect("couldn't lock mutex");
-            *state = WorkerState::new(uid);
+            *state = WorkerState::new(uid_bytes);
         })
         .expect("couldn't acquire thread-local storage")
 }
