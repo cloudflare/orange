@@ -1,3 +1,4 @@
+use mls_ops::{decrypt_msg, encrypt_msg};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -52,9 +53,10 @@ pub async fn processEvent(event: Object) -> Object {
         .unwrap()
         .as_string()
         .unwrap();
+    let ty = ty.as_str();
     console::log_1(&format!("Received event of type {} from main thread", ty).into());
 
-    match ty.as_str() {
+    match ty {
         "encryptStream" | "decryptStream" => {
             // Grab the streams from the object and pass them to `process_stream`
             let read_stream: ReadableStream =
@@ -64,7 +66,11 @@ pub async fn processEvent(event: Object) -> Object {
             let reader = ReadableStreamDefaultReader::new(&read_stream).unwrap();
             let writer = write_stream.get_writer().unwrap();
 
-            process_stream(reader, writer, |bytes| bytes.to_vec()).await;
+            if ty == "encryptStream" {
+                process_stream(reader, writer, encrypt_msg).await;
+            } else {
+                process_stream(reader, writer, decrypt_msg).await;
+            }
         }
 
         "initailize" => {
@@ -76,6 +82,10 @@ pub async fn processEvent(event: Object) -> Object {
             let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
             mls_ops::new_state(&user_id);
             mls_ops::start_group();
+        }
+
+        "userJoined" => {
+            let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
         }
 
         _ => panic!("unknown message type {ty} from main thread"),
