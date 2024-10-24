@@ -61,3 +61,6 @@ export type ClientMessage =
 	| {
 			type: 'partyserver-ping'
 	  }
+	| {
+			type: 'heartbeat'
+	  }
