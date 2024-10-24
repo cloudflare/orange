@@ -6,8 +6,9 @@ use std::{
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
-        BasicCredential, Ciphersuite, CredentialWithKey, KeyPackage, LeafNodeIndex,
-        MlsMessageBodyIn, MlsMessageIn, MlsMessageOut, OpenMlsProvider, ProcessedMessageContent,
+        ApplicationMessage, BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes,
+        KeyPackage, KeyPackageBundle, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
+        OpenMlsProvider, ProcessedMessageContent,
     },
 };
 use openmls_basic_credential::SignatureKeyPair;
@@ -26,9 +27,10 @@ struct WorkerState {
 }
 
 impl WorkerState {
-    /// Initializes MLS state with a unique identifier for this user.
+    /// Initializes MLS state with a unique identifier for this user. Also returns the freshly
+    /// generated key package of this user.
     /// This MUST be executed before anything else in this module.
-    fn new(uid: Vec<u8>) -> WorkerState {
+    fn new(uid: Vec<u8>) -> (WorkerState, KeyPackageBundle) {
         let mut state = WorkerState::default();
         let credential = BasicCredential::new(uid);
 
@@ -40,15 +42,26 @@ impl WorkerState {
         signature_keys
             .store(state.mls_provider.storage())
             .expect("couldn't store signature keys");
-
-        // Save the credential and keys into the state struct
-        state.my_credential = Some(CredentialWithKey {
+        let cred = CredentialWithKey {
             credential: credential.into(),
             signature_key: signature_keys.public().into(),
-        });
+        };
+
+        // Construct the key package
+        let key_package = KeyPackage::builder()
+            .build(
+                CIPHERSUITE,
+                &state.mls_provider,
+                &signature_keys,
+                cred.clone(),
+            )
+            .unwrap();
+
+        // Save the credential and keys into the state struct
+        state.my_credential = Some(cred);
         state.my_signing_keys = Some(signature_keys);
 
-        state
+        (state, key_package)
     }
 
     /// Starts a new MLS group. This is called if this user is the first user in the room
@@ -94,9 +107,9 @@ impl WorkerState {
         }
     }
 
-    /// If this user is the Designated Committer, this will create a Welcome package for the
-    /// for the new user and a Commit with an Add operation in it. Otherwise, this will just note that a new user has joined
-    /// the room but not yet been added to the MLS group
+    /// If this user is the Designated Committer, this will create a Welcome package for the for the
+    /// new user and a Commit with an Add operation in it. Otherwise, this will just note that a new
+    /// user has joined the room but not yet been added to the MLS group
     fn add_user(&mut self, user_keys: KeyPackage) -> Option<(MlsMessageOut, MlsMessageOut)> {
         let uid = user_keys.leaf_node().credential().serialized_content();
 
@@ -173,6 +186,45 @@ impl WorkerState {
             panic!("expected Commit message")
         }
     }
+
+    /// Takes a message, encrypts it, frames it as an MlsMessageOut, and serializes it
+    fn encrypt_app_msg(&mut self, msg: &[u8]) -> Vec<u8> {
+        let out = self
+            .mls_group
+            .as_mut()
+            .unwrap()
+            .create_message(
+                &self.mls_provider,
+                self.my_signing_keys.as_ref().unwrap(),
+                msg,
+            )
+            .unwrap();
+
+        out.to_bytes().unwrap()
+    }
+
+    /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
+    /// the bytes
+    fn decrypt_app_msg(&mut self, ct: &[u8]) -> Vec<u8> {
+        let group = self.mls_group.as_mut().unwrap();
+        let framed = MlsMessageIn::tls_deserialize_exact_bytes(ct).unwrap();
+
+        // Process the ciphertext into an application message
+        let msg = group
+            .process_message(
+                &self.mls_provider,
+                framed.try_into_protocol_message().unwrap(),
+            )
+            .expect("could not process message")
+            .into_content();
+
+        match msg {
+            ProcessedMessageContent::ApplicationMessage(app_msg) => app_msg.into_bytes(),
+            _ => {
+                panic!("unexpected MLS message {:?}", msg)
+            }
+        }
+    }
 }
 
 // Now define the top-level functions that touch global state. These are thin wrappers
@@ -184,12 +236,17 @@ thread_local! {
 
 pub fn new_state(uid: &str) {
     let uid_bytes = uid.as_bytes().to_vec();
-    STATE
+    let key_pkg = STATE
         .try_with(|mutex| {
             let mut state = mutex.lock().expect("couldn't lock mutex");
-            *state = WorkerState::new(uid_bytes);
+            let (new_state, key_pkg) = WorkerState::new(uid_bytes);
+            *state = new_state;
+            key_pkg
         })
-        .expect("couldn't acquire thread-local storage")
+        .expect("couldn't acquire thread-local storage");
+
+    // Return key package
+    todo!()
 }
 
 pub fn start_group() {
@@ -198,4 +255,26 @@ pub fn start_group() {
             mutex.lock().expect("couldn't lock mutex").start_group();
         })
         .expect("couldn't acquire thread-local storage");
+}
+
+pub fn encrypt_msg(msg: &[u8]) -> Vec<u8> {
+    STATE
+        .try_with(|mutex| {
+            mutex
+                .lock()
+                .expect("couldn't lock mutex")
+                .encrypt_app_msg(msg)
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+
+pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
+    STATE
+        .try_with(|mutex| {
+            mutex
+                .lock()
+                .expect("couldn't lock mutex")
+                .decrypt_app_msg(msg)
+        })
+        .expect("couldn't acquire thread-local storage")
 }
