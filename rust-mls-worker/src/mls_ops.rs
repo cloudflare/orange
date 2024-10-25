@@ -234,7 +234,8 @@ thread_local! {
     static STATE: Arc<Mutex<WorkerState>> = Arc::new(Mutex::new(WorkerState::default()));
 }
 
-pub fn new_state(uid: &str) {
+/// Creates a new state and returns the user's key package
+pub fn new_state(uid: &str) -> KeyPackage {
     let uid_bytes = uid.as_bytes().to_vec();
     let key_pkg = STATE
         .try_with(|mutex| {
@@ -246,7 +247,7 @@ pub fn new_state(uid: &str) {
         .expect("couldn't acquire thread-local storage");
 
     // Return key package
-    todo!()
+    key_pkg.key_package().clone()
 }
 
 pub fn start_group() {
