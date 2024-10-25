@@ -1,16 +1,16 @@
 use mls_ops::{decrypt_msg, encrypt_msg};
+use openmls::prelude::tls_codec::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     console,
     js_sys::{
-        ArrayBuffer, Object,
+        ArrayBuffer, JsString, Object,
         Reflect::{get as obj_get, set as obj_set},
         Uint8Array,
     },
-    ReadableStream, ReadableStreamByobReader, ReadableStreamDefaultReader,
-    ReadableStreamGetReaderOptions, ReadableStreamReaderMode, RtcEncodedAudioFrame,
-    RtcEncodedVideoFrame, WritableStream, WritableStreamDefaultWriter,
+    ReadableStream, ReadableStreamDefaultReader, RtcEncodedAudioFrame, RtcEncodedVideoFrame,
+    WritableStream, WritableStreamDefaultWriter,
 };
 
 mod mls_ops;
@@ -46,17 +46,19 @@ fn set_frame_data(frame: &JsValue, new_data: &[u8]) {
     }
 }
 
+/// Processes an event and returns an object that's null, i.e., no return value, or consists of
+/// fields "type": str, "payload_name": str, and "payload": ArrayBuffer.
 #[wasm_bindgen]
 #[allow(non_snake_case)]
-pub async fn processEvent(event: Object) -> Object {
+pub async fn processEvent(event: Object) -> JsValue {
     let ty = obj_get(&event, &"type".into())
         .unwrap()
         .as_string()
         .unwrap();
     let ty = ty.as_str();
-    console::log_1(&format!("Received event of type {} from main thread", ty).into());
+    console::log_1(&format!("Received event of type {ty} from main thread").into());
 
-    match ty {
+    let ret = match ty {
         "encryptStream" | "decryptStream" => {
             // Grab the streams from the object and pass them to `process_stream`
             let read_stream: ReadableStream =
@@ -71,31 +73,60 @@ pub async fn processEvent(event: Object) -> Object {
             } else {
                 process_stream(reader, writer, decrypt_msg).await;
             }
+            None
         }
 
-        "initailize" => {
+        "initialize" => {
             let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
-            mls_ops::new_state(&user_id);
+            let key_pkg = mls_ops::new_state(&user_id);
+            console::log_1(&format!("Initialized state").into());
+            Some((
+                "shareKeyPackage",
+                "keyPkg",
+                key_pkg.tls_serialize_detached().unwrap(),
+            ))
         }
 
         "initializeAndCreateGroup" => {
             let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
-            mls_ops::new_state(&user_id);
+            let key_pkg = mls_ops::new_state(&user_id);
             mls_ops::start_group();
+            Some((
+                "shareKeyPackage",
+                "keyPkg",
+                key_pkg.tls_serialize_detached().unwrap(),
+            ))
         }
 
         "userJoined" => {
-            let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
+            let key_pkg = obj_get(&event, &"keyPkg".into()).unwrap();
+            unimplemented!()
         }
 
         _ => panic!("unknown message type {ty} from main thread"),
-    }
+    };
 
-    // Return some dummy object
-    let ret = Object::new();
-    obj_set(&ret, &"type".into(), &"mlsMessage".into()).unwrap();
-    obj_set(&ret, &"msg".into(), &Uint8Array::default()).unwrap();
-    ret
+    // Make an object with "type" => ty, and payload_name => payload, where payload is an
+    // ArrayBuffer of bytes
+    if let Some((ty, payload_name, payload)) = ret {
+        // Copy into array buffer
+        let o = Object::new();
+        let buf = ArrayBuffer::new(payload.len() as u32);
+        let view = Uint8Array::new(&buf);
+        view.copy_from(&payload);
+
+        obj_set(&o, &"type".into(), &JsString::from(ty).into()).unwrap();
+        obj_set(
+            &o,
+            &"payload_name".into(),
+            &JsString::from(payload_name).into(),
+        )
+        .unwrap();
+        obj_set(&o, &"payload".into(), &buf).unwrap();
+        o.into()
+    } else {
+        JsValue::null()
+    }
 }
 
 /// Processes a posssibly infinite stream of `RtcEncodedAudio(/Video)Frame`s . Reads a frame from
