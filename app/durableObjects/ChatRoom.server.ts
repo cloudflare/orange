@@ -16,7 +16,7 @@ import {
 import { getDb, Meetings } from 'schema'
 import { log } from '~/utils/logging'
 
-const alarmInterval = 30_000
+const alarmInterval = 15_000
 
 /**
  * The ChatRoom Durable Object Class
@@ -88,6 +88,7 @@ export class ChatRoom extends Server<Env> {
 
 		// store the user's data in storage
 		await this.ctx.storage.put(`session-${connection.id}`, user)
+		await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
 		await this.trackPeakUserCount()
 		await this.broadcastRoomState()
 		const meetingId = await this.getMeetingId()
@@ -232,6 +233,13 @@ export class ChatRoom extends Server<Env> {
 								`Failed to delete session session-${connection.id} on userLeft`
 							)
 						})
+					await this.ctx.storage
+						.delete(`heartbeat-${connection.id}`)
+						.catch(() => {
+							console.warn(
+								`Failed to delete session session-heartbeat-${connection.id} on userLeft`
+							)
+						})
 					log({ eventName: 'userLeft', meetingId, connectionId: connection.id })
 
 					await this.broadcastRoomState()
@@ -304,6 +312,10 @@ export class ChatRoom extends Server<Env> {
 					)
 					break
 				}
+				case 'heartbeat': {
+					await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
+					break
+				}
 				default: {
 					assertNever(data)
 					break
@@ -367,33 +379,38 @@ export class ChatRoom extends Server<Env> {
 	async cleanupOldConnections() {
 		const meetingId = await this.getMeetingId()
 		if (!meetingId) log({ eventName: 'meetingIdNotFoundInCleanup' })
-		const websockets = this.ctx.getWebSockets()
+		const now = Date.now()
+		const users = await this.getUsers()
+		let removedUsers = 0
 		const connections = [...this.getConnections()]
-		log({
-			eventName: 'cleaningUpConnections',
-			meetingId,
-			connectionsFound: connections.length,
-			websocketsFound: websockets.length,
-			websocketStatuses: websockets.map((w) => w.readyState),
-		})
-		const sessionsToCleanUp = await this.getUsers()
 
-		connections.forEach((connection) =>
-			sessionsToCleanUp.delete(`session-${connection.id}`)
-		)
+		for (const [key, user] of users) {
+			const connectionId = key.replace('session-', '')
+			const heartbeat = await this.ctx.storage.get<number>(
+				`heartbeat-${connectionId}`
+			)
+			if (heartbeat === undefined || heartbeat + alarmInterval < now) {
+				removedUsers++
+				await this.ctx.storage.delete(key).catch(() => {
+					console.warn(
+						`Failed to delete session ${key} in cleanupOldConnections`
+					)
+				})
 
-		sessionsToCleanUp.forEach((user) => {
-			log({ eventName: 'userTimedOut', connectionId: user.id, meetingId })
-		})
-
-		await this.ctx.storage
-			.delete([...sessionsToCleanUp.keys()])
-			.catch(() => console.warn('Failed to clean up orphaned sessions'))
+				const connection = connections.find((c) => c.id === connectionId)
+				if (connection) {
+					connection.close(1011)
+				}
+				log({ eventName: 'userTimedOut', connectionId: user.id, meetingId })
+			}
+		}
 
 		const activeUserCount = (await this.getUsers()).size
 
 		if (meetingId && activeUserCount === 0) {
 			this.endMeeting(meetingId)
+		} else if (removedUsers > 0) {
+			this.broadcastRoomState()
 		}
 
 		return activeUserCount
