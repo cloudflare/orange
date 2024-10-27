@@ -1,5 +1,9 @@
 {
 	"lit-plugin.disable": true,
 	"editor.formatOnSave": true,
-	"editor.defaultFormatter": "esbenp.prettier-vscode"
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"editor.dragAndDrop": false,
+	"editor.dropIntoEditor.enabled": false,
+	"editor.emptySelectionClipboard": false,
+	"editor.experimental.asyncTokenizationVerification": true
 }
