@@ -10,12 +10,15 @@ use openmls::{
         DeserializeBytes, KeyPackage, KeyPackageBundle, LeafNodeIndex, MlsMessageBodyIn,
         MlsMessageIn, MlsMessageOut, OpenMlsProvider, ProcessedMessageContent, RatchetTreeIn,
     },
+    schedule::EpochAuthenticator,
     treesync::RatchetTree,
 };
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+
+type SafetyNumber = [u8; 32];
 
 /// Contains the data created by existing member that a new users needs to join a group. This is an
 /// MLS Welcome message along with the ratchet tree information
@@ -31,11 +34,13 @@ struct WelcomePackageIn {
     ratchet_tree: RatchetTreeIn,
 }
 
-/// An add or remove operation might result in a welcome package, and one or more MLS proposals
+/// An add or remove operation might result in a welcome package, one or more MLS proposals, and a
+/// new safety number (if this user is the designated committer)
 #[derive(Default)]
 struct AddRemoveResponse {
     welcome: Option<WelcomePackageOut>,
     proposals: Vec<MlsMessageOut>,
+    new_safety_number: Option<SafetyNumber>,
 }
 
 /// Helper function that turns a key package into a unique UID
@@ -51,7 +56,8 @@ struct WorkerState {
 
     my_credential: Option<CredentialWithKey>,
     my_signing_keys: Option<SignatureKeyPair>,
-    /// Is this user the Designated Committer of this group, i.e., the user with the lowest leaf index
+    /// Is this user the Designated Committer of this group, i.e., the user with the lowest leaf
+    /// index
     is_designated_committer: Option<bool>,
     /// The set of room members who have not yet been added to the MLS group
     pending_room_members: Vec<KeyPackage>,
@@ -95,8 +101,22 @@ impl WorkerState {
         (state, key_package)
     }
 
+    fn safety_number(&self) -> SafetyNumber {
+        let mut sn = SafetyNumber::default();
+        // Get the epoch authenticator and truncate it to 256 bits
+        sn.copy_from_slice(
+            &self
+                .mls_group
+                .as_ref()
+                .unwrap()
+                .epoch_authenticator()
+                .as_slice()[..32],
+        );
+        sn
+    }
+
     /// Starts a new MLS group. This is called if this user is the first user in the room
-    fn start_group(&mut self) {
+    fn start_group(&mut self) -> SafetyNumber {
         self.mls_group = Some(
             MlsGroup::new(
                 &self.mls_provider,
@@ -113,10 +133,13 @@ impl WorkerState {
 
         // We're the only person in the group, so we're the designated committer
         self.is_designated_committer = Some(true);
+
+        // Return the new safety number
+        self.safety_number()
     }
 
     /// Join a group using the given MLS Welcome message
-    fn join_group(&mut self, wp: WelcomePackageIn) {
+    fn join_group(&mut self, wp: WelcomePackageIn) -> SafetyNumber {
         let WelcomePackageIn {
             welcome,
             ratchet_tree,
@@ -144,6 +167,9 @@ impl WorkerState {
         } else {
             panic!("expected Welcome message in join_group")
         }
+
+        // Return the new safety number
+        self.safety_number()
     }
 
     /// If this user is the Designated Committer, this will create a welcome package for the for the
@@ -185,6 +211,7 @@ impl WorkerState {
                     ratchet_tree,
                 }),
                 proposals: vec![commit],
+                new_safety_number: Some(self.safety_number()),
             }
         } else {
             self.pending_room_members.push(user_kp);
@@ -268,6 +295,7 @@ impl WorkerState {
                     ratchet_tree,
                 }),
                 proposals: vec![removal, additions],
+                new_safety_number: Some(self.safety_number()),
             }
         } else {
             // Quick sanity check: if we're removing a user, they should not be in the pending list
@@ -287,7 +315,7 @@ impl WorkerState {
     }
 
     /// Applies the given MLS commit to the group state
-    fn handle_commit(&mut self, msg: MlsMessageIn) {
+    fn handle_commit(&mut self, msg: MlsMessageIn) -> SafetyNumber {
         let group = self.mls_group.as_mut().unwrap();
 
         // Process the message into a Staged Commit
@@ -312,6 +340,9 @@ impl WorkerState {
             // the UIDs that aren't in the pending list
             self.pending_room_members
                 .retain(|kp| !uids_being_added.contains(kp_to_uid(kp)));
+
+            // Return the new safety number
+            self.safety_number()
         } else {
             panic!("expected Commit message")
         }
@@ -380,12 +411,10 @@ pub fn new_state(uid: &str) -> KeyPackage {
     key_pkg.key_package().clone()
 }
 
-pub fn start_group() {
+pub fn start_group() -> SafetyNumber {
     STATE
-        .try_with(|mutex| {
-            mutex.lock().expect("couldn't lock mutex").start_group();
-        })
-        .expect("couldn't acquire thread-local storage");
+        .try_with(|mutex| mutex.lock().expect("couldn't lock mutex").start_group())
+        .expect("couldn't acquire thread-local storage")
 }
 
 pub fn encrypt_msg(msg: &[u8]) -> Vec<u8> {
