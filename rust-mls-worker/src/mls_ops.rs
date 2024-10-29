@@ -463,4 +463,10 @@ fn end_to_end() {
     charlie_group.join_group(wp);
     // Bob processes that Charlie was added
     bob_group.handle_commit(add);
+
+    // Now encrypt something
+    let msg = b"hello world";
+    let ct = alice_group.encrypt_app_msg(msg);
+    bob_group.decrypt_app_msg(&ct);
+    charlie_group.decrypt_app_msg(&ct);
 }
