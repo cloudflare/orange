@@ -154,7 +154,7 @@ impl WorkerState {
         let uid = kp_to_uid(&user_kp);
 
         if self.is_designated_committer.unwrap() {
-            // Random sanity check: if we're the DC and adding a new member, we shouldn't have any
+            // Sanity check: if we're the DC and adding a new member, we shouldn't have any
             // pending members
             assert!(self.pending_room_members.is_empty());
 
@@ -223,6 +223,12 @@ impl WorkerState {
 
         // If we're the designated committer then we have to remove the old DC
         if self.is_designated_committer.unwrap() {
+            // Sanity check: if we're the incumbent DC and removing a member, we shouldn't have any pending
+            // members
+            if !became_dc {
+                assert!(self.pending_room_members.is_empty());
+            }
+
             // Do the removal operation
             let (removal, _, _) = group
                 .remove_members(
@@ -252,6 +258,9 @@ impl WorkerState {
                 .merge_pending_commit(&self.mls_provider)
                 .unwrap();
             let ratchet_tree = self.mls_group.as_ref().unwrap().export_ratchet_tree();
+
+            // Once we've added these users, they are no longer pending, so remove them
+            self.pending_room_members.clear();
 
             AddRemoveResponse {
                 welcome: Some(WelcomePackageOut {
