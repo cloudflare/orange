@@ -6,15 +6,15 @@ use std::{
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
-        tls_codec::Serialize, ApplicationMessage, BasicCredential, Ciphersuite, CredentialWithKey,
-        DeserializeBytes, KeyPackage, KeyPackageBundle, LeafNodeIndex, MlsMessageBodyIn,
-        MlsMessageIn, MlsMessageOut, OpenMlsProvider, ProcessedMessageContent, RatchetTreeIn,
+        BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage,
+        KeyPackageBundle, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
+        OpenMlsProvider, ProcessedMessageContent, RatchetTreeIn,
     },
-    schedule::EpochAuthenticator,
     treesync::RatchetTree,
 };
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
+use rand::seq::SliceRandom;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 
@@ -64,10 +64,17 @@ struct WorkerState {
 }
 
 impl WorkerState {
-    /// Initializes MLS state with a unique identifier for this user. Also returns the freshly
-    /// generated key package of this user.
+    /// Initializes MLS state with an identifier for this user. Also returns the freshly generated
+    /// key package of this user.
     /// This MUST be executed before anything else in this module.
-    fn new(uid: Vec<u8>) -> (WorkerState, KeyPackageBundle) {
+    fn new(mut uid: Vec<u8>) -> (WorkerState, KeyPackageBundle) {
+        // Add a 35-bit suffix to the end of the UID so it's unique within the group
+        let mut rng = rand::thread_rng();
+        // Use the zbase32 alphabet
+        let alphabet = b"ybndrfg8ejkmcpqxot1uwisza345h769";
+        uid.push(b'_');
+        uid.extend(core::iter::repeat_with(|| *alphabet.choose(&mut rng).unwrap()).take(7));
+
         let mut state = WorkerState::default();
         let credential = BasicCredential::new(uid);
 
@@ -441,6 +448,8 @@ pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
 
 #[test]
 fn end_to_end() {
+    use openmls::prelude::tls_codec::Serialize;
+
     // Converts an MlsMessageOut to an MlsMessageIn
     fn msg_out_to_in(m: &MlsMessageOut) -> MlsMessageIn {
         let bytes = m.tls_serialize_detached().unwrap();
