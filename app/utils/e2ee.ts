@@ -76,10 +76,6 @@ export async function loadWorker(
 
 export async function setupSenderTransform(sender: RTCRtpSender) {
 	const worker = await loadWorker(console.log)
-	worker.postMessage({
-		type: 'initializeAndCreateGroup',
-		id: 'teetertotter',
-	})
 
 	if (
 		'createEncodedStreams' in sender &&
