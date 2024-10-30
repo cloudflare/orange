@@ -6,9 +6,9 @@ use std::{
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
-        BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage,
-        KeyPackageBundle, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn, MlsMessageOut,
-        OpenMlsProvider, ProcessedMessageContent, RatchetTreeIn,
+        tls_codec::Serialize, BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes,
+        KeyPackage, KeyPackageBundle, KeyPackageIn, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn,
+        MlsMessageOut, OpenMlsProvider, ProcessedMessageContent, ProtocolVersion, RatchetTreeIn,
     },
     treesync::RatchetTree,
 };
@@ -17,14 +17,15 @@ use openmls_rust_crypto::OpenMlsRustCrypto;
 use rand::seq::SliceRandom;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+const PROT_VERSION: ProtocolVersion = ProtocolVersion::Mls10;
 
 type SafetyNumber = [u8; 32];
 
 /// Contains the data created by existing member that a new users needs to join a group. This is an
 /// MLS Welcome message along with the ratchet tree information
-struct WelcomePackageOut {
-    welcome: MlsMessageOut,
-    ratchet_tree: RatchetTree,
+pub(crate) struct WelcomePackageOut {
+    pub(crate) welcome: MlsMessageOut,
+    pub(crate) ratchet_tree: RatchetTree,
 }
 
 /// Same as [`WelcomePackageOut`] but intended for incoming messages. This is created when the new
@@ -32,15 +33,6 @@ struct WelcomePackageOut {
 struct WelcomePackageIn {
     welcome: MlsMessageIn,
     ratchet_tree: RatchetTreeIn,
-}
-
-/// An add or remove operation might result in a welcome package, one or more MLS proposals, and a
-/// new safety number (if this user is the designated committer)
-#[derive(Default)]
-struct AddRemoveResponse {
-    welcome: Option<WelcomePackageOut>,
-    proposals: Vec<MlsMessageOut>,
-    new_safety_number: Option<SafetyNumber>,
 }
 
 /// Helper function that turns a key package into a unique UID
@@ -122,7 +114,8 @@ impl WorkerState {
         sn
     }
 
-    /// Starts a new MLS group. This is called if this user is the first user in the room
+    /// Starts a new MLS group. This is called if this user is the first user in the room. Returns a
+    /// new safety number and nothing else
     fn start_group(&mut self) -> SafetyNumber {
         self.mls_group = Some(
             MlsGroup::new(
@@ -183,8 +176,10 @@ impl WorkerState {
     /// new user and a Commit with an Add operation in it, and it will update the current state to
     /// include the Add. Otherwise, this will just note that a new user has joined the room but not
     /// yet been added to the MLS group.
-    fn add_user(&mut self, user_kp: KeyPackage) -> AddRemoveResponse {
-        let uid = kp_to_uid(&user_kp);
+    fn add_user(&mut self, user_kp: KeyPackageIn) -> WorkerResponse {
+        let user_kp = user_kp
+            .validate(self.mls_provider.crypto(), PROT_VERSION)
+            .unwrap();
 
         if self.is_designated_committer.unwrap() {
             // Sanity check: if we're the DC and adding a new member, we shouldn't have any
@@ -212,24 +207,25 @@ impl WorkerState {
                 .unwrap();
             let ratchet_tree = self.mls_group.as_ref().unwrap().export_ratchet_tree();
 
-            AddRemoveResponse {
+            WorkerResponse {
                 welcome: Some(WelcomePackageOut {
                     welcome,
                     ratchet_tree,
                 }),
                 proposals: vec![commit],
                 new_safety_number: Some(self.safety_number()),
+                ..Default::default()
             }
         } else {
             self.pending_room_members.push(user_kp);
-            AddRemoveResponse::default()
+            WorkerResponse::default()
         }
     }
 
     /// If this user is the Designated Committer, this will create a Remove message
     /// for the rest of the group. Otherwise, this will just note that a user has been
     /// removed from the room,  but not yet been removed from the MLS group
-    fn remove_user(&mut self, uid_to_remove: &[u8]) -> AddRemoveResponse {
+    fn remove_user(&mut self, uid_to_remove: &[u8]) -> WorkerResponse {
         let group = self.mls_group.as_mut().unwrap();
         let was_previously_designated_committer = self.is_designated_committer.unwrap();
 
@@ -296,13 +292,14 @@ impl WorkerState {
             // Once we've added these users, they are no longer pending, so remove them
             self.pending_room_members.clear();
 
-            AddRemoveResponse {
+            WorkerResponse {
                 welcome: Some(WelcomePackageOut {
                     welcome,
                     ratchet_tree,
                 }),
                 proposals: vec![removal, additions],
                 new_safety_number: Some(self.safety_number()),
+                ..Default::default()
             }
         } else {
             // Quick sanity check: if we're removing a user, they should not be in the pending list
@@ -317,12 +314,12 @@ impl WorkerState {
                 assert!(self.pending_room_members.is_empty());
             }
             // Nothing to return
-            AddRemoveResponse::default()
+            WorkerResponse::default()
         }
     }
 
     /// Applies the given MLS commit to the group state
-    fn handle_commit(&mut self, msg: MlsMessageIn) -> SafetyNumber {
+    fn handle_commit(&mut self, msg: MlsMessageIn) -> WorkerResponse {
         let group = self.mls_group.as_mut().unwrap();
 
         // Process the message into a Staged Commit
@@ -349,7 +346,10 @@ impl WorkerState {
                 .retain(|kp| !uids_being_added.contains(kp_to_uid(kp)));
 
             // Return the new safety number
-            self.safety_number()
+            WorkerResponse {
+                new_safety_number: Some(self.safety_number()),
+                ..Default::default()
+            }
         } else {
             panic!("expected Commit message")
         }
@@ -402,27 +402,85 @@ thread_local! {
     static STATE: Arc<Mutex<WorkerState>> = Arc::new(Mutex::new(WorkerState::default()));
 }
 
-/// Creates a new state and returns the user's key package
-pub fn new_state(uid: &str) -> KeyPackage {
+/// A create, join, add, or remove operation might result in a welcome package, one or more MLS
+/// proposals, a new safety number, and/or a user key pacakge
+#[derive(Default)]
+pub(crate) struct WorkerResponse {
+    pub(crate) welcome: Option<WelcomePackageOut>,
+    pub(crate) proposals: Vec<MlsMessageOut>,
+    pub(crate) new_safety_number: Option<SafetyNumber>,
+    pub(crate) key_pkg: Option<KeyPackage>,
+}
+
+/// Creates a new state
+pub fn new_state(uid: &str) -> WorkerResponse {
     let uid_bytes = uid.as_bytes().to_vec();
-    let key_pkg = STATE
+    STATE
         .try_with(|mutex| {
+            // Create a new state and start a new group
             let mut state = mutex.lock().expect("couldn't lock mutex");
             let (new_state, key_pkg) = WorkerState::new(uid_bytes);
+
+            // Update the state
             *state = new_state;
-            key_pkg
+
+            // Respond with the key package
+            WorkerResponse {
+                key_pkg: Some(key_pkg.key_package().clone()),
+                ..Default::default()
+            }
         })
-        .expect("couldn't acquire thread-local storage");
-
-    // Return key package
-    key_pkg.key_package().clone()
-}
-
-pub fn start_group() -> SafetyNumber {
-    STATE
-        .try_with(|mutex| mutex.lock().expect("couldn't lock mutex").start_group())
         .expect("couldn't acquire thread-local storage")
 }
+
+/// Creates a new state and starts a new MLS group
+pub fn new_state_and_start_group(uid: &str) -> WorkerResponse {
+    let uid_bytes = uid.as_bytes().to_vec();
+    STATE
+        .try_with(|mutex| {
+            // Create a new state and start a new group
+            let mut state = mutex.lock().expect("couldn't lock mutex");
+            let (mut new_state, key_pkg) = WorkerState::new(uid_bytes);
+            let safety_number = new_state.start_group();
+
+            // Update the state
+            *state = new_state;
+
+            // Respond with the key package and safety number
+            WorkerResponse {
+                new_safety_number: Some(safety_number),
+                key_pkg: Some(key_pkg.key_package().clone()),
+                ..Default::default()
+            }
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+
+/// Creates a new state and joins an MLS group
+/*
+pub fn new_state_and_join_group(uid: &str, wp: WelcomePackageIn) -> WorkerResponse {
+    let uid_bytes = uid.as_bytes().to_vec();
+
+    STATE
+        .try_with(|mutex| {
+            // Create a new state and start a new group
+            let mut state = mutex.lock().expect("couldn't lock mutex");
+            let (mut new_state, key_pkg) = WorkerState::new(uid_bytes);
+            let safety_number = new_state.join_group(wp);
+
+            // Update the state
+            *state = new_state;
+
+            // Respond with the key package and safety number
+            WorkerResponse {
+                new_safety_number: Some(safety_number),
+                key_pkg: Some(key_pkg.key_package().clone()),
+                ..Default::default()
+            }
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+*/
 
 pub fn encrypt_msg(msg: &[u8]) -> Vec<u8> {
     STATE
@@ -446,6 +504,14 @@ pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
         .expect("couldn't acquire thread-local storage")
 }
 
+pub fn add_user(serialized_kp: &[u8]) -> WorkerResponse {
+    let key_pkg = KeyPackageIn::tls_deserialize_exact_bytes(&serialized_kp).unwrap();
+
+    STATE
+        .try_with(|mutex| mutex.lock().expect("couldn't lock mutex").add_user(key_pkg))
+        .expect("couldn't acquire thread-local storage")
+}
+
 #[test]
 fn end_to_end() {
     use openmls::prelude::tls_codec::Serialize;
@@ -454,6 +520,11 @@ fn end_to_end() {
     fn msg_out_to_in(m: &MlsMessageOut) -> MlsMessageIn {
         let bytes = m.tls_serialize_detached().unwrap();
         MlsMessageIn::tls_deserialize_exact_bytes(&bytes).unwrap()
+    }
+
+    /// Converts a KeyPackage to a KeyPackageIn
+    fn key_pkg_out_to_in(kp: &KeyPackage) -> KeyPackageIn {
+        KeyPackageIn::tls_deserialize_exact_bytes(&kp.tls_serialize_detached().unwrap()).unwrap()
     }
 
     // Converts a WelcomePackageOut to a WelcomePackageIn
@@ -480,7 +551,7 @@ fn end_to_end() {
     alice_group.start_group();
 
     // Alice adds Bob
-    let add_op = alice_group.add_user(bob_key_pkg.key_package().clone());
+    let add_op = alice_group.add_user(key_pkg_out_to_in(bob_key_pkg.key_package()));
     // The Add op is a welcome package and 1 proposal
     assert!(add_op.welcome.is_some());
     assert_eq!(add_op.proposals.len(), 1);
@@ -491,9 +562,9 @@ fn end_to_end() {
     bob_group.join_group(wp);
 
     // Now Alice adds Charlie
-    let add_op = alice_group.add_user(charlie_key_pkg.key_package().clone());
+    let add_op = alice_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
     // Bob sees that the Add came in but Alice hasn't sent a proposal yet
-    bob_group.add_user(charlie_key_pkg.key_package().clone());
+    bob_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
     // Pretend Bob parsed the Add and Charlies parsed the welcome package
     let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
     let add = msg_out_to_in(&add_op.proposals[0]);
