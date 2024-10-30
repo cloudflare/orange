@@ -1,11 +1,11 @@
-use mls_ops::{decrypt_msg, encrypt_msg};
+use mls_ops::{decrypt_msg, encrypt_msg, WelcomePackageOut, WorkerResponse};
 use openmls::prelude::tls_codec::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     console,
     js_sys::{
-        ArrayBuffer, JsString, Object,
+        Array, ArrayBuffer, JsString, Object,
         Reflect::{get as obj_get, set as obj_set},
         Uint8Array,
     },
@@ -78,55 +78,97 @@ pub async fn processEvent(event: Object) -> JsValue {
 
         "initialize" => {
             let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
-            let key_pkg = mls_ops::new_state(&user_id);
-            console::log_1(&format!("Initialized state").into());
-            Some((
-                "shareKeyPackage",
-                "keyPkg",
-                key_pkg.tls_serialize_detached().unwrap(),
-            ))
+            Some(mls_ops::new_state(&user_id))
         }
 
         "initializeAndCreateGroup" => {
             let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
-            let key_pkg = mls_ops::new_state(&user_id);
-            mls_ops::start_group();
-            Some((
-                "shareKeyPackage",
-                "keyPkg",
-                key_pkg.tls_serialize_detached().unwrap(),
-            ))
+            Some(mls_ops::new_state_and_start_group(&user_id))
         }
 
         "userJoined" => {
-            let key_pkg = obj_get(&event, &"keyPkg".into()).unwrap();
-            unimplemented!()
+            let key_pkg_bytes: ArrayBuffer = obj_get(&event, &"keyPkg".into())
+                .unwrap()
+                .dyn_into()
+                .unwrap();
+            let key_pkg_bytes = Uint8Array::new(&key_pkg_bytes).to_vec();
+            Some(mls_ops::add_user(&key_pkg_bytes))
         }
 
         _ => panic!("unknown message type {ty} from main thread"),
     };
 
-    // Make an object with "type" => ty, and payload_name => payload, where payload is an
-    // ArrayBuffer of bytes
-    if let Some((ty, payload_name, payload)) = ret {
-        // Copy into array buffer
-        let o = Object::new();
-        let buf = ArrayBuffer::new(payload.len() as u32);
-        let view = Uint8Array::new(&buf);
-        view.copy_from(&payload);
+    // Now we have to format our response. We're gonna make a list of objects to send to the main
+    // thread, and a list of the buffers in each object (we need these in order to properly transfer
+    // data between threads)
+    let obj_list = Array::new();
+    let buffers_list = Array::new();
+    if let Some(WorkerResponse {
+        welcome,
+        proposals,
+        new_safety_number,
+        key_pkg,
+    }) = ret
+    {
+        // Make the safety number object if a new safety number is given
+        if let Some(sn) = new_safety_number {
+            let (o, buffers) = make_obj_and_save_buffers("newSafetyNumber", &[("hash", &sn)]);
 
-        obj_set(&o, &"type".into(), &JsString::from(ty).into()).unwrap();
-        obj_set(
-            &o,
-            &"payload_name".into(),
-            &JsString::from(payload_name).into(),
-        )
-        .unwrap();
-        obj_set(&o, &"payload".into(), &buf).unwrap();
-        o.into()
-    } else {
-        JsValue::null()
+            // Accumulate the object and buffers
+            obj_list.push(&o);
+            buffers_list.push(&buffers);
+        }
+
+        // Make the key package object if a key package is given
+        if let Some(kp) = key_pkg {
+            let (o, buffers) = make_obj_and_save_buffers(
+                "shareKeyPackage",
+                &[("keyPkg", &kp.tls_serialize_detached().unwrap())],
+            );
+
+            // Accumulate the object and buffers
+            obj_list.push(&o);
+            buffers_list.push(&buffers);
+        }
+
+        // Make the welcome object if a welcome package is given
+        if let Some(WelcomePackageOut {
+            welcome,
+            ratchet_tree,
+        }) = welcome
+        {
+            let (o, buffers) = make_obj_and_save_buffers(
+                "sendMlsWelcome",
+                &[
+                    ("welcome", &welcome.to_bytes().unwrap()),
+                    ("rtree", &ratchet_tree.tls_serialize_detached().unwrap()),
+                ],
+            );
+
+            // Accumulate the object and buffers
+            obj_list.push(&o);
+            buffers_list.push(&buffers);
+        }
+
+        // Make MLS message objects if messages are given
+        for msg in proposals {
+            let (o, buffers) = make_obj_and_save_buffers(
+                "sendMlsMessage",
+                &[("msg", &msg.tls_serialize_detached().unwrap())],
+            );
+
+            // Accumulate the object and buffers
+            obj_list.push(&o);
+            buffers_list.push(&buffers);
+        }
     }
+
+    // Finally, return an array [objs, payloads] for the worker JS script to go through and post to
+    // the calling thread
+    let ret = Array::new();
+    ret.push(&obj_list);
+    ret.push(&buffers_list);
+    ret.into()
 }
 
 /// Processes a posssibly infinite stream of `RtcEncodedAudio(/Video)Frame`s . Reads a frame from
@@ -167,4 +209,29 @@ async fn process_stream<F>(
             break;
         }
     }
+}
+
+/// Helper function. Given an object name and named bytestrings, returns the object
+/// `{ type: name, [b[0]: b[1] as ArrayBuffer for b in bytestrings] },`
+/// as well as the list
+/// `[b[1] as ArrayBuffer for b in bytestrings]`
+fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) -> (Object, Array) {
+    let o = Object::new();
+    let buffers = Array::new();
+    // Make the object { type: name, ...}
+    obj_set(&o, &"type".into(), &name.into()).unwrap();
+
+    // Make the bytestrings into JS ArrayBuffers and add them to the object and buffer list
+    for (field_name, bytes) in named_bytestrings {
+        let arr = {
+            let buf = ArrayBuffer::new(bytes.len() as u32);
+            Uint8Array::new(&buf).copy_from(&bytes);
+            buf
+        };
+
+        obj_set(&o, &(*field_name).into(), &arr).unwrap();
+        buffers.push(&arr);
+    }
+
+    (o, buffers)
 }
