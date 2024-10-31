@@ -49,7 +49,7 @@ fn set_frame_data(frame: &JsValue, new_data: &[u8]) {
 /// Sets some logging globals
 #[wasm_bindgen]
 #[allow(non_snake_case)]
-pub fn init() {
+pub fn initLogging() {
     console_log::init_with_level(Level::Info).unwrap();
     console_error_panic_hook::set_once();
 }
