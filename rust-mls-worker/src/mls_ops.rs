@@ -14,7 +14,6 @@ use openmls::{
 };
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
-use rand::seq::SliceRandom;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 const PROT_VERSION: ProtocolVersion = ProtocolVersion::Mls10;
@@ -56,17 +55,10 @@ struct WorkerState {
 }
 
 impl WorkerState {
-    /// Initializes MLS state with an identifier for this user. Also returns the freshly generated
-    /// key package of this user.
+    /// Initializes MLS state with a unique identifier for this user. Also returns the freshly
+    /// generated key package of this user.
     /// This MUST be executed before anything else in this module.
-    fn new(mut uid: Vec<u8>) -> (WorkerState, KeyPackageBundle) {
-        // Add a 35-bit suffix to the end of the UID so it's unique within the group
-        let mut rng = rand::thread_rng();
-        // Use the zbase32 alphabet
-        let alphabet = b"ybndrfg8ejkmcpqxot1uwisza345h769";
-        uid.push(b'_');
-        uid.extend(core::iter::repeat_with(|| *alphabet.choose(&mut rng).unwrap()).take(7));
-
+    fn new(uid: Vec<u8>) -> (WorkerState, KeyPackageBundle) {
         let mut state = WorkerState::default();
         let credential = BasicCredential::new(uid);
 
