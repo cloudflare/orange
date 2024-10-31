@@ -4,11 +4,12 @@
 importScripts('/e2ee/wasm-pkg/orange_mls_worker.js')
 
 // Use the `processEvent` top-level function defined in Rust
-const { processEvent } = wasm_bindgen
+const { init, processEvent } = wasm_bindgen
 
 // Load the Wasm file by awaiting the Promise returned by `wasm_bindgen`.
 async function init_wasm_in_worker() {
 	await wasm_bindgen('/e2ee/wasm-pkg/orange_mls_worker_bg.wasm')
+	init()
 }
 const wasm_is_ready = init_wasm_in_worker()
 
