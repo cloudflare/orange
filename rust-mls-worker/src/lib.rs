@@ -5,7 +5,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     console,
     js_sys::{
-        Array, ArrayBuffer, JsString, Object,
+        Array, ArrayBuffer, Object,
         Reflect::{get as obj_get, set as obj_set},
         Uint8Array,
     },
@@ -93,6 +93,11 @@ pub async fn processEvent(event: Object) -> JsValue {
                 .unwrap();
             let key_pkg_bytes = Uint8Array::new(&key_pkg_bytes).to_vec();
             Some(mls_ops::add_user(&key_pkg_bytes))
+        }
+
+        "userLeft" => {
+            let uid_to_remove = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
+            Some(mls_ops::remove_user(&uid_to_remove))
         }
 
         _ => panic!("unknown message type {ty} from main thread"),

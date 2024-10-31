@@ -6,8 +6,8 @@ use std::{
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
-        tls_codec::Serialize, BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes,
-        KeyPackage, KeyPackageBundle, KeyPackageIn, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn,
+        BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage,
+        KeyPackageBundle, KeyPackageIn, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn,
         MlsMessageOut, OpenMlsProvider, ProcessedMessageContent, ProtocolVersion, RatchetTreeIn,
     },
     treesync::RatchetTree,
@@ -216,8 +216,20 @@ impl WorkerState {
 
     /// If this user is the Designated Committer, this will create a Remove message
     /// for the rest of the group. Otherwise, this will just note that a user has been
-    /// removed from the room,  but not yet been removed from the MLS group
+    /// removed from the room,  but not yet been removed from the MLS group.
+    /// This will panic if a user tries to remove themselves.
     fn remove_user(&mut self, uid_to_remove: &[u8]) -> WorkerResponse {
+        if uid_to_remove
+            == self
+                .my_credential
+                .as_ref()
+                .unwrap()
+                .credential
+                .serialized_content()
+        {
+            panic!("cannot remove self");
+        }
+
         let group = self.mls_group.as_mut().unwrap();
         let was_previously_designated_committer = self.is_designated_committer.unwrap();
 
@@ -229,11 +241,11 @@ impl WorkerState {
             .expect("could not find user in tree") as u32;
         // Check if the removed user was the DC, i.e., was the existing user with the lowest index
         let removed_user_was_dc =
-            (0..removed_leaf_idx).any(|i| group.member(LeafNodeIndex::new(i)).is_some());
+            (0..removed_leaf_idx).all(|i| group.member(LeafNodeIndex::new(i)).is_none());
         // Now check if there is someone between the removed user and me
         let my_leaf_idx = group.own_leaf_index().u32();
-        let exists_other_designee =
-            (removed_leaf_idx..my_leaf_idx).any(|i| group.member(LeafNodeIndex::new(i)).is_some());
+        let exists_other_designee = (removed_leaf_idx + 1..my_leaf_idx)
+            .any(|i| group.member(LeafNodeIndex::new(i)).is_some());
         // If the removed user was the DC, and there's nobody between us, then we're the new DC
         if removed_user_was_dc && !exists_other_designee {
             self.is_designated_committer = Some(true);
@@ -259,21 +271,27 @@ impl WorkerState {
                     &[LeafNodeIndex::new(removed_leaf_idx as u32)],
                 )
                 .expect("could not remove user");
+            group.merge_pending_commit(&self.mls_provider).unwrap();
 
             // The previous DC may have died before adding all the pending users. Go add them now
-            let (additions, welcome, _) = self
-                .mls_group
-                .as_mut()
-                .unwrap()
-                .add_members(
-                    &self.mls_provider,
-                    self.my_signing_keys.as_ref().unwrap(),
-                    &self.pending_room_members,
-                )
-                .expect("couldn't add user to group");
+            let (additions, welcome) = if !self.pending_room_members.is_empty() {
+                let (additions, welcome, _) = self
+                    .mls_group
+                    .as_mut()
+                    .unwrap()
+                    .add_members(
+                        &self.mls_provider,
+                        self.my_signing_keys.as_ref().unwrap(),
+                        &self.pending_room_members,
+                    )
+                    .expect("couldn't add user to group");
+                (Some(additions), Some(welcome))
+            } else {
+                (None, None)
+            };
 
             // Merge all the above pending proposals so we can export the new ratchet tree and
-            // give it to the new users
+            // give it to the new users (if there are any)
             self.mls_group
                 .as_mut()
                 .unwrap()
@@ -285,11 +303,15 @@ impl WorkerState {
             self.pending_room_members.clear();
 
             WorkerResponse {
-                welcome: Some(WelcomePackageOut {
-                    welcome,
+                // If a new user was added, construct the welcome package
+                welcome: welcome.map(|w| WelcomePackageOut {
+                    welcome: w,
                     ratchet_tree,
                 }),
-                proposals: vec![removal, additions],
+                // Definitely send the Remove. If a new user was added, also send the Add
+                proposals: core::iter::once(removal)
+                    .chain(additions.into_iter())
+                    .collect(),
                 new_safety_number: Some(self.safety_number()),
                 ..Default::default()
             }
@@ -504,9 +526,32 @@ pub fn add_user(serialized_kp: &[u8]) -> WorkerResponse {
         .expect("couldn't acquire thread-local storage")
 }
 
-#[test]
-fn end_to_end() {
+pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
+    let uid_bytes = uid_to_remove.as_bytes();
+
+    STATE
+        .try_with(|mutex| {
+            mutex
+                .lock()
+                .expect("couldn't lock mutex")
+                .remove_user(uid_bytes)
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
     use openmls::prelude::tls_codec::Serialize;
+
+    impl WorkerResponse {
+        fn is_default(&self) -> bool {
+            self.welcome.is_none()
+                && self.proposals.is_empty()
+                && self.new_safety_number.is_none()
+                && self.key_pkg.is_none()
+        }
+    }
 
     // Converts an MlsMessageOut to an MlsMessageIn
     fn msg_out_to_in(m: &MlsMessageOut) -> MlsMessageIn {
@@ -535,39 +580,58 @@ fn end_to_end() {
         }
     }
 
-    let (mut alice_group, _alice_key_pkg) = WorkerState::new(b"Alice".to_vec());
-    let (mut bob_group, bob_key_pkg) = WorkerState::new(b"Bob".to_vec());
-    let (mut charlie_group, charlie_key_pkg) = WorkerState::new(b"Charlie".to_vec());
+    #[test]
+    fn end_to_end() {
+        let (mut alice_group, _alice_key_pkg) = WorkerState::new(b"Alice".to_vec());
+        let (mut bob_group, bob_key_pkg) = WorkerState::new(b"Bob".to_vec());
+        let (mut charlie_group, charlie_key_pkg) = WorkerState::new(b"Charlie".to_vec());
 
-    // Alice starts the group
-    alice_group.start_group();
+        // Alice starts the group
+        alice_group.start_group();
 
-    // Alice adds Bob
-    let add_op = alice_group.add_user(key_pkg_out_to_in(bob_key_pkg.key_package()));
-    // The Add op is a welcome package and 1 proposal
-    assert!(add_op.welcome.is_some());
-    assert_eq!(add_op.proposals.len(), 1);
+        // Alice adds Bob
+        let add_op = alice_group.add_user(key_pkg_out_to_in(bob_key_pkg.key_package()));
+        // The Add op is a welcome package and 1 proposal
+        assert!(add_op.welcome.is_some());
+        assert_eq!(add_op.proposals.len(), 1);
 
-    // Pretend Bob parsed the welcome package
-    let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
-    // Bob joins the group
-    bob_group.join_group(wp);
+        // Pretend Bob parsed the welcome package
+        let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
+        // Bob joins the group
+        bob_group.join_group(wp);
 
-    // Now Alice adds Charlie
-    let add_op = alice_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
-    // Bob sees that the Add came in but Alice hasn't sent a proposal yet
-    bob_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
-    // Pretend Bob parsed the Add and Charlies parsed the welcome package
-    let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
-    let add = msg_out_to_in(&add_op.proposals[0]);
-    // Charlie joins the group
-    charlie_group.join_group(wp);
-    // Bob processes that Charlie was added
-    bob_group.handle_commit(add);
+        // Now Alice adds Charlie
+        let add_op = alice_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
+        // Bob sees that the Add came in but Alice hasn't sent a proposal yet
+        bob_group.add_user(key_pkg_out_to_in(charlie_key_pkg.key_package()));
+        // Pretend Bob parsed the Add and Charlies parsed the welcome package
+        let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
+        let add = msg_out_to_in(&add_op.proposals[0]);
+        // Charlie joins the group
+        charlie_group.join_group(wp);
+        // Bob processes that Charlie was added
+        bob_group.handle_commit(add);
 
-    // Now encrypt something
-    let msg = b"hello world";
-    let ct = alice_group.encrypt_app_msg(msg);
-    bob_group.decrypt_app_msg(&ct);
-    charlie_group.decrypt_app_msg(&ct);
+        // Now encrypt something
+        let msg = b"hello world";
+        let ct = alice_group.encrypt_app_msg(msg);
+        bob_group.decrypt_app_msg(&ct);
+        charlie_group.decrypt_app_msg(&ct);
+
+        // Now Alice gets removed. Everyone removes her
+        let bob_out = bob_group.remove_user(b"Alice");
+        let charlie_out = charlie_group.remove_user(b"Alice");
+        // Bob is the DC, so Charlie's output should be empty
+        assert!(charlie_out.is_default());
+        // Bob's output should be 1 Add proposal
+        assert_eq!(bob_out.proposals.len(), 1);
+
+        // Let Charlie process Bob's new message
+        charlie_group.handle_commit(msg_out_to_in(&bob_out.proposals[0]));
+
+        // Now encrypt something
+        let msg = b"hello world";
+        let ct = bob_group.encrypt_app_msg(msg);
+        charlie_group.decrypt_app_msg(&ct);
+    }
 }
