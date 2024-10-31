@@ -134,6 +134,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_log"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
+dependencies = [
+ "log",
+ "web-sys",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -702,6 +712,8 @@ name = "orange-mls-worker"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "console_log",
+ "log",
  "openmls",
  "openmls_basic_credential",
  "openmls_rust_crypto",
