@@ -1,9 +1,9 @@
+use log::{debug, info, warn, Level};
 use mls_ops::{decrypt_msg, encrypt_msg, WelcomePackageOut, WorkerResponse};
 use openmls::prelude::tls_codec::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    console,
     js_sys::{
         Array, ArrayBuffer, Object,
         Reflect::{get as obj_get, set as obj_set},
@@ -46,6 +46,14 @@ fn set_frame_data(frame: &JsValue, new_data: &[u8]) {
     }
 }
 
+/// Sets some logging globals
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+pub fn init() {
+    console_log::init_with_level(Level::Info).unwrap();
+    console_error_panic_hook::set_once();
+}
+
 /// Processes an event and returns an object that's null, i.e., no return value, or consists of
 /// fields "type": str, "payload_name": str, and "payload": ArrayBuffer.
 #[wasm_bindgen]
@@ -56,7 +64,7 @@ pub async fn processEvent(event: Object) -> JsValue {
         .as_string()
         .unwrap();
     let ty = ty.as_str();
-    console::log_1(&format!("Received event of type {ty} from main thread").into());
+    info!("Received event of type {ty} from main thread");
 
     let ret = match ty {
         "encryptStream" | "decryptStream" => {
@@ -173,7 +181,7 @@ pub async fn processEvent(event: Object) -> JsValue {
     let ret = Array::new();
     ret.push(&obj_list);
     ret.push(&buffers_list);
-    ret.into()
+    ret.dyn_into().unwrap()
 }
 
 /// Processes a posssibly infinite stream of `RtcEncodedAudio(/Video)Frame`s . Reads a frame from
@@ -200,7 +208,7 @@ async fn process_stream<F>(
         // Process the frame data
         let frame_data = get_frame_data(&frame);
         let chunk_len = frame_data.len();
-        console::log_1(&format!("Read chunk of size {chunk_len}").into());
+        info!("Read chunk of size {chunk_len}");
         let new_frame_data = f(&frame_data);
 
         // Set the new frame data value
