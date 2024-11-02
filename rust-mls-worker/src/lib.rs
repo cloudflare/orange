@@ -1,4 +1,4 @@
-use log::{debug, info, warn, Level};
+use log::{info, Level};
 use mls_ops::{decrypt_msg, encrypt_msg, WelcomePackageOut, WorkerResponse};
 use openmls::prelude::tls_codec::Serialize;
 use wasm_bindgen::prelude::*;
@@ -95,17 +95,28 @@ pub async fn processEvent(event: Object) -> JsValue {
         }
 
         "userJoined" => {
-            let key_pkg_bytes: ArrayBuffer = obj_get(&event, &"keyPkg".into())
-                .unwrap()
-                .dyn_into()
-                .unwrap();
-            let key_pkg_bytes = Uint8Array::new(&key_pkg_bytes).to_vec();
+            let key_pkg_bytes = extract_bytes_field(&event, "keyPkg");
             Some(mls_ops::add_user(&key_pkg_bytes))
         }
 
         "userLeft" => {
             let uid_to_remove = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
             Some(mls_ops::remove_user(&uid_to_remove))
+        }
+
+        "recvMlsWelcome" => {
+            let welcome_bytes = extract_bytes_field(&event, "welcome");
+            let rtree_bytes = extract_bytes_field(&event, "rtree");
+            Some(mls_ops::join_group(&welcome_bytes, &rtree_bytes))
+        }
+
+        "recvMlsMessage" => {
+            let msg_bytes = extract_bytes_field(&event, "msg");
+            let sender = obj_get(&event, &"senderId".into())
+                .unwrap()
+                .as_string()
+                .unwrap();
+            Some(mls_ops::handle_commit(&msg_bytes, &sender))
         }
 
         _ => panic!("unknown message type {ty} from main thread"),
@@ -247,4 +258,10 @@ fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) ->
     }
 
     (o, buffers)
+}
+
+/// Given an object `o` with field `field` of type `ArrayBuffer`, returns `o[field]` as a `Vec<u8>`
+fn extract_bytes_field(o: &Object, field: &'static str) -> Vec<u8> {
+    let buf: ArrayBuffer = obj_get(o, &field.into()).unwrap().dyn_into().unwrap();
+    Uint8Array::new(&buf).to_vec()
 }
