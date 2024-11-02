@@ -3,7 +3,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use log::info;
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
@@ -107,6 +106,14 @@ impl WorkerState {
         sn
     }
 
+    fn uid(&self) -> &[u8] {
+        self.my_credential
+            .as_ref()
+            .unwrap()
+            .credential
+            .serialized_content()
+    }
+
     /// Starts a new MLS group. This is called if this user is the first user in the room. Returns a
     /// new safety number and nothing else
     fn start_group(&mut self) -> SafetyNumber {
@@ -132,7 +139,7 @@ impl WorkerState {
     }
 
     /// Join a group using the given MLS Welcome message
-    fn join_group(&mut self, wp: WelcomePackageIn) -> SafetyNumber {
+    fn join_group(&mut self, wp: WelcomePackageIn) -> WorkerResponse {
         let WelcomePackageIn {
             welcome,
             ratchet_tree,
@@ -162,7 +169,10 @@ impl WorkerState {
         }
 
         // Return the new safety number
-        self.safety_number()
+        WorkerResponse {
+            new_safety_number: Some(self.safety_number()),
+            ..Default::default()
+        }
     }
 
     /// If this user is the Designated Committer, this will create a welcome package for the for the
@@ -220,14 +230,7 @@ impl WorkerState {
     /// removed from the room,  but not yet been removed from the MLS group.
     /// This will panic if a user tries to remove themselves.
     fn remove_user(&mut self, uid_to_remove: &[u8]) -> WorkerResponse {
-        if uid_to_remove
-            == self
-                .my_credential
-                .as_ref()
-                .unwrap()
-                .credential
-                .serialized_content()
-        {
+        if uid_to_remove == self.uid() {
             panic!("cannot remove self");
         }
 
@@ -303,16 +306,20 @@ impl WorkerState {
             // Once we've added these users, they are no longer pending, so remove them
             self.pending_room_members.clear();
 
+            // Definitely send the Remove. If a new user was added, also send the Add
+            let proposals = core::iter::once(removal)
+                .chain(additions.into_iter())
+                .collect();
+
+            // Record the mesages we send out
+
             WorkerResponse {
                 // If a new user was added, construct the welcome package
                 welcome: welcome.map(|w| WelcomePackageOut {
                     welcome: w,
                     ratchet_tree,
                 }),
-                // Definitely send the Remove. If a new user was added, also send the Add
-                proposals: core::iter::once(removal)
-                    .chain(additions.into_iter())
-                    .collect(),
+                proposals,
                 new_safety_number: Some(self.safety_number()),
                 ..Default::default()
             }
@@ -338,7 +345,8 @@ impl WorkerState {
         let group = self.mls_group.as_mut().unwrap();
 
         // Process the message into a Staged Commit
-        let prot_msg = msg.try_into_protocol_message().unwrap();
+        let prot_msg = dbg!(msg.try_into_protocol_message().unwrap());
+
         let processed_message = group
             .process_message(&self.mls_provider, prot_msg)
             .expect("could not process message")
@@ -536,6 +544,40 @@ pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
                 .lock()
                 .expect("couldn't lock mutex")
                 .remove_user(uid_bytes)
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+
+pub fn join_group(serialized_welcome: &[u8], serialized_rtree: &[u8]) -> WorkerResponse {
+    let welcome = MlsMessageIn::tls_deserialize_exact_bytes(&serialized_welcome).unwrap();
+    let ratchet_tree = RatchetTreeIn::tls_deserialize_exact_bytes(&serialized_rtree).unwrap();
+
+    STATE
+        .try_with(|mutex| {
+            mutex
+                .lock()
+                .expect("couldn't lock mutex")
+                .join_group(WelcomePackageIn {
+                    welcome,
+                    ratchet_tree,
+                })
+        })
+        .expect("couldn't acquire thread-local storage")
+}
+
+pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerResponse {
+    let uid_bytes = sender_uid.as_bytes().to_vec();
+    let commit = MlsMessageIn::tls_deserialize_exact_bytes(&serialized_commit).unwrap();
+
+    STATE
+        .try_with(|mutex| {
+            let mut state = mutex.lock().expect("couldn't lock mutex");
+            // A user cannot process a commit created by themselves. Ignore
+            if state.uid() == uid_bytes {
+                WorkerResponse::default()
+            } else {
+                state.handle_commit(commit)
+            }
         })
         .expect("couldn't acquire thread-local storage")
 }
