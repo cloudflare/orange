@@ -60,19 +60,23 @@ pub fn initLogging() {
 #[allow(non_snake_case)]
 pub async fn processEvent(event: Object) -> JsValue {
     let ty = obj_get(&event, &"type".into())
-        .unwrap()
+        .expect("event expects input field 'type'")
         .as_string()
-        .unwrap();
+        .expect("event field 'type' must be a string");
     let ty = ty.as_str();
     info!("Received event of type {ty} from main thread");
 
     let ret = match ty {
         "encryptStream" | "decryptStream" => {
             // Grab the streams from the object and pass them to `process_stream`
-            let read_stream: ReadableStream =
-                obj_get(&event, &"in".into()).unwrap().dyn_into().unwrap();
-            let write_stream: WritableStream =
-                obj_get(&event, &"out".into()).unwrap().dyn_into().unwrap();
+            let read_stream: ReadableStream = obj_get(&event, &"in".into())
+                .expect("encrypt/decryptStream event expects input field 'in'")
+                .dyn_into()
+                .expect("encrypt/decryptStream field 'in' must be a ReadableStream");
+            let write_stream: WritableStream = obj_get(&event, &"out".into())
+                .expect("encrypt/decryptStream event expects input field 'out'")
+                .dyn_into()
+                .expect("encrypt/decryptStream field 'out' must be a WritableStream");
             let reader = ReadableStreamDefaultReader::new(&read_stream).unwrap();
             let writer = write_stream.get_writer().unwrap();
 
@@ -81,21 +85,29 @@ pub async fn processEvent(event: Object) -> JsValue {
             } else {
                 process_stream(reader, writer, decrypt_msg).await;
             }
+
+            // No response necessary if we're just writing between two streams
             None
         }
 
         "initialize" => {
-            let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
+            let user_id = obj_get(&event, &"id".into())
+                .expect("initialize event expects input field 'id'")
+                .as_string()
+                .expect("initialize field 'id' must be a string");
             Some(mls_ops::new_state(&user_id))
         }
 
         "initializeAndCreateGroup" => {
-            let user_id = obj_get(&event, &"id".into()).unwrap().as_string().unwrap();
+            let user_id = obj_get(&event, &"id".into())
+                .expect("initializeAndCreateGroup event expects input field 'id'")
+                .as_string()
+                .expect("initializeAndCreateGroup field 'id' must be a string");
             Some(mls_ops::new_state_and_start_group(&user_id))
         }
 
         "userJoined" => {
-            let key_pkg_bytes = extract_bytes_field(&event, "keyPkg");
+            let key_pkg_bytes = extract_bytes_field("userJoined", &event, "keyPkg");
             Some(mls_ops::add_user(&key_pkg_bytes))
         }
 
@@ -105,17 +117,17 @@ pub async fn processEvent(event: Object) -> JsValue {
         }
 
         "recvMlsWelcome" => {
-            let welcome_bytes = extract_bytes_field(&event, "welcome");
-            let rtree_bytes = extract_bytes_field(&event, "rtree");
+            let welcome_bytes = extract_bytes_field("recvMlsWelcome", &event, "welcome");
+            let rtree_bytes = extract_bytes_field("recvMlsWelcome", &event, "rtree");
             Some(mls_ops::join_group(&welcome_bytes, &rtree_bytes))
         }
 
         "recvMlsMessage" => {
-            let msg_bytes = extract_bytes_field(&event, "msg");
+            let msg_bytes = extract_bytes_field("recvMlsMessage", &event, "msg");
             let sender = obj_get(&event, &"senderId".into())
-                .unwrap()
+                .expect("recvMlsMessage event expects input field 'senderId'")
                 .as_string()
-                .unwrap();
+                .expect("recvMlsMessage field 'senderId' must be a string");
             Some(mls_ops::handle_commit(&msg_bytes, &sender))
         }
 
@@ -207,10 +219,13 @@ async fn process_stream<F>(
     loop {
         let promise = reader.read();
 
-        // Await the call. This will return an object { value, done }, where
-        // value is a view containing the new data, and done is a bool indicating
-        // that there is nothing left to read
-        let res: Object = JsFuture::from(promise).await.unwrap().dyn_into().unwrap();
+        // Await the call. This will return an object { value, done }, where value is a view
+        // containing the new data, and done is a bool indicating that there is nothing left to read
+        let res: Object = JsFuture::from(promise)
+            .await
+            .expect("failed to read stream chunk")
+            .dyn_into()
+            .expect("stream chunk must be an object");
         let done_reading = obj_get(&res, &"done".into()).unwrap().as_bool().unwrap();
 
         // Read a frame and get the underlying bytestring
@@ -261,7 +276,10 @@ fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) ->
 }
 
 /// Given an object `o` with field `field` of type `ArrayBuffer`, returns `o[field]` as a `Vec<u8>`
-fn extract_bytes_field(o: &Object, field: &'static str) -> Vec<u8> {
-    let buf: ArrayBuffer = obj_get(o, &field.into()).unwrap().dyn_into().unwrap();
+fn extract_bytes_field(event_name: &str, o: &Object, field: &'static str) -> Vec<u8> {
+    let buf: ArrayBuffer = obj_get(o, &field.into())
+        .expect(&format!("{event_name} must have field '{field}'"))
+        .dyn_into()
+        .expect("{event_name} field '{field}' must be an ArrayBuffer");
     Uint8Array::new(&buf).to_vec()
 }
