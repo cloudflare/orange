@@ -272,7 +272,7 @@ impl WorkerState {
                 .remove_members(
                     &self.mls_provider,
                     self.my_signing_keys.as_ref().unwrap(),
-                    &[LeafNodeIndex::new(removed_leaf_idx as u32)],
+                    &[LeafNodeIndex::new(removed_leaf_idx)],
                 )
                 .expect("could not remove user");
             group.merge_pending_commit(&self.mls_provider).unwrap();
@@ -307,9 +307,7 @@ impl WorkerState {
             self.pending_room_members.clear();
 
             // Definitely send the Remove. If a new user was added, also send the Add
-            let proposals = core::iter::once(removal)
-                .chain(additions.into_iter())
-                .collect();
+            let proposals = core::iter::once(removal).chain(additions).collect();
 
             // Record the mesages we send out
 
@@ -325,11 +323,10 @@ impl WorkerState {
             }
         } else {
             // Quick sanity check: if we're removing a user, they should not be in the pending list
-            assert!(self
+            assert!(!self
                 .pending_room_members
                 .iter()
-                .find(|kp| kp_to_uid(&kp) == uid_to_remove)
-                .is_none());
+                .any(|kp| kp_to_uid(kp) == uid_to_remove));
             // Another quick sanity check: if we're removing a user, and they weren't the DC, then
             // there shouldn't be any pending additions
             if !removed_user_was_dc {
@@ -528,7 +525,7 @@ pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
 }
 
 pub fn add_user(serialized_kp: &[u8]) -> WorkerResponse {
-    let key_pkg = KeyPackageIn::tls_deserialize_exact_bytes(&serialized_kp).unwrap();
+    let key_pkg = KeyPackageIn::tls_deserialize_exact_bytes(serialized_kp).unwrap();
 
     STATE
         .try_with(|mutex| mutex.lock().expect("couldn't lock mutex").add_user(key_pkg))
@@ -549,8 +546,8 @@ pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
 }
 
 pub fn join_group(serialized_welcome: &[u8], serialized_rtree: &[u8]) -> WorkerResponse {
-    let welcome = MlsMessageIn::tls_deserialize_exact_bytes(&serialized_welcome).unwrap();
-    let ratchet_tree = RatchetTreeIn::tls_deserialize_exact_bytes(&serialized_rtree).unwrap();
+    let welcome = MlsMessageIn::tls_deserialize_exact_bytes(serialized_welcome).unwrap();
+    let ratchet_tree = RatchetTreeIn::tls_deserialize_exact_bytes(serialized_rtree).unwrap();
 
     STATE
         .try_with(|mutex| {
@@ -567,7 +564,7 @@ pub fn join_group(serialized_welcome: &[u8], serialized_rtree: &[u8]) -> WorkerR
 
 pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerResponse {
     let uid_bytes = sender_uid.as_bytes().to_vec();
-    let commit = MlsMessageIn::tls_deserialize_exact_bytes(&serialized_commit).unwrap();
+    let commit = MlsMessageIn::tls_deserialize_exact_bytes(serialized_commit).unwrap();
 
     STATE
         .try_with(|mutex| {
@@ -658,8 +655,8 @@ mod tests {
         // Now encrypt something
         let msg = b"hello world";
         let ct = alice_group.encrypt_app_msg(msg);
-        bob_group.decrypt_app_msg(&ct);
-        charlie_group.decrypt_app_msg(&ct);
+        assert_eq!(bob_group.decrypt_app_msg(&ct), msg);
+        assert_eq!(charlie_group.decrypt_app_msg(&ct), msg);
 
         // Now Alice gets removed. Everyone removes her
         let bob_out = bob_group.remove_user(b"Alice");
@@ -675,6 +672,6 @@ mod tests {
         // Now encrypt something
         let msg = b"hello world";
         let ct = bob_group.encrypt_app_msg(msg);
-        charlie_group.decrypt_app_msg(&ct);
+        assert_eq!(charlie_group.decrypt_app_msg(&ct), msg);
     }
 }
