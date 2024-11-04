@@ -264,7 +264,7 @@ fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) ->
     for (field_name, bytes) in named_bytestrings {
         let arr = {
             let buf = ArrayBuffer::new(bytes.len() as u32);
-            Uint8Array::new(&buf).copy_from(&bytes);
+            Uint8Array::new(&buf).copy_from(bytes);
             buf
         };
 
@@ -278,7 +278,7 @@ fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) ->
 /// Given an object `o` with field `field` of type `ArrayBuffer`, returns `o[field]` as a `Vec<u8>`
 fn extract_bytes_field(event_name: &str, o: &Object, field: &'static str) -> Vec<u8> {
     let buf: ArrayBuffer = obj_get(o, &field.into())
-        .expect(&format!("{event_name} must have field '{field}'"))
+        .unwrap_or_else(|_| panic!("{event_name} must have field '{field}'"))
         .dyn_into()
         .expect("{event_name} field '{field}' must be an ArrayBuffer");
     Uint8Array::new(&buf).to_vec()
