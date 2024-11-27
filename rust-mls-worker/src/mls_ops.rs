@@ -135,6 +135,12 @@ impl WorkerState {
             .serialized_content()
     }
 
+    fn uid_as_str(&self) -> String {
+        // We can unwrap here because UID is always initially a string in the event object we
+        // receive
+        String::from_utf8(self.uid().to_vec()).unwrap()
+    }
+
     /// Starts a new MLS group. This is called if this user is the first user in the room. Returns a
     /// new safety number and nothing else
     fn start_group(&mut self) -> SafetyNumber {
@@ -238,7 +244,7 @@ impl WorkerState {
                 }),
                 proposals: vec![commit],
                 new_safety_number: Some(self.safety_number()),
-                sender_id: Some(self.uid().to_vec()),
+                sender_id: Some(self.uid_as_str()),
                 ..Default::default()
             }
         } else {
@@ -341,7 +347,7 @@ impl WorkerState {
                 }),
                 proposals,
                 new_safety_number: Some(self.safety_number()),
-                sender_id: Some(self.uid().to_vec()),
+                sender_id: Some(self.uid_as_str()),
                 ..Default::default()
             }
         } else {
@@ -492,7 +498,7 @@ pub(crate) struct WorkerResponse {
     pub(crate) proposals: Vec<MlsMessageOut>,
     pub(crate) new_safety_number: Option<SafetyNumber>,
     pub(crate) key_pkg: Option<KeyPackage>,
-    pub(crate) sender_id: Option<Vec<u8>>,
+    pub(crate) sender_id: Option<String>,
 }
 
 /// Acquires the global state, clears it, and generates a new identity
