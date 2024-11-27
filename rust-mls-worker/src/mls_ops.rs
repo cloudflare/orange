@@ -5,7 +5,9 @@ use std::{
 
 use log::info;
 use openmls::{
-    group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
+    group::{
+        MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, ProcessMessageError, StagedWelcome,
+    },
     prelude::{
         BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage,
         KeyPackageBundle, KeyPackageIn, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn,
@@ -236,6 +238,7 @@ impl WorkerState {
                 }),
                 proposals: vec![commit],
                 new_safety_number: Some(self.safety_number()),
+                sender_id: Some(self.uid().to_vec()),
                 ..Default::default()
             }
         } else {
@@ -338,6 +341,7 @@ impl WorkerState {
                 }),
                 proposals,
                 new_safety_number: Some(self.safety_number()),
+                sender_id: Some(self.uid().to_vec()),
                 ..Default::default()
             }
         } else {
@@ -361,12 +365,34 @@ impl WorkerState {
         let group = self.mls_group.as_mut().unwrap();
 
         // Process the message into a Staged Commit
-        let prot_msg = dbg!(msg.try_into_protocol_message().unwrap());
+        let prot_msg = msg.try_into_protocol_message().unwrap();
 
-        let processed_message = group
-            .process_message(&self.mls_provider, prot_msg)
-            .expect("could not process message")
-            .into_content();
+        let processed_message = match group.process_message(&self.mls_provider, prot_msg) {
+            Ok(m) => m.into_content(),
+
+            // If the message is from the wrong epoch, ignore it. Things can't really get out of
+            // order when we have a designated committer and a strongly serializing message delivery
+            // service.
+            // TODO: Test this edge case. What happens if the DC dies and then the MDS receives
+            // their messages? Then either:
+            // * Users will know its dead and reject further messages (not the current logic).
+            //   * The joiner will not know that the Welcome comes from a dead DC, so they will
+            //     process it
+            //   * The new DC will send a Remove, then Add, and a Welcome. The joiner will not
+            //     process the new Welcome, but will attempt to process the Remove and fail, since
+            //     the new DC didn't process the old DC's Add. So the new user is locked out.
+            // * Users will accept the old DC's Add message for the joiner, then the new DC's
+            //   Remove message for the old DC. The joiner will accept the Welcome, fail to process
+            //   the Add, then succeed in processing the Remove, which is good.
+            Err(ProcessMessageError::ValidationError(
+                openmls::group::ValidationError::WrongEpoch,
+            )) => {
+                return WorkerResponse::default();
+            }
+            Err(e) => {
+                panic!("could not process message: {e}")
+            }
+        };
         if let ProcessedMessageContent::StagedCommitMessage(staged_com) = processed_message {
             // Collect all the UIDs of the users being added
             let uids_being_added: BTreeSet<Vec<u8>> = staged_com
@@ -466,6 +492,7 @@ pub(crate) struct WorkerResponse {
     pub(crate) proposals: Vec<MlsMessageOut>,
     pub(crate) new_safety_number: Option<SafetyNumber>,
     pub(crate) key_pkg: Option<KeyPackage>,
+    pub(crate) sender_id: Option<Vec<u8>>,
 }
 
 /// Acquires the global state, clears it, and generates a new identity
