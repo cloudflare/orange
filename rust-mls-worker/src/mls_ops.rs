@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use log::info;
 use openmls::{
     group::{MlsGroup, MlsGroupCreateConfig, MlsGroupJoinConfig, StagedWelcome},
     prelude::{
@@ -14,11 +15,29 @@ use openmls::{
 };
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
+use thiserror::Error;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 const PROT_VERSION: ProtocolVersion = ProtocolVersion::Mls10;
 
 type SafetyNumber = [u8; 32];
+
+/// Error incurred when attempting to decrypt an app message (in our case, an encrypted frame from
+/// a video/audio stream)
+#[derive(Error, Debug, PartialEq, Clone)]
+pub enum DecryptAppMsgError {
+    #[error(transparent)]
+    Mls(#[from] openmls::prelude::Error),
+
+    #[error(transparent)]
+    Processing(#[from] openmls::prelude::ProcessMessageError),
+
+    #[error("Not in a group, so decryption does not make sense")]
+    NoGroup,
+
+    #[error("Wrong message type: {0}")]
+    WrongMsgType(&'static str),
+}
 
 /// Contains the data created by existing member that a new users needs to join a group. This is an
 /// MLS Welcome message along with the ratchet tree information
@@ -375,43 +394,60 @@ impl WorkerState {
         }
     }
 
-    /// Takes a message, encrypts it, frames it as an MlsMessageOut, and serializes it
-    fn encrypt_app_msg(&mut self, msg: &[u8]) -> Vec<u8> {
-        let out = self
-            .mls_group
+    /// Takes a message, encrypts it, frames it as an `MlsMessageOut`, and serializes it. If
+    /// `self.mls_group` doesn't exist, returns all 0s, with the length of `msg`.
+    fn encrypt_app_msg_nofail(&mut self, msg: &[u8]) -> Vec<u8> {
+        self.mls_group
             .as_mut()
-            .unwrap()
-            .create_message(
-                &self.mls_provider,
-                self.my_signing_keys.as_ref().unwrap(),
-                msg,
-            )
-            .unwrap();
-
-        out.to_bytes().unwrap()
+            .map(|group| {
+                group
+                    .create_message(
+                        &self.mls_provider,
+                        self.my_signing_keys.as_ref().unwrap(),
+                        msg,
+                    )
+                    .unwrap()
+                    .to_bytes()
+                    .unwrap()
+            })
+            .unwrap_or_else(|| vec![0u8; msg.len()])
     }
 
     /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
-    /// the bytes
-    fn decrypt_app_msg(&mut self, ct: &[u8]) -> Vec<u8> {
-        let group = self.mls_group.as_mut().unwrap();
-        let framed = MlsMessageIn::tls_deserialize_exact_bytes(ct).unwrap();
+    /// the bytes.
+    fn decrypt_app_msg(&mut self, ct: &[u8]) -> Result<Vec<u8>, DecryptAppMsgError> {
+        let group = self.mls_group.as_mut().ok_or(DecryptAppMsgError::NoGroup)?;
+        let framed = MlsMessageIn::tls_deserialize_exact_bytes(ct)?;
 
         // Process the ciphertext into an application message
         let msg = group
             .process_message(
                 &self.mls_provider,
                 framed.try_into_protocol_message().unwrap(),
-            )
-            .expect("could not process message")
+            )?
             .into_content();
 
         match msg {
-            ProcessedMessageContent::ApplicationMessage(app_msg) => app_msg.into_bytes(),
-            _ => {
-                panic!("unexpected MLS message {:?}", msg)
+            ProcessedMessageContent::ApplicationMessage(app_msg) => Ok(app_msg.into_bytes()),
+            ProcessedMessageContent::ProposalMessage(_) => {
+                Err(DecryptAppMsgError::WrongMsgType("proposal"))
+            }
+            ProcessedMessageContent::ExternalJoinProposalMessage(_) => {
+                Err(DecryptAppMsgError::WrongMsgType("external join proposal"))
+            }
+            ProcessedMessageContent::StagedCommitMessage(_) => {
+                Err(DecryptAppMsgError::WrongMsgType("staged commit"))
             }
         }
+    }
+
+    /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
+    /// the bytes. If any error happens, returns the empty vec.
+    fn decrypt_app_msg_nofail(&mut self, ct: &[u8]) -> Vec<u8> {
+        self.decrypt_app_msg(ct).unwrap_or_else(|e| {
+            info!("Frame decryption failed: {e}");
+            Vec::new()
+        })
     }
 }
 
@@ -432,7 +468,7 @@ pub(crate) struct WorkerResponse {
     pub(crate) key_pkg: Option<KeyPackage>,
 }
 
-/// Creates a new state
+/// Acquires the global state, clears it, and generates a new identity
 pub fn new_state(uid: &str) -> WorkerResponse {
     let uid_bytes = uid.as_bytes().to_vec();
     STATE
@@ -453,7 +489,7 @@ pub fn new_state(uid: &str) -> WorkerResponse {
         .expect("couldn't acquire thread-local storage")
 }
 
-/// Creates a new state and starts a new MLS group
+/// Acquires the global state, clears it, generates a new identity, and starts a new MLS group
 pub fn new_state_and_start_group(uid: &str) -> WorkerResponse {
     let uid_bytes = uid.as_bytes().to_vec();
     STATE
@@ -476,54 +512,33 @@ pub fn new_state_and_start_group(uid: &str) -> WorkerResponse {
         .expect("couldn't acquire thread-local storage")
 }
 
-/// Creates a new state and joins an MLS group
-/*
-pub fn new_state_and_join_group(uid: &str, wp: WelcomePackageIn) -> WorkerResponse {
-    let uid_bytes = uid.as_bytes().to_vec();
-
-    STATE
-        .try_with(|mutex| {
-            // Create a new state and start a new group
-            let mut state = mutex.lock().expect("couldn't lock mutex");
-            let (mut new_state, key_pkg) = WorkerState::new(uid_bytes);
-            let safety_number = new_state.join_group(wp);
-
-            // Update the state
-            *state = new_state;
-
-            // Respond with the key package and safety number
-            WorkerResponse {
-                new_safety_number: Some(safety_number),
-                key_pkg: Some(key_pkg.key_package().clone()),
-                ..Default::default()
-            }
-        })
-        .expect("couldn't acquire thread-local storage")
-}
-*/
-
+/// Acquires the global state and encrypts the message if the MLS group exists. If not, returns all
+/// 0s with the length of `msg`
 pub fn encrypt_msg(msg: &[u8]) -> Vec<u8> {
     STATE
         .try_with(|mutex| {
             mutex
                 .lock()
                 .expect("couldn't lock mutex")
-                .encrypt_app_msg(msg)
+                .encrypt_app_msg_nofail(msg)
         })
         .expect("couldn't acquire thread-local storage")
 }
 
+/// Acquires the global state and attempts to decrypt the given MLS application message. On failure,
+/// returns the empty vector.
 pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
     STATE
         .try_with(|mutex| {
             mutex
                 .lock()
                 .expect("couldn't lock mutex")
-                .decrypt_app_msg(msg)
+                .decrypt_app_msg_nofail(msg)
         })
         .expect("couldn't acquire thread-local storage")
 }
 
+/// Acquires the global state and adds the given user by key package
 pub fn add_user(serialized_kp: &[u8]) -> WorkerResponse {
     let key_pkg = KeyPackageIn::tls_deserialize_exact_bytes(serialized_kp).unwrap();
 
@@ -532,6 +547,7 @@ pub fn add_user(serialized_kp: &[u8]) -> WorkerResponse {
         .expect("couldn't acquire thread-local storage")
 }
 
+/// Acquires the global state and removes the given user by their UID
 pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
     let uid_bytes = uid_to_remove.as_bytes();
 
@@ -545,6 +561,7 @@ pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
         .expect("couldn't acquire thread-local storage")
 }
 
+/// Acquires the global state and joins the group given by the welcome package and ratchet tree
 pub fn join_group(serialized_welcome: &[u8], serialized_rtree: &[u8]) -> WorkerResponse {
     let welcome = MlsMessageIn::tls_deserialize_exact_bytes(serialized_welcome).unwrap();
     let ratchet_tree = RatchetTreeIn::tls_deserialize_exact_bytes(serialized_rtree).unwrap();
@@ -562,6 +579,7 @@ pub fn join_group(serialized_welcome: &[u8], serialized_rtree: &[u8]) -> WorkerR
         .expect("couldn't acquire thread-local storage")
 }
 
+/// Acquires the global state and processes the given Commit message from the given sender
 pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerResponse {
     let uid_bytes = sender_uid.as_bytes().to_vec();
     let commit = MlsMessageIn::tls_deserialize_exact_bytes(serialized_commit).unwrap();
@@ -654,9 +672,9 @@ mod tests {
 
         // Now encrypt something
         let msg = b"hello world";
-        let ct = alice_group.encrypt_app_msg(msg);
-        assert_eq!(bob_group.decrypt_app_msg(&ct), msg);
-        assert_eq!(charlie_group.decrypt_app_msg(&ct), msg);
+        let ct = alice_group.encrypt_app_msg_nofail(msg);
+        assert_eq!(bob_group.decrypt_app_msg(&ct).unwrap(), msg);
+        assert_eq!(charlie_group.decrypt_app_msg(&ct).unwrap(), msg);
 
         // Now Alice gets removed. Everyone removes her
         let bob_out = bob_group.remove_user(b"Alice");
@@ -671,7 +689,7 @@ mod tests {
 
         // Now encrypt something
         let msg = b"hello world";
-        let ct = bob_group.encrypt_app_msg(msg);
-        assert_eq!(charlie_group.decrypt_app_msg(&ct), msg);
+        let ct = bob_group.encrypt_app_msg_nofail(msg);
+        assert_eq!(charlie_group.decrypt_app_msg(&ct).unwrap(), msg);
     }
 }
