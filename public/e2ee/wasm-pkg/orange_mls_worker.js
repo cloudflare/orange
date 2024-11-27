@@ -219,7 +219,7 @@ function makeMutClosure(arg0, arg1, dtor, f) {
     return real;
 }
 function __wbg_adapter_28(arg0, arg1, arg2) {
-    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h50aea8050d8e200e(arg0, arg1, addHeapObject(arg2));
+    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__ha2fe9d6d9cecb9bd(arg0, arg1, addHeapObject(arg2));
 }
 
 /**
@@ -248,7 +248,7 @@ function handleError(f, args) {
     }
 }
 function __wbg_adapter_111(arg0, arg1, arg2, arg3) {
-    wasm.wasm_bindgen__convert__closures__invoke2_mut__h88f76befb6b77aae(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+    wasm.wasm_bindgen__convert__closures__invoke2_mut__hd439513aaedacbc3(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 async function __wbg_load(module, imports) {
@@ -405,6 +405,14 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_2b3adb99ce26c314 = function(arg0) {
         console.warn(getObject(arg0));
     };
+    imports.wbg.__wbg_new_66a484e91c711ee9 = function() { return handleError(function (arg0) {
+        const ret = new ReadableStreamDefaultReader(getObject(arg0));
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_read_e48a676fb81ea800 = function(arg0) {
+        const ret = getObject(arg0).read();
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_instanceof_ReadableStream_7b49703629f1df3c = function(arg0) {
         let result;
         try {
@@ -414,14 +422,6 @@ function __wbg_get_imports() {
         }
         const ret = result;
         return ret;
-    };
-    imports.wbg.__wbg_new_66a484e91c711ee9 = function() { return handleError(function (arg0) {
-        const ret = new ReadableStreamDefaultReader(getObject(arg0));
-        return addHeapObject(ret);
-    }, arguments) };
-    imports.wbg.__wbg_read_e48a676fb81ea800 = function(arg0) {
-        const ret = getObject(arg0).read();
-        return addHeapObject(ret);
     };
     imports.wbg.__wbg_instanceof_RtcEncodedAudioFrame_334535b0a73c9025 = function(arg0) {
         let result;
@@ -626,8 +626,8 @@ function __wbg_get_imports() {
         const ret = wasm.memory;
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper1762 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 528, __wbg_adapter_28);
+    imports.wbg.__wbindgen_closure_wrapper1700 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 477, __wbg_adapter_28);
         return addHeapObject(ret);
     };
 
