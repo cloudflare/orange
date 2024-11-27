@@ -119,6 +119,11 @@ pub async fn processEvent(event: Object) -> JsValue {
         "recvMlsWelcome" => {
             let welcome_bytes = extract_bytes_field("recvMlsWelcome", &event, "welcome");
             let rtree_bytes = extract_bytes_field("recvMlsWelcome", &event, "rtree");
+            // We don't really use this field
+            let _sender = obj_get(&event, &"senderId".into())
+                .expect("recvMlsMessage event expects input field 'senderId'")
+                .as_string()
+                .expect("recvMlsMessage field 'senderId' must be a string");
             Some(mls_ops::join_group(&welcome_bytes, &rtree_bytes))
         }
 
@@ -144,6 +149,7 @@ pub async fn processEvent(event: Object) -> JsValue {
         proposals,
         new_safety_number,
         key_pkg,
+        sender_id,
     }) = ret
     {
         // Make the safety number object if a new safety number is given
@@ -178,6 +184,7 @@ pub async fn processEvent(event: Object) -> JsValue {
                 &[
                     ("welcome", &welcome.to_bytes().unwrap()),
                     ("rtree", &ratchet_tree.tls_serialize_detached().unwrap()),
+                    ("senderId", sender_id.as_ref().unwrap()),
                 ],
             );
 
@@ -190,7 +197,10 @@ pub async fn processEvent(event: Object) -> JsValue {
         for msg in proposals {
             let (o, buffers) = make_obj_and_save_buffers(
                 "sendMlsMessage",
-                &[("msg", &msg.tls_serialize_detached().unwrap())],
+                &[
+                    ("msg", &msg.tls_serialize_detached().unwrap()),
+                    ("senderId", sender_id.as_ref().unwrap()),
+                ],
             );
 
             // Accumulate the object and buffers
