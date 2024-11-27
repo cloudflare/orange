@@ -184,9 +184,9 @@ pub async fn processEvent(event: Object) -> JsValue {
                 &[
                     ("welcome", &welcome.to_bytes().unwrap()),
                     ("rtree", &ratchet_tree.tls_serialize_detached().unwrap()),
-                    ("senderId", sender_id.as_ref().unwrap()),
                 ],
             );
+            set_sender_id(&o, sender_id.as_ref().unwrap());
 
             // Accumulate the object and buffers
             obj_list.push(&o);
@@ -197,11 +197,9 @@ pub async fn processEvent(event: Object) -> JsValue {
         for msg in proposals {
             let (o, buffers) = make_obj_and_save_buffers(
                 "sendMlsMessage",
-                &[
-                    ("msg", &msg.tls_serialize_detached().unwrap()),
-                    ("senderId", sender_id.as_ref().unwrap()),
-                ],
+                &[("msg", &msg.tls_serialize_detached().unwrap())],
             );
+            set_sender_id(&o, sender_id.as_ref().unwrap());
 
             // Accumulate the object and buffers
             obj_list.push(&o);
@@ -283,6 +281,11 @@ fn make_obj_and_save_buffers(name: &str, named_bytestrings: &[(&str, &[u8])]) ->
     }
 
     (o, buffers)
+}
+
+/// Sets the `senderId` field in the given object to the given string
+fn set_sender_id(o: &Object, sender_id: &str) {
+    obj_set(o, &"senderId".into(), &sender_id.into()).unwrap();
 }
 
 /// Given an object `o` with field `field` of type `ArrayBuffer`, returns `o[field]` as a `Vec<u8>`
