@@ -460,16 +460,16 @@ pub fn new_state_and_start_group(uid: &str) -> WorkerResponse {
         .try_with(|mutex| {
             // Create a new state and start a new group
             let mut state = mutex.lock().expect("couldn't lock mutex");
-            let (mut new_state, key_pkg) = WorkerState::new(uid_bytes);
+            let (mut new_state, _) = WorkerState::new(uid_bytes);
             let safety_number = new_state.start_group();
 
             // Update the state
             *state = new_state;
 
-            // Respond with the key package and safety number
+            // Respond with the safety number. Key package isn't necessary because there's nobody to
+            // give it to yet
             WorkerResponse {
                 new_safety_number: Some(safety_number),
-                key_pkg: Some(key_pkg.key_package().clone()),
                 ..Default::default()
             }
         })
