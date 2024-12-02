@@ -12,6 +12,7 @@ use openmls::{
         BasicCredential, Ciphersuite, CredentialWithKey, DeserializeBytes, KeyPackage,
         KeyPackageBundle, KeyPackageIn, LeafNodeIndex, MlsMessageBodyIn, MlsMessageIn,
         MlsMessageOut, OpenMlsProvider, ProcessedMessageContent, ProtocolVersion, RatchetTreeIn,
+        SenderRatchetConfiguration,
     },
     treesync::RatchetTree,
 };
@@ -21,6 +22,11 @@ use thiserror::Error;
 
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 const PROT_VERSION: ProtocolVersion = ProtocolVersion::Mls10;
+// Permit decryption of messages that are up to 500 messages old (for that sender)
+const OUT_OF_ORDER_TOLERANCE: u32 = 500;
+// Permit decryption of messages from up to 1000 messages in the future (for that sender). 1000 is
+// the default.
+const MAX_MESSAGE_SEQ_JUMP: u32 = 1000;
 
 type SafetyNumber = [u8; 32];
 
@@ -144,13 +150,20 @@ impl WorkerState {
     /// Starts a new MLS group. This is called if this user is the first user in the room. Returns a
     /// new safety number and nothing else
     fn start_group(&mut self) -> SafetyNumber {
+        let config = MlsGroupCreateConfig::builder()
+            .sender_ratchet_configuration(SenderRatchetConfiguration::new(
+                OUT_OF_ORDER_TOLERANCE,
+                MAX_MESSAGE_SEQ_JUMP,
+            ))
+            .build();
+
         self.mls_group = Some(
             MlsGroup::new(
                 &self.mls_provider,
                 self.my_signing_keys
                     .as_ref()
                     .expect("used start_group() before initialize()"),
-                &MlsGroupCreateConfig::default(),
+                &config,
                 self.my_credential
                     .clone()
                     .expect("used start_group() before initialize()"),
@@ -172,15 +185,19 @@ impl WorkerState {
             ratchet_tree,
         } = wp;
 
+        // Permit decryption of old frames
+        let config = MlsGroupJoinConfig::builder()
+            .sender_ratchet_configuration(SenderRatchetConfiguration::new(
+                OUT_OF_ORDER_TOLERANCE,
+                MAX_MESSAGE_SEQ_JUMP,
+            ))
+            .build();
+
         // Process the message
         if let MlsMessageBodyIn::Welcome(w) = welcome.extract() {
-            let staged_join = StagedWelcome::new_from_welcome(
-                &self.mls_provider,
-                &MlsGroupJoinConfig::default(),
-                w,
-                Some(ratchet_tree),
-            )
-            .expect("could not stage welcome");
+            let staged_join =
+                StagedWelcome::new_from_welcome(&self.mls_provider, &config, w, Some(ratchet_tree))
+                    .expect("could not stage welcome");
 
             // Create a group from the processed welcome
             self.mls_group = Some(
@@ -634,6 +651,7 @@ pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerRespon
 mod tests {
     use super::*;
     use openmls::prelude::tls_codec::Serialize;
+    use rand::seq::SliceRandom;
 
     impl WorkerResponse {
         fn is_default(&self) -> bool {
@@ -724,5 +742,17 @@ mod tests {
         let msg = b"hello world";
         let ct = bob_group.encrypt_app_msg_nofail(msg);
         assert_eq!(charlie_group.decrypt_app_msg(&ct).unwrap(), msg);
+
+        // Now test that we can decrypt messages out of order. We'll deliver a bunch of messages in
+        // a totally random order
+        let mut ciphertexts: Vec<_> =
+            (0..core::cmp::min(OUT_OF_ORDER_TOLERANCE, MAX_MESSAGE_SEQ_JUMP))
+                .map(|_| bob_group.encrypt_app_msg_nofail(msg))
+                .collect();
+        ciphertexts.shuffle(&mut rand::thread_rng());
+        // Open the ciphertexts
+        ciphertexts.into_iter().for_each(|ct| {
+            charlie_group.decrypt_app_msg(&ct).unwrap();
+        })
     }
 }
