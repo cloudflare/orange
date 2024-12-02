@@ -717,6 +717,7 @@ dependencies = [
  "openmls",
  "openmls_basic_credential",
  "openmls_rust_crypto",
+ "rand",
  "sha2",
  "thiserror 2.0.3",
  "wasm-bindgen",
