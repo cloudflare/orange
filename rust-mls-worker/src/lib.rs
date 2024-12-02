@@ -121,9 +121,9 @@ pub async fn processEvent(event: Object) -> JsValue {
             let rtree_bytes = extract_bytes_field("recvMlsWelcome", &event, "rtree");
             // We don't really use this field
             let _sender = obj_get(&event, &"senderId".into())
-                .expect("recvMlsMessage event expects input field 'senderId'")
+                .expect("recvMlsWelcome event expects input field 'senderId'")
                 .as_string()
-                .expect("recvMlsMessage field 'senderId' must be a string");
+                .expect("recvMlsWelcome field 'senderId' must be a string");
             Some(mls_ops::join_group(&welcome_bytes, &rtree_bytes))
         }
 
