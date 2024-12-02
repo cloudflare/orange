@@ -293,6 +293,6 @@ fn extract_bytes_field(event_name: &str, o: &Object, field: &'static str) -> Vec
     let buf: ArrayBuffer = obj_get(o, &field.into())
         .unwrap_or_else(|_| panic!("{event_name} must have field '{field}'"))
         .dyn_into()
-        .expect("{event_name} field '{field}' must be an ArrayBuffer");
+        .unwrap_or_else(|_| panic!("{event_name} field '{field}' must be an ArrayBuffer"));
     Uint8Array::new(&buf).to_vec()
 }
