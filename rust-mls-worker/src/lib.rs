@@ -242,7 +242,6 @@ async fn process_stream<F>(
         // Process the frame data
         let frame_data = get_frame_data(&frame);
         let chunk_len = frame_data.len();
-        info!("Read chunk of size {chunk_len}");
         let new_frame_data = f(&frame_data);
 
         // Set the new frame data value

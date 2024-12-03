@@ -195,9 +195,12 @@ impl WorkerState {
 
         // Process the message
         if let MlsMessageBodyIn::Welcome(w) = welcome.extract() {
-            let staged_join =
+            // If we can't process this Welcome, it's because it's not meant for us. Return early
+            let Ok(staged_join) =
                 StagedWelcome::new_from_welcome(&self.mls_provider, &config, w, Some(ratchet_tree))
-                    .expect("could not stage welcome");
+            else {
+                return WorkerResponse::default();
+            };
 
             // Create a group from the processed welcome
             self.mls_group = Some(
