@@ -1,5 +1,7 @@
 import {
 	Observable,
+	ReplaySubject,
+	Subject,
 	catchError,
 	combineLatest,
 	distinctUntilChanged,
@@ -22,7 +24,6 @@ import type {
 	TrackObject,
 	TracksResponse,
 } from '../callsTypes'
-import { setupReceiverTransform, setupSenderTransform } from '../e2ee'
 import { History } from '../History'
 import { BulkRequestDispatcher, FIFOScheduler } from '../Peer.utils'
 
@@ -55,6 +56,8 @@ export class RxjsPeer {
 	}>
 	sessionError$: Observable<string>
 	peerConnectionState$: Observable<RTCPeerConnectionState>
+	sender$: Subject<RTCRtpSender> = new ReplaySubject()
+	receiver$: Subject<RTCRtpReceiver> = new ReplaySubject()
 	config: PeerConfig
 
 	constructor(config: PeerConfig) {
@@ -330,8 +333,7 @@ export class RxjsPeer {
 					direction: 'sendonly',
 				})
 				console.debug('🌱 creating transceiver!')
-
-				await setupSenderTransform(transceiver.sender)
+				this.sender$.next(transceiver.sender)
 
 				return {
 					transceiver,
@@ -423,10 +425,13 @@ export class RxjsPeer {
 								if (pulledTrackData && pulledTrackData.mid) {
 									acc.set(track, {
 										mid: pulledTrackData.mid,
-										resolvedTrack: resolveTrack(
+										resolvedTrack: resolveTransceiver(
 											peerConnection,
 											(t) => t.mid === pulledTrackData.mid
-										),
+										).then((transceiver) => {
+											this.receiver$.next(transceiver.receiver)
+											return transceiver.receiver.track
+										}),
 									})
 								}
 
@@ -557,18 +562,17 @@ export class RxjsPeer {
 	}
 }
 
-async function resolveTrack(
+async function resolveTransceiver(
 	peerConnection: RTCPeerConnection,
 	compare: (t: RTCRtpTransceiver) => boolean,
 	timeout = 5000
 ) {
-	return new Promise<MediaStreamTrack>((resolve, reject) => {
+	return new Promise<RTCRtpTransceiver>((resolve, reject) => {
 		setTimeout(reject, timeout)
 		const handler = () => {
 			const transceiver = peerConnection.getTransceivers().find(compare)
 			if (transceiver) {
-				setupReceiverTransform(transceiver.receiver)
-				resolve(transceiver.receiver.track)
+				resolve(transceiver)
 				peerConnection.removeEventListener('track', handler)
 			}
 		}

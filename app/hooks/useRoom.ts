@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientMessage, RoomState, ServerMessage } from '~/types/Messages'
-import assertNever from '~/utils/assertNever'
 
 import usePartySocket from 'partysocket/react'
 import type { UserMedia } from './useUserMedia'
@@ -41,10 +40,12 @@ export default function useRoom({
 					userMedia.turnMicOff()
 					break
 				case 'partyserver-pong':
+				case 'e2eeMlsMessage':
+				case 'userLeftNotification':
 					// do nothing
 					break
 				default:
-					assertNever(message)
+					message satisfies never
 					break
 			}
 		},
