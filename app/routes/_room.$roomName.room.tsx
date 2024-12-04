@@ -20,8 +20,9 @@ import { ParticipantLayout } from '~/components/ParticipantLayout'
 import { ParticipantsButton } from '~/components/ParticipantsMenu'
 import { PullAudioTracks } from '~/components/PullAudioTracks'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
+import { SafetyNumberToast } from '~/components/SafetyNumberToast'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
-import Toast from '~/components/Toast'
+import Toast, { useDispatchToast } from '~/components/Toast'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -29,6 +30,7 @@ import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
 import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
+import { useE2EE } from '~/utils/e2ee'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
 
@@ -79,13 +81,15 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		pushedTracks,
 		showDebugInfo,
 		pinnedTileIds,
-		room: {
-			otherUsers,
-			websocket,
-			identity,
-			roomState: { meetingId },
-		},
+		room,
 	} = useRoomContext()
+	const {
+		otherUsers,
+		websocket,
+		identity,
+		roomState: { meetingId },
+	} = room
+	const e2eeSafetyNumber = useE2EE({ room, partyTracks })
 
 	useShowDebugInfoShortcut()
 
@@ -134,6 +138,17 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const unpinnedActors = actorsOnStage.filter(
 		(u) => !pinnedTileIds.includes(u.id)
 	)
+
+	const dispatchToast = useDispatchToast()
+
+	useEffect(() => {
+		if (e2eeSafetyNumber) {
+			dispatchToast(
+				<SafetyNumberToast safetyNumber={e2eeSafetyNumber.slice(0, 8)} />,
+				{ duration: Infinity, id: 'e2ee-safety-number' }
+			)
+		}
+	}, [e2eeSafetyNumber, dispatchToast])
 
 	return (
 		<PullAudioTracks

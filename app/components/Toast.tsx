@@ -23,19 +23,19 @@ interface Notification {
 
 const NotificationToasts = createContext([
 	[] as Notification[],
-	(_content: ReactNode, _options?: { duration?: number }) => {},
+	(_content: ReactNode, _options?: { duration?: number; id?: string }) => {},
 ] as const)
 
 export const NotificationToastsProvider = (props: { children?: ReactNode }) => {
 	const [messages, setMessages] = useState<Notification[]>([])
 
 	const dispatch = useCallback(
-		(content: ReactNode, options?: { duration?: number }) =>
+		(content: ReactNode, options?: { duration?: number; id?: string }) =>
 			setMessages((ms) => [
-				...ms,
+				...ms.filter((m) => m.id !== options?.id),
 				{
 					...options,
-					id: nanoid(14),
+					id: options?.id ?? nanoid(14),
 					content,
 				},
 			]),
