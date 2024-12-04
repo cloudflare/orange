@@ -50,8 +50,12 @@ export type ServerMessage =
 			type: 'partyserver-pong'
 	  }
 	| {
-			type: 'aiSdp'
-			sdp: string
+			type: 'e2eeMlsMessage'
+			payload: string
+	  }
+	| {
+			type: 'userLeftNotification'
+			id: string
 	  }
 
 export type ClientMessage =
@@ -91,4 +95,8 @@ export type ClientMessage =
 	  }
 	| {
 			type: 'relenquishAiControl'
+	  }
+	| {
+			type: 'e2eeMlsMessage'
+			payload: string
 	  }
