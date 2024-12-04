@@ -169,8 +169,37 @@ export class ChatRoom extends Server<Env> {
 		return meeting
 	}
 
-	async broadcastRoomState() {
+	async broadcastMessage(
+		message: ServerMessage,
+		excludedConnection?: Connection
+	) {
 		let didSomeoneQuit = false
+		const meetingId = await this.getMeetingId()
+		const messageAsString = JSON.stringify(message)
+
+		for (const connection of this.getConnections()) {
+			try {
+				if (excludedConnection && connection === excludedConnection) continue
+				connection.send(messageAsString)
+			} catch (err) {
+				connection.close(1011, 'Failed to broadcast state')
+				log({
+					eventName: 'errorBroadcastingToUser',
+					meetingId,
+					connectionId: connection.id,
+				})
+				await this.ctx.storage.delete(`session-${connection.id}`)
+				didSomeoneQuit = true
+			}
+		}
+
+		if (didSomeoneQuit) {
+			// broadcast again to remove the user who quit
+			await this.broadcastRoomState()
+		}
+	}
+
+	async broadcastRoomState() {
 		const meetingId = await this.getMeetingId()
 		const aiEnabled =
 			(await this.ctx.storage.get<boolean>('ai:enabled')) ?? false
@@ -215,28 +244,7 @@ export class ChatRoom extends Server<Env> {
 				],
 			},
 		} satisfies ServerMessage
-
-		const roomStateMessage = JSON.stringify(roomState)
-
-		for (const connection of this.getConnections()) {
-			try {
-				connection.send(roomStateMessage)
-			} catch (err) {
-				connection.close(1011, 'Failed to broadcast state')
-				log({
-					eventName: 'errorBroadcastingToUser',
-					meetingId,
-					connectionId: connection.id,
-				})
-				await this.ctx.storage.delete(`session-${connection.id}`)
-				didSomeoneQuit = true
-			}
-		}
-
-		if (didSomeoneQuit) {
-			// broadcast again to remove the user who quit
-			await this.broadcastRoomState()
-		}
+		return this.broadcastMessage(roomState)
 	}
 
 	async onClose(
@@ -272,6 +280,7 @@ export class ChatRoom extends Server<Env> {
 			switch (data.type) {
 				case 'userLeft': {
 					connection.close(1000, 'User left')
+					this.userLeftNotification(connection.id)
 					await this.ctx.storage
 						.delete(`session-${connection.id}`)
 						.catch(() => {
@@ -356,6 +365,11 @@ export class ChatRoom extends Server<Env> {
 					console.warn(
 						"Received partyserver-ping from client. You shouldn't be seeing this message. Did you forget to enable hibernation?"
 					)
+					break
+				}
+				case 'e2eeMlsMessage': {
+					// forward as-is
+					this.broadcastMessage(data, connection)
 					break
 				}
 				case 'heartbeat': {
@@ -579,6 +593,13 @@ export class ChatRoom extends Server<Env> {
 		await this.ctx.storage.deleteAll()
 	}
 
+	userLeftNotification(id: string) {
+		this.broadcastMessage({
+			type: 'userLeftNotification',
+			id,
+		})
+	}
+
 	async cleanupOldConnections() {
 		const meetingId = await this.getMeetingId()
 		if (!meetingId) log({ eventName: 'meetingIdNotFoundInCleanup' })
@@ -593,6 +614,7 @@ export class ChatRoom extends Server<Env> {
 				`heartbeat-${connectionId}`
 			)
 			if (heartbeat === undefined || heartbeat + alarmInterval < now) {
+				this.userLeftNotification(connectionId)
 				removedUsers++
 				await this.ctx.storage.delete(key).catch(() => {
 					console.warn(
