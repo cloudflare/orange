@@ -173,7 +173,7 @@ export class EncryptionWorker {
 				[readable, writable]
 			)
 		} else {
-			throw new Error('e2ee not supported')
+			throw new Error('RTCRtpSender.createEncodedStreams method not supported')
 		}
 	}
 
