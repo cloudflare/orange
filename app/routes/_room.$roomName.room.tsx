@@ -23,13 +23,13 @@ import { OverflowMenu } from '~/components/OverflowMenu'
 import { Participant } from '~/components/Participant'
 import { ParticipantsButton } from '~/components/ParticipantsMenu'
 import { PullAudioTracks } from '~/components/PullAudioTracks'
-import { PullVideoTrack } from '~/components/PullVideoTrack'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
 import Toast from '~/components/Toast'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
+import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
 import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
@@ -55,33 +55,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	})
 }
 
-function useDebugEnabled() {
-	const [enabled, setEnabled] = useState(false)
-
-	useEffect(() => {
-		const handler = (e: KeyboardEvent) => {
-			if (e.key.toLowerCase() === 'd' && e.ctrlKey) {
-				e.preventDefault()
-				setEnabled(!enabled)
-			}
-		}
-		document.addEventListener('keypress', handler)
-
-		return () => {
-			document.removeEventListener('keypress', handler)
-		}
-	}, [enabled])
-
-	return enabled
-}
-
-function useGridDebugControls({
-	initialCount,
-	enabled,
-}: {
-	initialCount: number
-	enabled: boolean
-}) {
+function useGridDebugControls({ initialCount }: { initialCount: number }) {
+	const { showDebugInfo: enabled } = useRoomContext()
 	const [fakeUsers, setFakeUsers] = useState<string[]>(
 		Array.from({ length: initialCount }).map(() => nanoid())
 	)
@@ -142,6 +117,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		peer,
 		dataSaverMode,
 		pushedTracks,
+		showDebugInfo,
 		room: {
 			otherUsers,
 			websocket,
@@ -150,9 +126,8 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		},
 	} = useRoomContext()
 
-	const debugEnabled = useDebugEnabled()
+	useShowDebugInfoShortcut()
 	const { GridDebugControls, fakeUsers } = useGridDebugControls({
-		enabled: debugEnabled,
 		initialCount: 0,
 	})
 
@@ -205,8 +180,6 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		})
 	}, [otherUsers, recordActivity])
 
-	const [pinnedId, setPinnedId] = useState<string>()
-
 	const flexContainerWidth = useMemo(
 		() =>
 			100 /
@@ -244,90 +217,33 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						{identity && userMedia.audioStreamTrack && (
 							<Participant
 								user={identity}
-								isSelf
-								flipId={'identity user'}
+								id={'identity user'}
 								ref={firstFlexChildRef}
-								videoTrack={userMedia.videoStreamTrack}
-								audioTrack={userMedia.audioStreamTrack}
-								pinnedId={pinnedId}
-								setPinnedId={setPinnedId}
-								showDebugInfo={debugEnabled}
 							/>
 						)}
 
 						{identity &&
 							userMedia.screenShareVideoTrack &&
 							userMedia.screenShareEnabled && (
-								<Participant
-									user={identity}
-									flipId={'identity user screenshare'}
-									isSelf
-									isScreenShare
-									videoTrack={userMedia.screenShareVideoTrack}
-									pinnedId={pinnedId}
-									setPinnedId={setPinnedId}
-									showDebugInfo={debugEnabled}
-								/>
+								<Participant user={identity} id={'identity user screenshare'} />
 							)}
 						{actorsOnStage.map((user) => (
 							<Fragment key={user.id}>
-								<PullVideoTrack
-									video={dataSaverMode ? undefined : user.tracks.video}
-									audio={user.tracks.audio}
-								>
-									{({ videoTrack, audioTrack }) => (
-										<Participant
-											user={user}
-											flipId={user.id}
-											videoTrack={videoTrack}
-											audioTrack={audioTrack}
-											pinnedId={pinnedId}
-											setPinnedId={setPinnedId}
-											showDebugInfo={debugEnabled}
-										></Participant>
-									)}
-								</PullVideoTrack>
+								<Participant user={user} id={user.id}></Participant>
 								{user.tracks.screenshare && user.tracks.screenShareEnabled && (
-									<PullVideoTrack video={user.tracks.screenshare}>
-										{({ videoTrack }) => (
-											<Participant
-												user={user}
-												videoTrack={videoTrack}
-												flipId={user.id + 'screenshare'}
-												isScreenShare
-												pinnedId={pinnedId}
-												setPinnedId={setPinnedId}
-												showDebugInfo={debugEnabled}
-											/>
-										)}
-									</PullVideoTrack>
+									<Participant user={user} id={user.id + 'screenshare'} />
 								)}
 							</Fragment>
 						))}
-
 						{identity &&
 							userMedia.audioStreamTrack &&
 							userMedia.videoStreamTrack &&
 							fakeUsers.map((uid) => (
-								<PullVideoTrack
-									key={identity.id}
-									video={identity.tracks.video}
-									audio={identity.tracks.audio}
-								>
-									{({ videoTrack }) => (
-										<Participant
-											user={identity}
-											isSelf
-											videoTrack={videoTrack}
-											audioTrack={userMedia.audioStreamTrack}
-											key={uid}
-											flipId={uid.toString()}
-											pinnedId={pinnedId}
-											setPinnedId={setPinnedId}
-											showDebugInfo={debugEnabled}
-										></Participant>
-									)}
-								</PullVideoTrack>
+								<Participant
+									user={identity}
+									key={uid}
+									id={uid.toString()}
+								></Participant>
 							))}
 					</div>
 					<Toast.Viewport />
@@ -352,7 +268,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						navigateToFeedbackPage={hasDb}
 						meetingId={meetingId}
 					/>
-					{debugEnabled && meetingId && (
+					{showDebugInfo && meetingId && (
 						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
 					)}
 				</div>

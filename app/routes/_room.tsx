@@ -194,10 +194,16 @@ function Room({ room, userMedia }: RoomProps) {
 		)
 	}, [peer, userMedia.screenShareVideoTrack$])
 	const pushedScreenSharingTrack = useSubscribedState(pushedScreenSharingTrack$)
+	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
+	const [showDebugInfo, setShowDebugInfo] = useState(false)
 
 	const context: RoomContextType = {
 		joined,
 		setJoined,
+		pinnedTileIds,
+		setPinnedTileIds,
+		showDebugInfo,
+		setShowDebugInfo,
 		dataSaverMode,
 		setDataSaverMode,
 		traceLink,
