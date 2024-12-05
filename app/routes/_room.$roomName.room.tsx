@@ -187,7 +187,11 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 
 	const { width } = useWindowSize()
 
-	const stageLimit = width < 600 ? 2 : 8
+	const sharedScreens = otherUsers.filter(
+		(u) => u.tracks.screenShareEnabled
+	).length
+
+	const stageLimit = width < 600 ? 2 : 7 - sharedScreens
 
 	const { recordActivity, actorsOnStage } = useStageManager(
 		otherUsers,
