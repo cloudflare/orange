@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { User } from '~/types/Messages'
 
 /**
  * Returns an updated list with as few
@@ -34,34 +35,76 @@ export const resolveRoster = <T extends { id: string }>(
 		.concat(remainingNewItems)
 }
 
-export default function useStageManager<Actor extends { id: string }>(
-	actors: Actor[],
-	limit: number
+export const screenshareSuffix = '_screenshare'
+
+export default function useStageManager(
+	users: User[],
+	limit: number,
+	self?: User
 ) {
-	const [actorsOnStage, setActorsOnStage] = useState<Actor[]>(
-		actors.slice(0, limit)
+	const usersAndScreenshares = useMemo(
+		() =>
+			users.concat(self ? [self] : []).flatMap((u) =>
+				u.tracks.screenshare
+					? [
+							u,
+							{
+								...u,
+								id: u.id + screenshareSuffix,
+								tracks: {
+									...u.tracks,
+									video: u.tracks.screenshare,
+									videoEnabled: u.tracks.screenShareEnabled,
+								},
+							},
+						]
+					: [u]
+			),
+		[self, users]
+	)
+
+	const [actorsOnStage, setActorsOnStage] = useState<User[]>(
+		usersAndScreenshares.slice(0, limit)
 	)
 	const [activityRecord, setActivityRecord] = useState<Record<string, number>>(
 		{}
 	)
 
-	const recordActivity = useCallback((actor: Actor) => {
+	const recordActivity = useCallback((actor: User) => {
 		setActivityRecord((ah) => ({ ...ah, [actor.id]: Date.now() }))
 	}, [])
 
 	const actorsThatShouldBeOnStage = useMemo(
 		() =>
-			[...actors]
-				.sort(
-					(a, b) => (activityRecord[b.id] ?? 0) - (activityRecord[a.id] ?? 0)
-				)
+			[...usersAndScreenshares]
+				.sort((a, b) => {
+					// prioritize self
+					if (a.id === self?.id) return -1
+					if (b.id === self?.id) return 1
+
+					// prioritize screenshares
+					if (
+						a.id.includes(screenshareSuffix) &&
+						!b.id.includes(screenshareSuffix)
+					)
+						return -1
+					if (
+						!a.id.includes(screenshareSuffix) &&
+						b.id.includes(screenshareSuffix)
+					)
+						return 1
+
+					// sort by activity
+					return (activityRecord[b.id] ?? 0) - (activityRecord[a.id] ?? 0)
+				})
 				.slice(0, limit),
-		[activityRecord, actors, limit]
+		[activityRecord, limit, self?.id, usersAndScreenshares]
 	)
 
 	const newUsers = useMemo(
-		() => actors.filter((a) => activityRecord[a.id] === undefined),
-		[activityRecord, actors]
+		() =>
+			usersAndScreenshares.filter((a) => activityRecord[a.id] === undefined),
+		[activityRecord, usersAndScreenshares]
 	)
 
 	useEffect(() => {

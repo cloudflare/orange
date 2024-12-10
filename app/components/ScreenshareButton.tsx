@@ -11,7 +11,10 @@ interface ScreenshareButtonProps {}
 export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	const {
 		userMedia: { screenShareVideoTrack, startScreenShare, endScreenShare },
+		room: { otherUsers },
 	} = useRoomContext()
+
+	const otherUserIsSharing = otherUsers.some((u) => u.tracks.screenshare)
 
 	const sharing = screenShareVideoTrack !== undefined
 
@@ -19,7 +22,7 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 
 	// setting this in a useEffect because we need to do this feature
 	// detection to remove it for iOS, but the feature detection also
-	//  doesn't work on the server, so it causes a mismatch between
+	// doesn't work on the server, so it causes a mismatch between
 	// the server/client that React doesn't like
 	useEffect(() => {
 		setCanShareScreen(
@@ -31,9 +34,18 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	if (!canShareScreen) return null
 
 	return (
-		<Tooltip content={sharing ? 'Stop sharing' : 'Share screen'}>
+		<Tooltip
+			content={
+				otherUserIsSharing
+					? 'Someone else is sharing'
+					: sharing
+						? 'Stop sharing'
+						: 'Share screen'
+			}
+		>
 			<Button
 				displayType={sharing ? 'danger' : 'secondary'}
+				disabled={otherUserIsSharing}
 				onClick={sharing ? endScreenShare : startScreenShare}
 			>
 				<VisuallyHidden>Share screen</VisuallyHidden>
