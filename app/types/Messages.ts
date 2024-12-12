@@ -8,6 +8,7 @@ export type User = {
 	tracks: {
 		audio?: string
 		audioEnabled?: boolean
+		audioUnavailable: boolean
 		video?: string
 		videoEnabled?: boolean
 		screenshare?: string

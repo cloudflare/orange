@@ -1,3 +1,4 @@
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
@@ -21,6 +22,20 @@ export const MuteUserButton: FC<MuteUserButtonProps> = ({
 }) => {
 	const { room } = useRoomContext()
 	const { data } = useUserMetadata(user.name)
+
+	if (user.tracks.audioUnavailable) {
+		return (
+			<Tooltip content="Mic is unavailable. User cannot unmute.">
+				<Button disabled displayType="secondary">
+					<Icon type="micOff" className="text-red-700 dark:text-red-400" />
+					<VisuallyHidden>
+						User's mic is unavailable, cannot unmute.
+					</VisuallyHidden>
+				</Button>
+			</Tooltip>
+		)
+	}
+
 	return (
 		<AlertDialog.Root>
 			{user.tracks.audioEnabled ? (

@@ -206,11 +206,19 @@ export const Participant = forwardRef<
 									user.tracks.videoEnabled &&
 									user.speaking && <AudioIndicator audioTrack={audioTrack} />}
 
-								{!user.tracks.audioEnabled && (
+								{!user.tracks.audioEnabled && !user.tracks.audioUnavailable && (
 									<Tooltip content="Mic is turned off">
 										<div className="indication-shadow">
 											<Icon type="micOff" />
-											<VisuallyHidden>Mic is turned off</VisuallyHidden>
+											<VisuallyHidden>Mic is muted</VisuallyHidden>
+										</div>
+									</Tooltip>
+								)}
+								{user.tracks.audioUnavailable && (
+									<Tooltip content="Mic is unavailable. User cannot unmute.">
+										<div className="indication-shadow">
+											<Icon type="micOff" className="text-red-400" />
+											<VisuallyHidden>Mic is muted</VisuallyHidden>
 										</div>
 									</Tooltip>
 								)}

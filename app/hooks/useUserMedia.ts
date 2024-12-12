@@ -71,6 +71,7 @@ export default function useUserMedia() {
 												console.error('Unknown error getting video track: ', e)
 											}
 											setVideoUnavailableReason(reason)
+											setVideoEnabled(false)
 										},
 									})
 								)
@@ -107,6 +108,7 @@ export default function useUserMedia() {
 							console.error('Unknown error getting audio track: ', e)
 						}
 						setAudioUnavailableReason(reason)
+						setAudioEnabled(false)
 					},
 				})
 			),

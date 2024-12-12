@@ -80,6 +80,7 @@ export class ChatRoom extends Server<Env> {
 				speaking: false,
 				tracks: {
 					audioEnabled: false,
+					audioUnavailable: false,
 					videoEnabled: false,
 					screenShareEnabled: false,
 				},
