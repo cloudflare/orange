@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useLocalStorage } from 'react-use'
-import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
+import {
+	combineLatest,
+	map,
+	Observable,
+	of,
+	shareReplay,
+	switchMap,
+	tap,
+} from 'rxjs'
 import invariant from 'tiny-invariant'
 import { blackCanvasStreamTrack } from '~/utils/blackCanvasStreamTrack'
 import blurVideoTrack from '~/utils/blurVideoTrack'
-import type { Mode } from '~/utils/mode'
 import noiseSuppression from '~/utils/noiseSuppression'
 import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
 import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
 import { useStateObservable, useSubscribedState } from './rxjsHooks'
-
-// export const userRejectedPermission = 'NotAllowedError'
 
 export const errorMessageMap = {
 	NotAllowedError:
@@ -25,13 +30,13 @@ export const errorMessageMap = {
 
 type UserMediaError = keyof typeof errorMessageMap
 
-export default function useUserMedia(mode: Mode) {
+export default function useUserMedia() {
 	const [blurVideo, setBlurVideo] = useLocalStorage('blur-video', false)
 	const [suppressNoise, setSuppressNoise] = useLocalStorage(
 		'suppress-noise',
 		false
 	)
-	const [audioEnabled, setAudioEnabled] = useState(mode === 'production')
+	const [audioEnabled, setAudioEnabled] = useState(true)
 	const [videoEnabled, setVideoEnabled] = useState(true)
 	const [screenShareEnabled, setScreenShareEnabled] = useState(false)
 	const [videoUnavailableReason, setVideoUnavailableReason] =
@@ -58,11 +63,14 @@ export default function useUserMedia(mode: Mode) {
 									tap({
 										error: (e) => {
 											invariant(e instanceof Error)
-											setVideoUnavailableReason(
+											const reason =
 												e.name in errorMessageMap
 													? (e.name as UserMediaError)
 													: 'UnknownError'
-											)
+											if (reason === 'UnknownError') {
+												console.error('Unknown error getting video track: ', e)
+											}
+											setVideoUnavailableReason(reason)
 										},
 									})
 								)
@@ -91,11 +99,14 @@ export default function useUserMedia(mode: Mode) {
 				tap({
 					error: (e) => {
 						invariant(e instanceof Error)
-						setAudioUnavailableReason(
+						const reason =
 							e.name in errorMessageMap
 								? (e.name as UserMediaError)
 								: 'UnknownError'
-						)
+						if (reason === 'UnknownError') {
+							console.error('Unknown error getting audio track: ', e)
+						}
+						setAudioUnavailableReason(reason)
 					},
 				})
 			),
@@ -111,25 +122,16 @@ export default function useUserMedia(mode: Mode) {
 		)
 	}, [suppressNoiseEnabled$])
 	const mutedAudioTrack$ = useMemo(() => {
-		return getUserMediaTrack$('audioinput').pipe(
-			tap({
-				next: (track) => {
-					track.enabled = false
-				},
-				error: (e) => {
-					invariant(e instanceof Error)
-					setAudioUnavailableReason(
-						e.name in errorMessageMap
-							? (e.name as UserMediaError)
-							: 'UnknownError'
-					)
-				},
-			}),
-			shareReplay({
-				refCount: true,
-				bufferSize: 1,
-			})
-		)
+		return new Observable<MediaStreamTrack>((subscriber) => {
+			const audioContext = new window.AudioContext()
+			const destination = audioContext.createMediaStreamDestination()
+			const track = destination.stream.getAudioTracks()[0]
+			subscriber.next(track)
+			return () => {
+				track.stop()
+				audioContext.close()
+			}
+		})
 	}, [])
 
 	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
@@ -137,10 +139,8 @@ export default function useUserMedia(mode: Mode) {
 	const audioEnabled$ = useStateObservable(audioEnabled)
 	const publicAudioTrack$ = useMemo(
 		() =>
-			combineLatest([audioEnabled$, audioTrack$, mutedAudioTrack$]).pipe(
-				map(([enabled, alwaysOnTrack, mutedTrack]) =>
-					enabled ? alwaysOnTrack : mutedTrack
-				),
+			audioEnabled$.pipe(
+				switchMap((enabled) => (enabled ? audioTrack$ : mutedAudioTrack$)),
 				shareReplay({
 					refCount: true,
 					bufferSize: 1,

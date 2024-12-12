@@ -31,7 +31,6 @@ function trackObjectToString(trackObject?: TrackObject) {
 
 export const loader = async ({ context }: LoaderFunctionArgs) => {
 	const {
-		mode,
 		env: {
 			TRACE_LINK,
 			API_EXTRA_PARAMS,
@@ -43,7 +42,6 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 	} = context
 
 	return json({
-		mode,
 		userDirectoryUrl: context.env.USER_DIRECTORY_URL,
 		traceLink: TRACE_LINK,
 		apiExtraParams: API_EXTRA_PARAMS,
@@ -82,10 +80,9 @@ export default function RoomWithPermissions() {
 }
 
 function RoomPreparation() {
-	const { mode } = useLoaderData<typeof loader>()
 	const { roomName } = useParams()
 	invariant(roomName)
-	const userMedia = useUserMedia(mode)
+	const userMedia = useUserMedia()
 	const room = useRoom({ roomName, userMedia })
 
 	return room.roomState.meetingId ? (
