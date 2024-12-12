@@ -109,7 +109,7 @@ function acquireTrack(
 		.catch((err) => {
 			// this device is in use already, probably on Windows
 			// so we can just call this one complete and move on
-			if (err instanceof Error && err.name === 'NotReadable') {
+			if (err instanceof Error && err.name === 'NotReadableError') {
 				subscriber.complete()
 			} else {
 				subscriber.error(err)
