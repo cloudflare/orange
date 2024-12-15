@@ -19,6 +19,12 @@ export type User = {
 export type RoomState = {
 	meetingId?: string
 	users: User[]
+	ai: {
+		enabled: boolean
+		controllingUser?: string
+		error?: string
+		connectionPending?: boolean
+	}
 }
 
 export type ServerMessage =
@@ -40,6 +46,10 @@ export type ServerMessage =
 	  }
 	| {
 			type: 'partyserver-pong'
+	  }
+	| {
+			type: 'aiSdp'
+			sdp: string
 	  }
 
 export type ClientMessage =
@@ -64,4 +74,17 @@ export type ClientMessage =
 	  }
 	| {
 			type: 'heartbeat'
+	  }
+	| {
+			type: 'enableAi'
+	  }
+	| {
+			type: 'establishAiPeerConnection'
+			sdp: string
+	  }
+	| {
+			type: 'requestAiControl'
+	  }
+	| {
+			type: 'relenquishAiControl'
 	  }

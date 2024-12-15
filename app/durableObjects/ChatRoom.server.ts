@@ -14,7 +14,15 @@ import {
 	type WSMessage,
 } from 'partyserver'
 import { getDb, Meetings } from 'schema'
+import invariant from 'tiny-invariant'
 import { log } from '~/utils/logging'
+import {
+	CallsNewSession,
+	CallsSession,
+	checkNewTracksResponse,
+	requestOpenAIService,
+	type SessionDescription,
+} from '~/utils/openai.server'
 
 const alarmInterval = 15_000
 
@@ -166,6 +174,15 @@ export class ChatRoom extends Server<Env> {
 		const roomState = {
 			type: 'roomState',
 			state: {
+				ai: {
+					enabled: (await this.ctx.storage.get<boolean>('ai:enabled')) ?? false,
+					controllingUser:
+						await this.ctx.storage.get<string>('ai:userControlling'),
+					connectionPending: await this.ctx.storage.get<boolean>(
+						'ai:connectionPending'
+					),
+					error: await this.ctx.storage.get<string>('ai:error'),
+				},
 				meetingId,
 				users: [...(await this.getUsers()).values()],
 			},
@@ -317,6 +334,188 @@ export class ChatRoom extends Server<Env> {
 					await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
 					break
 				}
+				case 'enableAi': {
+					await this.ctx.storage.put('ai:connectionPending', true)
+					await this.ctx.storage.delete('ai:error')
+					this.broadcastRoomState()
+
+					try {
+						// This session establishes a PeerConnection between Calls and OpenAI.
+						// CallsNewSession thirdparty parameter must be true to be able to connect to an external WebRTC server
+						const openAiSession = await CallsNewSession(
+							this.env.CALLS_APP_ID,
+							this.env.CALLS_APP_SECRET,
+							true
+						)
+						const openAiTracksResponse = await openAiSession.NewTracks({
+							// No offer is provided so Calls will generate one for us
+							tracks: [
+								{
+									location: 'local',
+									trackName: 'ai-generated-voice',
+									// Let it know a sendrecv transceiver is wanted to receive this track instead of a recvonly one
+									bidirectionalMediaStream: true,
+									// Needed to create an appropriate response
+									kind: 'audio',
+								},
+							],
+						})
+						checkNewTracksResponse(openAiTracksResponse, true)
+
+						invariant(this.env.OPENAI_MODEL_ENDPOINT)
+						invariant(this.env.OPEN_AI_KEY)
+
+						// The Calls's offer is sent to OpenAI
+						const openaiAnswer = await requestOpenAIService(
+							openAiTracksResponse.sessionDescription ||
+								({} as SessionDescription),
+							this.env.OPEN_AI_KEY,
+							this.env.OPENAI_MODEL_ENDPOINT
+						)
+
+						console.log('OpenAI answer', openaiAnswer)
+
+						// And the negotiation is completed by setting the answer from OpenAI
+						const renegotiationResponse =
+							await openAiSession.Renegotiate(openaiAnswer)
+						console.log('renegotiationResponse', renegotiationResponse)
+
+						console.log('set ai:sessionId', openAiSession.sessionId)
+						await this.ctx.storage.put('ai:sessionId', openAiSession.sessionId)
+						await this.ctx.storage.put('ai:enabled', true)
+						await this.ctx.storage.put('ai:connectionPending', false)
+						this.broadcastRoomState()
+
+						break
+					} catch (error) {
+						console.error(error)
+						await this.ctx.storage.put('ai:connectionPending', false)
+						await this.ctx.storage.put(
+							'ai:error',
+							'Error establishing connection with AI'
+						)
+						this.broadcastRoomState()
+						break
+					}
+				}
+				case 'requestAiControl': {
+					const aiSessionId = await this.ctx.storage.get<string>('ai:sessionId')
+					invariant(aiSessionId)
+					const openAiSession = new CallsSession(
+						aiSessionId,
+						{
+							Authorization: `Bearer ${this.env.CALLS_APP_SECRET}`,
+							'Content-Type': 'application/json',
+						},
+						`https://rtc.live.cloudflare.com/apps/${this.env.CALLS_APP_ID}`
+					)
+
+					const userAiSessionId = await this.ctx.storage.get<string>(
+						`ai:${connection.id}:sessionId`
+					)
+					invariant(userAiSessionId)
+
+					console.log({ aiSessionId, userAiSessionId })
+					console.log('starting exchangeStepTwo')
+					const exchangeStepTwo = await openAiSession.NewTracks({
+						tracks: [
+							{
+								location: 'remote',
+								sessionId: userAiSessionId,
+								trackName: `user-${connection.id}-mic`,
+								// Let Calls to find out the actual mid value
+								mid: `#ai-generated-voice`,
+							},
+						],
+					})
+					console.log('exchangeStepTwo result', exchangeStepTwo)
+					checkNewTracksResponse(exchangeStepTwo)
+
+					this.ctx.storage.put('ai:userControlling', connection.id)
+					this.broadcastRoomState()
+					break
+				}
+				case 'relenquishAiControl': {
+					this.ctx.storage.delete('ai:userControlling')
+					this.broadcastRoomState()
+					break
+				}
+				case 'establishAiPeerConnection': {
+					const { sdp } = data
+					// This session establishes a PeerConnection between the end-user and Calls.
+					const userAiSession = await CallsNewSession(
+						this.env.CALLS_APP_ID,
+						this.env.CALLS_APP_SECRET
+					)
+					const newTracksResponseA = await userAiSession.NewTracks({
+						sessionDescription: { sdp, type: 'offer' },
+						tracks: [
+							{
+								location: 'local',
+								trackName: `user-${connection.id}-mic`,
+								// Let it know a sendrecv transceiver is wanted to receive this track instead of a recvonly one
+								bidirectionalMediaStream: true,
+								// Needed to create an appropriate response
+								kind: 'audio',
+								mid: '0',
+							},
+						],
+					})
+					console.log('newTracksResponseA', newTracksResponseA)
+					checkNewTracksResponse(newTracksResponseA, true)
+
+					console.log(
+						`set ai:${connection.id}:sessionId`,
+						userAiSession.sessionId
+					)
+					await this.ctx.storage.put(
+						`ai:${connection.id}:sessionId`,
+						userAiSession.sessionId
+					)
+
+					this.sendMessage(connection, {
+						type: 'aiSdp',
+						sdp: newTracksResponseA.sessionDescription.sdp,
+						aiSessionId: await this.ctx.storage.get('ai:sessionId'),
+						userSessionid: userAiSession.sessionId,
+					})
+
+					const aiSessionId = await this.ctx.storage.get<string>('ai:sessionId')
+					invariant(aiSessionId)
+
+					console.log('aiSessionId', aiSessionId)
+					console.log('connection.id', connection.id)
+
+					const exchangeStepOne = await userAiSession.NewTracks({
+						// Session A is the PeerConnection from Calls to the end-user.
+						// The following request instructs Calls to pull the 'ai-generated-voice' from session B and to send
+						// it back to the end-user through an existing transceiver that was created to
+						// publish the user-mic track at the beginning
+						//
+						//
+						//                 PeerConnection A
+						// end-user <-> [sendrecv transceiver] <---- ai-generated-voice (new!)
+						//                mid=0 (#user-mic)   \
+						//                                     `--> user-mic
+						tracks: [
+							{
+								location: 'remote',
+								sessionId: aiSessionId,
+								trackName: 'ai-generated-voice',
+								// We may not know the exact mid value associated to the user-mic transceiver
+								// so instead of providing it, let Calls to resolve it for you
+								mid: `#user-${connection.id}-mic`,
+							},
+						],
+					})
+					console.log(
+						'Checking new tracks response after exchangeStepOne',
+						exchangeStepOne
+					)
+					checkNewTracksResponse(exchangeStepOne)
+
+					break
+				}
 				default: {
 					assertNever(data)
 					break
@@ -365,7 +564,6 @@ export class ChatRoom extends Server<Env> {
 
 	async endMeeting(meetingId: string) {
 		log({ eventName: 'endingMeeting', meetingId })
-		await this.ctx.storage.delete('meetingId')
 		if (this.db) {
 			// stamp meeting as ended
 			await this.db
@@ -375,6 +573,7 @@ export class ChatRoom extends Server<Env> {
 				})
 				.where(eq(Meetings.id, meetingId))
 		}
+		await this.ctx.storage.deleteAll()
 	}
 
 	async cleanupOldConnections() {

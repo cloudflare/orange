@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
+import { AiButton } from '~/components/AiButton'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
@@ -30,7 +31,6 @@ import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import { calculateLayout } from '~/utils/calculateLayout'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
-import { mode } from '~/utils/mode'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -44,6 +44,9 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		),
 		mode: context.mode,
 		hasDb: Boolean(context.env.DB),
+		hasAiCredentials: Boolean(
+			context.env.OPEN_AI_KEY && context.env.OPENAI_MODEL_ENDPOINT
+		),
 	})
 }
 
@@ -126,7 +129,7 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb } = useLoaderData<typeof loader>()
+	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		peer,
@@ -157,7 +160,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const speaking = useIsSpeaking(userMedia.audioStreamTrack)
 
 	useMount(() => {
-		if (otherUsers.length > 5 || mode === 'development') {
+		if (otherUsers.length > 5) {
 			userMedia.turnMicOff()
 		}
 	})
@@ -320,6 +323,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 				</Flipper>
 				<div className="flex flex-wrap items-center justify-center gap-2 p-2 text-sm md:gap-4 md:p-5 md:text-base">
 					<GridDebugControls />
+					{hasAiCredentials && <AiButton />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
 					<ScreenshareButton />
