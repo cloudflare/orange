@@ -1,14 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useLocalStorage } from 'react-use'
-import {
-	combineLatest,
-	map,
-	Observable,
-	of,
-	shareReplay,
-	switchMap,
-	tap,
-} from 'rxjs'
+import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { blackCanvasStreamTrack } from '~/utils/blackCanvasStreamTrack'
 import blurVideoTrack from '~/utils/blurVideoTrack'
@@ -16,6 +8,7 @@ import noiseSuppression from '~/utils/noiseSuppression'
 import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
 import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
+import { mutedAudioTrack$ } from '~/utils/rxjs/mutedAudioTrack$'
 import { useStateObservable, useSubscribedState } from './rxjsHooks'
 
 export const errorMessageMap = {
@@ -44,12 +37,12 @@ export default function useUserMedia() {
 	const [audioUnavailableReason, setAudioUnavailableReason] =
 		useState<UserMediaError>()
 
-	const turnMicOff = () => setAudioEnabled(false)
-	const turnMicOn = () => setAudioEnabled(true)
-	const turnCameraOn = () => setVideoEnabled(true)
-	const turnCameraOff = () => setVideoEnabled(false)
-	const startScreenShare = () => setScreenShareEnabled(true)
-	const endScreenShare = () => setScreenShareEnabled(false)
+	const turnMicOff = useCallback(() => setAudioEnabled(false), [])
+	const turnMicOn = useCallback(() => setAudioEnabled(true), [])
+	const turnCameraOn = useCallback(() => setVideoEnabled(true), [])
+	const turnCameraOff = useCallback(() => setVideoEnabled(false), [])
+	const startScreenShare = useCallback(() => setScreenShareEnabled(true), [])
+	const endScreenShare = useCallback(() => setScreenShareEnabled(false), [])
 
 	const blurVideo$ = useStateObservable(blurVideo)
 	const videoEnabled$ = useStateObservable(videoEnabled)
@@ -123,18 +116,6 @@ export default function useUserMedia() {
 			})
 		)
 	}, [suppressNoiseEnabled$])
-	const mutedAudioTrack$ = useMemo(() => {
-		return new Observable<MediaStreamTrack>((subscriber) => {
-			const audioContext = new window.AudioContext()
-			const destination = audioContext.createMediaStreamDestination()
-			const track = destination.stream.getAudioTracks()[0]
-			subscriber.next(track)
-			return () => {
-				track.stop()
-				audioContext.close()
-			}
-		})
-	}, [])
 
 	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
 	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
@@ -148,7 +129,7 @@ export default function useUserMedia() {
 					bufferSize: 1,
 				})
 			),
-		[audioEnabled$, audioTrack$, mutedAudioTrack$]
+		[audioEnabled$, audioTrack$]
 	)
 	const audioStreamTrack = useSubscribedState(publicAudioTrack$)
 

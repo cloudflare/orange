@@ -171,11 +171,17 @@ export class ChatRoom extends Server<Env> {
 	async broadcastRoomState() {
 		let didSomeoneQuit = false
 		const meetingId = await this.getMeetingId()
+		const aiEnabled =
+			(await this.ctx.storage.get<boolean>('ai:enabled')) ?? false
+		const aiSessionId =
+			(await this.ctx.storage.get<string>('ai:sessionId')) ?? undefined
+		const aiAudioTrack =
+			(await this.ctx.storage.get<string>('ai:trackName')) ?? undefined
 		const roomState = {
 			type: 'roomState',
 			state: {
 				ai: {
-					enabled: (await this.ctx.storage.get<boolean>('ai:enabled')) ?? false,
+					enabled: aiEnabled,
 					controllingUser:
 						await this.ctx.storage.get<string>('ai:userControlling'),
 					connectionPending: await this.ctx.storage.get<boolean>(
@@ -184,7 +190,28 @@ export class ChatRoom extends Server<Env> {
 					error: await this.ctx.storage.get<string>('ai:error'),
 				},
 				meetingId,
-				users: [...(await this.getUsers()).values()],
+				users: [
+					...(await this.getUsers()).values(),
+					...(aiEnabled
+						? [
+								{
+									id: 'ai',
+									name: 'AI',
+									joined: true,
+									raisedHand: false,
+									transceiverSessionId: aiSessionId,
+									speaking: false,
+									tracks: {
+										audioEnabled: true,
+										audio: aiSessionId + '/' + aiAudioTrack,
+										audioUnavailable: false,
+										videoEnabled: false,
+										screenShareEnabled: false,
+									},
+								} satisfies User,
+							]
+						: []),
+				],
 			},
 		} satisfies ServerMessage
 
@@ -382,6 +409,10 @@ export class ChatRoom extends Server<Env> {
 
 						console.log('set ai:sessionId', openAiSession.sessionId)
 						await this.ctx.storage.put('ai:sessionId', openAiSession.sessionId)
+						await this.ctx.storage.put(
+							'ai:trackName',
+							openAiTracksResponse.tracks[0].trackName
+						)
 						await this.ctx.storage.put('ai:enabled', true)
 						await this.ctx.storage.put('ai:connectionPending', false)
 						this.broadcastRoomState()
@@ -410,19 +441,18 @@ export class ChatRoom extends Server<Env> {
 						`https://rtc.live.cloudflare.com/apps/${this.env.CALLS_APP_ID}`
 					)
 
-					const userAiSessionId = await this.ctx.storage.get<string>(
-						`ai:${connection.id}:sessionId`
-					)
-					invariant(userAiSessionId)
+					const { track } = data
 
-					console.log({ aiSessionId, userAiSessionId })
-					console.log('starting exchangeStepTwo')
+					console.log('starting exchangeStepTwo, pulling', {
+						session: track.sessionId,
+						trackName: track.trackName,
+					})
 					const exchangeStepTwo = await openAiSession.NewTracks({
 						tracks: [
 							{
 								location: 'remote',
-								sessionId: userAiSessionId,
-								trackName: `user-${connection.id}-mic`,
+								sessionId: track.sessionId,
+								trackName: track.trackName,
 								// Let Calls to find out the actual mid value
 								mid: `#ai-generated-voice`,
 							},
@@ -438,82 +468,6 @@ export class ChatRoom extends Server<Env> {
 				case 'relenquishAiControl': {
 					this.ctx.storage.delete('ai:userControlling')
 					this.broadcastRoomState()
-					break
-				}
-				case 'establishAiPeerConnection': {
-					const { sdp } = data
-					// This session establishes a PeerConnection between the end-user and Calls.
-					const userAiSession = await CallsNewSession(
-						this.env.CALLS_APP_ID,
-						this.env.CALLS_APP_SECRET
-					)
-					const newTracksResponseA = await userAiSession.NewTracks({
-						sessionDescription: { sdp, type: 'offer' },
-						tracks: [
-							{
-								location: 'local',
-								trackName: `user-${connection.id}-mic`,
-								// Let it know a sendrecv transceiver is wanted to receive this track instead of a recvonly one
-								bidirectionalMediaStream: true,
-								// Needed to create an appropriate response
-								kind: 'audio',
-								mid: '0',
-							},
-						],
-					})
-					console.log('newTracksResponseA', newTracksResponseA)
-					checkNewTracksResponse(newTracksResponseA, true)
-
-					console.log(
-						`set ai:${connection.id}:sessionId`,
-						userAiSession.sessionId
-					)
-					await this.ctx.storage.put(
-						`ai:${connection.id}:sessionId`,
-						userAiSession.sessionId
-					)
-
-					this.sendMessage(connection, {
-						type: 'aiSdp',
-						sdp: newTracksResponseA.sessionDescription.sdp,
-						aiSessionId: await this.ctx.storage.get('ai:sessionId'),
-						userSessionid: userAiSession.sessionId,
-					})
-
-					const aiSessionId = await this.ctx.storage.get<string>('ai:sessionId')
-					invariant(aiSessionId)
-
-					console.log('aiSessionId', aiSessionId)
-					console.log('connection.id', connection.id)
-
-					const exchangeStepOne = await userAiSession.NewTracks({
-						// Session A is the PeerConnection from Calls to the end-user.
-						// The following request instructs Calls to pull the 'ai-generated-voice' from session B and to send
-						// it back to the end-user through an existing transceiver that was created to
-						// publish the user-mic track at the beginning
-						//
-						//
-						//                 PeerConnection A
-						// end-user <-> [sendrecv transceiver] <---- ai-generated-voice (new!)
-						//                mid=0 (#user-mic)   \
-						//                                     `--> user-mic
-						tracks: [
-							{
-								location: 'remote',
-								sessionId: aiSessionId,
-								trackName: 'ai-generated-voice',
-								// We may not know the exact mid value associated to the user-mic transceiver
-								// so instead of providing it, let Calls to resolve it for you
-								mid: `#user-${connection.id}-mic`,
-							},
-						],
-					})
-					console.log(
-						'Checking new tracks response after exchangeStepOne',
-						exchangeStepOne
-					)
-					checkNewTracksResponse(exchangeStepOne)
-
 					break
 				}
 				default: {

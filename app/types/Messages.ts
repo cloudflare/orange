@@ -1,3 +1,5 @@
+import type { TrackObject } from '~/utils/callsTypes'
+
 export type User = {
 	id: string
 	name: string
@@ -79,11 +81,8 @@ export type ClientMessage =
 			type: 'enableAi'
 	  }
 	| {
-			type: 'establishAiPeerConnection'
-			sdp: string
-	  }
-	| {
 			type: 'requestAiControl'
+			track: TrackObject
 	  }
 	| {
 			type: 'relenquishAiControl'
