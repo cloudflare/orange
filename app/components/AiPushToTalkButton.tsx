@@ -119,7 +119,7 @@ export function AiPushToTalkButtion() {
 	}, [holdingTalkButton, pushedAiAudioTrack, turnMicOn, websocket])
 
 	return (
-		<Button disabled={disabled} ref={talkButtonRef}>
+		<Button className="text-xs" disabled={disabled} ref={talkButtonRef}>
 			{hasControl ? 'Speaking to Ai...' : 'Hold to talk to Ai'}
 		</Button>
 	)
