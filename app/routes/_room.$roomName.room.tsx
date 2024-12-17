@@ -1,6 +1,11 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
-import { useLoaderData, useNavigate, useParams } from '@remix-run/react'
+import {
+	useLoaderData,
+	useNavigate,
+	useParams,
+	useSearchParams,
+} from '@remix-run/react'
 import { nanoid } from 'nanoid'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Flipper } from 'react-flip-toolkit'
@@ -114,10 +119,12 @@ export default function Room() {
 	const navigate = useNavigate()
 	const { roomName } = useParams()
 	const { mode, bugReportsEnabled } = useLoaderData<typeof loader>()
+	const [search] = useSearchParams()
 
 	useEffect(() => {
-		if (!joined && mode !== 'development') navigate(`/${roomName}`)
-	}, [joined, mode, navigate, roomName])
+		if (!joined && mode !== 'development')
+			navigate(`/${roomName}${search.size > 0 ? '?' + search.toString() : ''}`)
+	}, [joined, mode, navigate, roomName, search])
 
 	if (!joined && mode !== 'development') return null
 
