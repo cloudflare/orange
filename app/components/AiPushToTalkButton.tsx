@@ -3,6 +3,7 @@ import { switchMap } from 'rxjs'
 import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import type { ClientMessage } from '~/types/Messages'
+import { playSound } from '~/utils/playSound'
 import { inaudibleAudioTrack$ } from '~/utils/rxjs/inaudibleAudioTrack$'
 import { Button } from './Button'
 
@@ -118,9 +119,15 @@ export function AiPushToTalkButtion() {
 		}
 	}, [holdingTalkButton, pushedAiAudioTrack, turnMicOn, websocket])
 
+	useEffect(() => {
+		if (controllingUser !== undefined) {
+			playSound('aiReady')
+		}
+	}, [controllingUser])
+
 	return (
 		<Button className="text-xs" disabled={disabled} ref={talkButtonRef}>
-			{hasControl ? 'Speaking to Ai...' : 'Hold to talk to Ai'}
+			{hasControl ? 'Speaking to Ai...' : 'Hold to talk to AI'}
 		</Button>
 	)
 }
