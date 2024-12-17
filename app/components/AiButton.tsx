@@ -1,8 +1,9 @@
 import { useSearchParams } from '@remix-run/react'
 import { useRoomContext } from '~/hooks/useRoomContext'
-import type { ClientMessage } from '~/types/Messages'
+import type { ClientMessage, User } from '~/types/Messages'
 import { AiPushToTalkButtion } from './AiPushToTalkButton'
 import { Button } from './Button'
+import { RecordAiVoiceActivity } from './RecordAiVoiceActivity'
 
 function RemoveAiButton() {
 	const {
@@ -23,7 +24,7 @@ function RemoveAiButton() {
 	)
 }
 
-export function AiButton() {
+export function AiButton(props: { recordActivity: (user: User) => void }) {
 	const {
 		room: {
 			websocket,
@@ -34,7 +35,7 @@ export function AiButton() {
 		},
 	} = useRoomContext()
 
-	const connected = users.some((u) => u.id === 'ai')
+	const aiUser = users.find((u) => u.id === 'ai')
 	const [params] = useSearchParams()
 	const voice = params.get('voice') ?? undefined
 	const instructions = params.get('instructions') ?? undefined
@@ -42,10 +43,14 @@ export function AiButton() {
 	return (
 		<>
 			{error && <span className="text-red-800 dark:text-red-500">{error}</span>}
-			{connected ? (
+			{aiUser ? (
 				<>
 					<RemoveAiButton />
 					<AiPushToTalkButtion />
+					<RecordAiVoiceActivity
+						user={aiUser}
+						recordActivity={props.recordActivity}
+					/>
 				</>
 			) : (
 				<Button
