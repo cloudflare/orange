@@ -1,7 +1,7 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
-import { useNavigate, useParams } from '@remix-run/react'
+import { useNavigate, useParams, useSearchParams } from '@remix-run/react'
 import invariant from 'tiny-invariant'
 import { AudioIndicator } from '~/components/AudioIndicator'
 import { Button } from '~/components/Button'
@@ -64,6 +64,8 @@ export default function Lobby() {
 		: null
 
 	const roomUrl = useRoomUrl()
+
+	const [params] = useSearchParams()
 
 	return (
 		<div className="flex flex-col items-center justify-center h-full p-4">
@@ -155,7 +157,9 @@ export default function Lobby() {
 							// we navigate here with javascript instead of an a
 							// tag because we don't want it to be possible to join
 							// the room without the JS having loaded
-							navigate('room')
+							navigate(
+								'room' + (params.size > 0 ? '?' + params.toString() : '')
+							)
 						}}
 						disabled={!session?.sessionId}
 					>

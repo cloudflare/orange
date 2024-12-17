@@ -361,6 +361,20 @@ export class ChatRoom extends Server<Env> {
 					await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
 					break
 				}
+				case 'disableAi': {
+					await this.ctx.storage
+						.list({
+							prefix: 'ai:',
+						})
+						.then((map) => {
+							for (const key of map.keys()) {
+								this.ctx.storage.delete(key)
+							}
+						})
+					this.broadcastRoomState()
+
+					break
+				}
 				case 'enableAi': {
 					await this.ctx.storage.put('ai:connectionPending', true)
 					await this.ctx.storage.delete('ai:error')
@@ -392,12 +406,22 @@ export class ChatRoom extends Server<Env> {
 						invariant(this.env.OPENAI_MODEL_ENDPOINT)
 						invariant(this.env.OPEN_AI_KEY)
 
+						const params = new URLSearchParams()
+						const { voice, instructions } = data
+						if (voice) {
+							params.set('voice', voice)
+						}
+						if (instructions) {
+							params.set('instructions', instructions)
+						}
+
 						// The Calls's offer is sent to OpenAI
 						const openaiAnswer = await requestOpenAIService(
 							openAiTracksResponse.sessionDescription ||
 								({} as SessionDescription),
 							this.env.OPEN_AI_KEY,
-							this.env.OPENAI_MODEL_ENDPOINT
+							this.env.OPENAI_MODEL_ENDPOINT,
+							params
 						)
 
 						console.log('OpenAI answer', openaiAnswer)

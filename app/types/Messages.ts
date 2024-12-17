@@ -79,6 +79,11 @@ export type ClientMessage =
 	  }
 	| {
 			type: 'enableAi'
+			instructions?: string
+			voice?: string
+	  }
+	| {
+			type: 'disableAi'
 	  }
 	| {
 			type: 'requestAiControl'
