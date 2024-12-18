@@ -50,7 +50,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		mode: context.mode,
 		hasDb: Boolean(context.env.DB),
 		hasAiCredentials: Boolean(
-			context.env.OPEN_AI_KEY && context.env.OPENAI_MODEL_ENDPOINT
+			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
 	})
 }

@@ -15,6 +15,6 @@ export type Env = {
 	MAX_WEBCAM_QUALITY_LEVEL?: string
 	MAX_API_HISTORY?: string
 	DB?: D1Database
-	OPEN_AI_KEY?: string
+	OPENAI_API_TOKEN?: string
 	OPENAI_MODEL_ENDPOINT?: string
 }

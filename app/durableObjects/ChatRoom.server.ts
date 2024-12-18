@@ -404,7 +404,7 @@ export class ChatRoom extends Server<Env> {
 						checkNewTracksResponse(openAiTracksResponse, true)
 
 						invariant(this.env.OPENAI_MODEL_ENDPOINT)
-						invariant(this.env.OPEN_AI_KEY)
+						invariant(this.env.OPENAI_API_TOKEN)
 
 						const params = new URLSearchParams()
 						const { voice, instructions } = data
@@ -419,7 +419,7 @@ export class ChatRoom extends Server<Env> {
 						const openaiAnswer = await requestOpenAIService(
 							openAiTracksResponse.sessionDescription ||
 								({} as SessionDescription),
-							this.env.OPEN_AI_KEY,
+							this.env.OPENAI_API_TOKEN,
 							this.env.OPENAI_MODEL_ENDPOINT,
 							params
 						)
