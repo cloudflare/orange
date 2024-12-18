@@ -454,42 +454,59 @@ export class ChatRoom extends Server<Env> {
 					}
 				}
 				case 'requestAiControl': {
-					const aiSessionId = await this.ctx.storage.get<string>('ai:sessionId')
-					invariant(aiSessionId)
-					const openAiSession = new CallsSession(
-						aiSessionId,
-						{
-							Authorization: `Bearer ${this.env.CALLS_APP_SECRET}`,
-							'Content-Type': 'application/json',
-						},
-						`https://rtc.live.cloudflare.com/apps/${this.env.CALLS_APP_ID}`
+					const userControllingPending = await this.ctx.storage.get<string>(
+						'ai:userControlling:pending'
 					)
-
-					const { track } = data
-
-					console.log('starting exchangeStepTwo, pulling', {
-						session: track.sessionId,
-						trackName: track.trackName,
-					})
-					const exchangeStepTwo = await openAiSession.NewTracks({
-						tracks: [
+					if (userControllingPending) {
+						break
+					}
+					await this.ctx.storage.put(
+						'ai:userControlling:pending',
+						connection.id
+					)
+					try {
+						const aiSessionId =
+							await this.ctx.storage.get<string>('ai:sessionId')
+						invariant(aiSessionId)
+						const openAiSession = new CallsSession(
+							aiSessionId,
 							{
-								location: 'remote',
-								sessionId: track.sessionId,
-								trackName: track.trackName,
-								// Let Calls to find out the actual mid value
-								mid: `#ai-generated-voice`,
+								Authorization: `Bearer ${this.env.CALLS_APP_SECRET}`,
+								'Content-Type': 'application/json',
 							},
-						],
-					})
-					console.log('exchangeStepTwo result', exchangeStepTwo)
-					checkNewTracksResponse(exchangeStepTwo)
+							`https://rtc.live.cloudflare.com/apps/${this.env.CALLS_APP_ID}`
+						)
 
-					this.ctx.storage.put('ai:userControlling', connection.id)
-					this.broadcastRoomState()
+						const { track } = data
+
+						console.log('starting exchangeStepTwo, pulling', {
+							session: track.sessionId,
+							trackName: track.trackName,
+						})
+						const exchangeStepTwo = await openAiSession.NewTracks({
+							tracks: [
+								{
+									location: 'remote',
+									sessionId: track.sessionId,
+									trackName: track.trackName,
+									// Let Calls to find out the actual mid value
+									mid: `#ai-generated-voice`,
+								},
+							],
+						})
+
+						console.log('exchangeStepTwo result', exchangeStepTwo)
+						checkNewTracksResponse(exchangeStepTwo)
+
+						await this.ctx.storage.put('ai:userControlling', connection.id)
+						this.broadcastRoomState()
+					} finally {
+						await this.ctx.storage.delete('ai:userControlling:pending')
+					}
 					break
 				}
 				case 'relenquishAiControl': {
+					await this.ctx.storage.delete('ai:userControlling:pending')
 					this.ctx.storage.delete('ai:userControlling')
 					this.broadcastRoomState()
 					break
