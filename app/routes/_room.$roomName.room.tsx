@@ -30,6 +30,7 @@ import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import { calculateLayout } from '~/utils/calculateLayout'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
+import { mode } from '~/utils/mode'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -156,7 +157,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const speaking = useIsSpeaking(userMedia.audioStreamTrack)
 
 	useMount(() => {
-		if (otherUsers.length > 5) {
+		if (otherUsers.length > 5 || mode === 'development') {
 			userMedia.turnMicOff()
 		}
 	})

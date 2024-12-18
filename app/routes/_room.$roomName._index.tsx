@@ -149,24 +149,18 @@ export default function Lobby() {
 					</div>
 				)}
 				<div className="flex gap-4 text-sm">
-					{audioUnavailableMessage ? (
-						<Tooltip content="Unable to join without a mic.">
-							<Button disabled>Join</Button>
-						</Tooltip>
-					) : (
-						<Button
-							onClick={() => {
-								setJoined(true)
-								// we navigate here with javascript instead of an a
-								// tag because we don't want it to be possible to join
-								// the room without the JS having loaded
-								navigate('room')
-							}}
-							disabled={!session?.sessionId}
-						>
-							Join
-						</Button>
-					)}
+					<Button
+						onClick={() => {
+							setJoined(true)
+							// we navigate here with javascript instead of an a
+							// tag because we don't want it to be possible to join
+							// the room without the JS having loaded
+							navigate('room')
+						}}
+						disabled={!session?.sessionId}
+					>
+						Join
+					</Button>
 					<MicButton />
 					<CameraButton />
 					<SettingsButton />

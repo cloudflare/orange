@@ -27,9 +27,15 @@ export default function useBroadcastStatus({
 	raisedHand,
 	speaking,
 }: Config) {
-	const { audioEnabled, videoEnabled, screenShareEnabled } = userMedia
+	const {
+		audioEnabled,
+		videoEnabled,
+		screenShareEnabled,
+		audioUnavailableReason,
+	} = userMedia
 	const { audio, video, screenshare } = pushedTracks
 	const { sessionId } = useSubscribedState(peer.session$) ?? {}
+	const audioUnavailable = audioUnavailableReason !== undefined
 
 	const id = identity?.id
 	const name = identity?.name
@@ -44,6 +50,7 @@ export default function useBroadcastStatus({
 				transceiverSessionId: sessionId,
 				tracks: {
 					audioEnabled,
+					audioUnavailable,
 					videoEnabled,
 					screenShareEnabled,
 					video,
@@ -82,6 +89,8 @@ export default function useBroadcastStatus({
 		screenShareEnabled,
 		raisedHand,
 		speaking,
+		audioUnavailableReason,
+		audioUnavailable,
 	])
 
 	useUnmount(() => {
@@ -96,7 +105,9 @@ export default function useBroadcastStatus({
 						raisedHand,
 						speaking,
 						transceiverSessionId: sessionId,
-						tracks: {},
+						tracks: {
+							audioUnavailable,
+						},
 					},
 				} satisfies ClientMessage)
 			)

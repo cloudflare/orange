@@ -25,6 +25,24 @@ export async function trackIsHealthy(
 
 	const healthy = !track.muted && track.readyState === 'live' && !randomFailure
 
+	try {
+		if (!healthy) {
+			const devices = await navigator.mediaDevices.enumerateDevices()
+			const deviceFromTrack = devices.find(
+				(device) => device.deviceId === track.getSettings().deviceId
+			)
+			console.warn(
+				`👩🏻‍⚕️ Track from ${deviceFromTrack?.label ?? "unkonwn device (enumerateDevices didn't find a matching device id)"} is unhealthy!`
+			)
+			console.warn(
+				`👩🏻‍⚕️ track.readyState: ${track.readyState} and track.muted: ${track.muted}`,
+				track
+			)
+		}
+	} catch (e) {
+		console.error('Error getting device info for unhealthy track', e, track)
+	}
+
 	console.info(`👩🏻‍⚕️ track is ${healthy ? 'healthy' : 'unhealthy'}!`)
 	return healthy
 }
