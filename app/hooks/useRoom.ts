@@ -12,7 +12,10 @@ export default function useRoom({
 	roomName: string
 	userMedia: UserMedia
 }) {
-	const [roomState, setRoomState] = useState<RoomState>({ users: [] })
+	const [roomState, setRoomState] = useState<RoomState>({
+		users: [],
+		ai: { enabled: false },
+	})
 
 	const userLeftFunctionRef = useRef(() => {})
 
@@ -41,6 +44,7 @@ export default function useRoom({
 					userMedia.turnMicOff()
 					break
 				case 'partyserver-pong':
+				case 'aiSdp':
 					// do nothing
 					break
 				default:

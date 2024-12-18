@@ -12,6 +12,7 @@ export default function useIsSpeaking(mediaStreamTrack?: MediaStreamTrack) {
 
 	// this effect syncs the state on a 50ms interval
 	useEffect(() => {
+		if (!mediaStreamTrack) return
 		isSpeakingRef.current = isSpeaking
 		const interval = window.setInterval(() => {
 			// state is already in sync — do nothing
@@ -25,7 +26,7 @@ export default function useIsSpeaking(mediaStreamTrack?: MediaStreamTrack) {
 		return () => {
 			clearInterval(interval)
 		}
-	}, [isSpeaking, isSpeakingRef])
+	}, [isSpeaking, isSpeakingRef, mediaStreamTrack])
 
 	useEffect(() => {
 		if (!mediaStreamTrack) return

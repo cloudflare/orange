@@ -4,6 +4,7 @@ import { Flipped } from 'react-flip-toolkit'
 import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
 import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
+import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
 import type { User } from '~/types/Messages'
@@ -23,6 +24,7 @@ import { HoverFade } from './HoverFade'
 import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
 import { OptionalLink } from './OptionalLink'
+import { usePulledAudioTrack } from './PullAudioTracks'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
 
@@ -78,6 +80,13 @@ export const Participant = forwardRef<
 		const { data } = useUserMetadata(user.name)
 		const { traceLink, peer, dataSaverMode } = useRoomContext()
 		const peerConnection = useSubscribedState(peer.peerConnection$)
+		const isAi = user.id === 'ai'
+		const aiAudioTrack = usePulledAudioTrack(
+			isAi ? user.tracks.audio : undefined
+		)
+		const isSpeaking =
+			useIsSpeaking(user.id === 'ai' ? aiAudioTrack : undefined) ||
+			user.speaking
 
 		useDeadPulledTrackMonitor(
 			user.tracks.video,
@@ -153,7 +162,7 @@ export const Participant = forwardRef<
 										</div>
 									) : (
 										<span className="relative grid w-full h-full uppercase rounded-full place-items-center bg-zinc-500">
-											{user.speaking && (
+											{isSpeaking && (
 												<AudioGlow
 													type="text"
 													className="absolute uppercase"
@@ -204,7 +213,7 @@ export const Participant = forwardRef<
 							<div className="absolute left-4 top-4">
 								{user.tracks.audioEnabled &&
 									user.tracks.videoEnabled &&
-									user.speaking && <AudioIndicator audioTrack={audioTrack} />}
+									isSpeaking && <AudioIndicator audioTrack={audioTrack} />}
 
 								{!user.tracks.audioEnabled && !user.tracks.audioUnavailable && (
 									<Tooltip content="Mic is turned off">
@@ -266,7 +275,7 @@ export const Participant = forwardRef<
 								</Tooltip>
 							)}
 						</div>
-						{(user.speaking || user.raisedHand) && (
+						{(isSpeaking || user.raisedHand) && (
 							<div
 								className={cn(
 									'pointer-events-none absolute inset-0 h-full w-full border-4 border-orange-400',

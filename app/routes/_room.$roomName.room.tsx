@@ -1,10 +1,16 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
-import { useLoaderData, useNavigate, useParams } from '@remix-run/react'
+import {
+	useLoaderData,
+	useNavigate,
+	useParams,
+	useSearchParams,
+} from '@remix-run/react'
 import { nanoid } from 'nanoid'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Flipper } from 'react-flip-toolkit'
 import { useMeasure, useMount, useWindowSize } from 'react-use'
+import { AiButton } from '~/components/AiButton'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
@@ -30,7 +36,6 @@ import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import { calculateLayout } from '~/utils/calculateLayout'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
-import { mode } from '~/utils/mode'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -44,6 +49,9 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		),
 		mode: context.mode,
 		hasDb: Boolean(context.env.DB),
+		hasAiCredentials: Boolean(
+			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
+		),
 	})
 }
 
@@ -111,10 +119,12 @@ export default function Room() {
 	const navigate = useNavigate()
 	const { roomName } = useParams()
 	const { mode, bugReportsEnabled } = useLoaderData<typeof loader>()
+	const [search] = useSearchParams()
 
 	useEffect(() => {
-		if (!joined && mode !== 'development') navigate(`/${roomName}`)
-	}, [joined, mode, navigate, roomName])
+		if (!joined && mode !== 'development')
+			navigate(`/${roomName}${search.size > 0 ? '?' + search.toString() : ''}`)
+	}, [joined, mode, navigate, roomName, search])
 
 	if (!joined && mode !== 'development') return null
 
@@ -126,7 +136,7 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb } = useLoaderData<typeof loader>()
+	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		peer,
@@ -157,7 +167,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const speaking = useIsSpeaking(userMedia.audioStreamTrack)
 
 	useMount(() => {
-		if (otherUsers.length > 5 || mode === 'development') {
+		if (otherUsers.length > 5) {
 			userMedia.turnMicOff()
 		}
 	})
@@ -320,6 +330,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 				</Flipper>
 				<div className="flex flex-wrap items-center justify-center gap-2 p-2 text-sm md:gap-4 md:p-5 md:text-base">
 					<GridDebugControls />
+					{hasAiCredentials && <AiButton recordActivity={recordActivity} />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
 					<ScreenshareButton />

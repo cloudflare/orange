@@ -14,7 +14,15 @@ import {
 	type WSMessage,
 } from 'partyserver'
 import { getDb, Meetings } from 'schema'
+import invariant from 'tiny-invariant'
 import { log } from '~/utils/logging'
+import {
+	CallsNewSession,
+	CallsSession,
+	checkNewTracksResponse,
+	requestOpenAIService,
+	type SessionDescription,
+} from '~/utils/openai.server'
 
 const alarmInterval = 15_000
 
@@ -163,11 +171,47 @@ export class ChatRoom extends Server<Env> {
 	async broadcastRoomState() {
 		let didSomeoneQuit = false
 		const meetingId = await this.getMeetingId()
+		const aiEnabled =
+			(await this.ctx.storage.get<boolean>('ai:enabled')) ?? false
+		const aiSessionId =
+			(await this.ctx.storage.get<string>('ai:sessionId')) ?? undefined
+		const aiAudioTrack =
+			(await this.ctx.storage.get<string>('ai:trackName')) ?? undefined
 		const roomState = {
 			type: 'roomState',
 			state: {
+				ai: {
+					enabled: aiEnabled,
+					controllingUser:
+						await this.ctx.storage.get<string>('ai:userControlling'),
+					connectionPending: await this.ctx.storage.get<boolean>(
+						'ai:connectionPending'
+					),
+					error: await this.ctx.storage.get<string>('ai:error'),
+				},
 				meetingId,
-				users: [...(await this.getUsers()).values()],
+				users: [
+					...(await this.getUsers()).values(),
+					...(aiEnabled
+						? [
+								{
+									id: 'ai',
+									name: 'AI',
+									joined: true,
+									raisedHand: false,
+									transceiverSessionId: aiSessionId,
+									speaking: false,
+									tracks: {
+										audioEnabled: true,
+										audio: aiSessionId + '/' + aiAudioTrack,
+										audioUnavailable: false,
+										videoEnabled: false,
+										screenShareEnabled: false,
+									},
+								} satisfies User,
+							]
+						: []),
+				],
 			},
 		} satisfies ServerMessage
 
@@ -317,6 +361,156 @@ export class ChatRoom extends Server<Env> {
 					await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
 					break
 				}
+				case 'disableAi': {
+					await this.ctx.storage
+						.list({
+							prefix: 'ai:',
+						})
+						.then((map) => {
+							for (const key of map.keys()) {
+								this.ctx.storage.delete(key)
+							}
+						})
+					this.broadcastRoomState()
+
+					break
+				}
+				case 'enableAi': {
+					await this.ctx.storage.put('ai:connectionPending', true)
+					await this.ctx.storage.delete('ai:error')
+					this.broadcastRoomState()
+
+					try {
+						// This session establishes a PeerConnection between Calls and OpenAI.
+						// CallsNewSession thirdparty parameter must be true to be able to connect to an external WebRTC server
+						const openAiSession = await CallsNewSession(
+							this.env.CALLS_APP_ID,
+							this.env.CALLS_APP_SECRET,
+							true
+						)
+						const openAiTracksResponse = await openAiSession.NewTracks({
+							// No offer is provided so Calls will generate one for us
+							tracks: [
+								{
+									location: 'local',
+									trackName: 'ai-generated-voice',
+									// Let it know a sendrecv transceiver is wanted to receive this track instead of a recvonly one
+									bidirectionalMediaStream: true,
+									// Needed to create an appropriate response
+									kind: 'audio',
+								},
+							],
+						})
+						checkNewTracksResponse(openAiTracksResponse, true)
+
+						invariant(this.env.OPENAI_MODEL_ENDPOINT)
+						invariant(this.env.OPENAI_API_TOKEN)
+
+						const params = new URLSearchParams()
+						const { voice, instructions } = data
+						if (voice) {
+							params.set('voice', voice)
+						}
+						if (instructions) {
+							params.set('instructions', instructions)
+						}
+
+						// The Calls's offer is sent to OpenAI
+						const openaiAnswer = await requestOpenAIService(
+							openAiTracksResponse.sessionDescription ||
+								({} as SessionDescription),
+							this.env.OPENAI_API_TOKEN,
+							this.env.OPENAI_MODEL_ENDPOINT,
+							params
+						)
+
+						console.log('OpenAI answer', openaiAnswer)
+
+						// And the negotiation is completed by setting the answer from OpenAI
+						const renegotiationResponse =
+							await openAiSession.Renegotiate(openaiAnswer)
+						console.log('renegotiationResponse', renegotiationResponse)
+
+						console.log('set ai:sessionId', openAiSession.sessionId)
+						await this.ctx.storage.put('ai:sessionId', openAiSession.sessionId)
+						await this.ctx.storage.put(
+							'ai:trackName',
+							openAiTracksResponse.tracks[0].trackName
+						)
+						await this.ctx.storage.put('ai:enabled', true)
+						await this.ctx.storage.put('ai:connectionPending', false)
+						this.broadcastRoomState()
+
+						break
+					} catch (error) {
+						console.error(error)
+						await this.ctx.storage.put('ai:connectionPending', false)
+						await this.ctx.storage.put(
+							'ai:error',
+							'Error establishing connection with AI'
+						)
+						this.broadcastRoomState()
+						break
+					}
+				}
+				case 'requestAiControl': {
+					const userControllingPending = await this.ctx.storage.get<string>(
+						'ai:userControlling:pending'
+					)
+					if (userControllingPending) {
+						break
+					}
+					await this.ctx.storage.put(
+						'ai:userControlling:pending',
+						connection.id
+					)
+					try {
+						const aiSessionId =
+							await this.ctx.storage.get<string>('ai:sessionId')
+						invariant(aiSessionId)
+						const openAiSession = new CallsSession(
+							aiSessionId,
+							{
+								Authorization: `Bearer ${this.env.CALLS_APP_SECRET}`,
+								'Content-Type': 'application/json',
+							},
+							`https://rtc.live.cloudflare.com/apps/${this.env.CALLS_APP_ID}`
+						)
+
+						const { track } = data
+
+						console.log('starting exchangeStepTwo, pulling', {
+							session: track.sessionId,
+							trackName: track.trackName,
+						})
+						const exchangeStepTwo = await openAiSession.NewTracks({
+							tracks: [
+								{
+									location: 'remote',
+									sessionId: track.sessionId,
+									trackName: track.trackName,
+									// Let Calls to find out the actual mid value
+									mid: `#ai-generated-voice`,
+								},
+							],
+						})
+
+						console.log('exchangeStepTwo result', exchangeStepTwo)
+						checkNewTracksResponse(exchangeStepTwo)
+
+						await this.ctx.storage.put('ai:userControlling', connection.id)
+						this.broadcastRoomState()
+					} finally {
+						await this.ctx.storage.delete('ai:userControlling:pending')
+					}
+					break
+				}
+				case 'relenquishAiControl': {
+					await this.ctx.storage.delete('ai:userControlling:pending')
+					this.ctx.storage.delete('ai:userControlling')
+					this.broadcastRoomState()
+					break
+				}
 				default: {
 					assertNever(data)
 					break
@@ -365,7 +559,6 @@ export class ChatRoom extends Server<Env> {
 
 	async endMeeting(meetingId: string) {
 		log({ eventName: 'endingMeeting', meetingId })
-		await this.ctx.storage.delete('meetingId')
 		if (this.db) {
 			// stamp meeting as ended
 			await this.db
@@ -375,6 +568,7 @@ export class ChatRoom extends Server<Env> {
 				})
 				.where(eq(Meetings.id, meetingId))
 		}
+		await this.ctx.storage.deleteAll()
 	}
 
 	async cleanupOldConnections() {
