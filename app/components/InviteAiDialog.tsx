@@ -5,6 +5,17 @@ import type { ClientMessage } from '~/types/Messages'
 import { Button } from './Button'
 import { Dialog, DialogContent, DialogOverlay, Portal } from './Dialog'
 
+const aiVoices = [
+	'Alloy',
+	'Ash',
+	'Ballad',
+	'Coral',
+	'Echo',
+	'Sage',
+	'Shimmer',
+	'Verse',
+]
+
 export function InviteAiDialog(props: { children?: ReactNode }) {
 	const [open, setOpen] = useState(false)
 
@@ -70,8 +81,11 @@ export function InviteAiDialog(props: { children?: ReactNode }) {
 									name="voice"
 									defaultValue={voice ?? 'ash'}
 								>
-									<option value="ash">Ash</option>
-									<option value="ballad">Ballad</option>
+									{aiVoices.map((voice) => (
+										<option key={voice} value={voice.toLowerCase()}>
+											{voice}
+										</option>
+									))}
 								</select>
 							</div>
 						</div>
