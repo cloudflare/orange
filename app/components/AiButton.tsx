@@ -17,8 +17,8 @@ function RemoveAiButton() {
 					JSON.stringify({ type: 'disableAi' } satisfies ClientMessage)
 				)
 			}
-			className="text-xs text-zinc-800"
-			displayType="ghost"
+			className="text-xs"
+			displayType="secondary"
 		>
 			Remove AI
 		</Button>
