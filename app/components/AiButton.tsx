@@ -1,8 +1,9 @@
-import { useSearchParams } from '@remix-run/react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import type { ClientMessage, User } from '~/types/Messages'
 import { AiPushToTalkButtion } from './AiPushToTalkButton'
 import { Button } from './Button'
+import { Trigger } from './Dialog'
+import { InviteAiDialog } from './InviteAiDialog'
 import { RecordAiVoiceActivity } from './RecordAiVoiceActivity'
 
 function RemoveAiButton() {
@@ -16,7 +17,7 @@ function RemoveAiButton() {
 					JSON.stringify({ type: 'disableAi' } satisfies ClientMessage)
 				)
 			}
-			className="text-xs"
+			className="text-xs text-zinc-800"
 			displayType="ghost"
 		>
 			Remove AI
@@ -27,7 +28,6 @@ function RemoveAiButton() {
 export function AiButton(props: { recordActivity: (user: User) => void }) {
 	const {
 		room: {
-			websocket,
 			roomState: {
 				ai: { connectionPending, error },
 				users,
@@ -36,9 +36,6 @@ export function AiButton(props: { recordActivity: (user: User) => void }) {
 	} = useRoomContext()
 
 	const aiUser = users.find((u) => u.id === 'ai')
-	const [params] = useSearchParams()
-	const voice = params.get('voice') ?? undefined
-	const instructions = params.get('instructions') ?? undefined
 
 	return (
 		<>
@@ -53,21 +50,16 @@ export function AiButton(props: { recordActivity: (user: User) => void }) {
 					/>
 				</>
 			) : (
-				<Button
-					onClick={() =>
-						websocket.send(
-							JSON.stringify({
-								type: 'enableAi',
-								voice,
-								instructions,
-							} satisfies ClientMessage)
-						)
-					}
-					className="text-xs flex items-center gap-2"
-					disabled={connectionPending}
-				>
-					<span>Invite AI</span>
-				</Button>
+				<InviteAiDialog>
+					<Trigger asChild>
+						<Button
+							className="text-xs flex items-center gap-2"
+							disabled={connectionPending}
+						>
+							<span>Invite AI</span>
+						</Button>
+					</Trigger>
+				</InviteAiDialog>
 			)}
 		</>
 	)
