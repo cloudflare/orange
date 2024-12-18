@@ -126,7 +126,11 @@ export function AiPushToTalkButtion() {
 	}, [controllingUser])
 
 	return (
-		<Button className="text-xs" disabled={disabled} ref={talkButtonRef}>
+		<Button
+			className="text-xs select-none"
+			disabled={disabled}
+			ref={talkButtonRef}
+		>
 			{hasControl ? 'Speaking to Ai...' : 'Hold to talk to AI'}
 		</Button>
 	)
