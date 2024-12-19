@@ -25,14 +25,25 @@ export class CallsSession {
 	sessionId: string
 	headers: any
 	endpoint: string
-	constructor(sessionId: string, headers: any, endpoint: string) {
+	params: URLSearchParams
+	constructor(
+		sessionId: string,
+		headers: any,
+		endpoint: string,
+		apiExtraParams?: string,
+		meetingId?: string
+	) {
 		this.sessionId = sessionId
 		this.headers = headers
 		this.endpoint = endpoint
+		this.params = new URLSearchParams(apiExtraParams)
+		if (meetingId) {
+			this.params.set('correlationId', meetingId)
+		}
 	}
 	async NewTracks(body: any): Promise<NewTracksResponse> {
 		const newTracksURL = new URL(
-			`${this.endpoint}/sessions/${this.sessionId}/tracks/new?streamDebug&forceTracing=true`
+			`${this.endpoint}/sessions/${this.sessionId}/tracks/new?${this.params.toString()}`
 		)
 		const newTracksResponse = (await fetch(newTracksURL.href, {
 			method: 'POST',
@@ -49,7 +60,7 @@ export class CallsSession {
 			sessionDescription: sdp,
 		}
 		const renegotiateURL = new URL(
-			`${this.endpoint}/sessions/${this.sessionId}/renegotiate?streamDebug&forceTracing=true`
+			`${this.endpoint}/sessions/${this.sessionId}/renegotiate?${this.params.toString()}`
 		)
 		return fetch(renegotiateURL.href, {
 			method: 'PUT',
@@ -64,16 +75,20 @@ const baseURL = 'https://rtc.live.cloudflare.com/apps'
 export async function CallsNewSession(
 	appID: string,
 	appToken: string,
-	thirdparty: boolean = false
+	apiExtraParams?: string,
+	meetingId?: string,
+	thirdparty = false
 ): Promise<CallsSession> {
 	const headers = {
 		Authorization: `Bearer ${appToken}`,
 		'Content-Type': 'application/json',
 	}
 	const endpoint = `${baseURL}/${appID}`
-	const newSessionURL = new URL(
-		`${endpoint}/sessions/new?streamDebug&forceTracing=true`
-	)
+	const params = new URLSearchParams(apiExtraParams)
+	if (meetingId) {
+		params.set('correlationId', meetingId)
+	}
+	const newSessionURL = new URL(`${endpoint}/sessions/new?${params.toString()}`)
 	if (thirdparty) {
 		newSessionURL.searchParams.set('thirdparty', 'true')
 	}
@@ -89,7 +104,13 @@ export async function CallsNewSession(
 		})
 
 		.then((res) => res.json())) as NewSessionResponse
-	return new CallsSession(sessionResponse.sessionId, headers, endpoint)
+	return new CallsSession(
+		sessionResponse.sessionId,
+		headers,
+		endpoint,
+		apiExtraParams,
+		meetingId
+	)
 }
 
 export function checkNewTracksResponse(
@@ -114,10 +135,8 @@ export async function requestOpenAIService(
 	offer: SessionDescription,
 	openAiKey: string,
 	openAiModelEndpoint: string,
-	// env: Env,
 	searchParams?: URLSearchParams
 ): Promise<SessionDescription> {
-	// const originalRequestURL = new URL(originalRequest.url)
 	console.log(`Request to: ${openAiModelEndpoint}`)
 	const endpointURL = new URL(openAiModelEndpoint)
 	endpointURL.search = searchParams?.toString() ?? ''
