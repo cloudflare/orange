@@ -386,6 +386,8 @@ export class ChatRoom extends Server<Env> {
 						const openAiSession = await CallsNewSession(
 							this.env.CALLS_APP_ID,
 							this.env.CALLS_APP_SECRET,
+							this.env.API_EXTRA_PARAMS,
+							await this.getMeetingId(),
 							true
 						)
 						const openAiTracksResponse = await openAiSession.NewTracks({
