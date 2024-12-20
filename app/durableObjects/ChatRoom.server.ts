@@ -25,6 +25,7 @@ import {
 } from '~/utils/openai.server'
 
 const alarmInterval = 15_000
+const defaultOpenAIModelID = 'gpt-4o-realtime-preview-2024-10-01'
 
 /**
  * The ChatRoom Durable Object Class
@@ -414,6 +415,8 @@ export class ChatRoom extends Server<Env> {
 						if (instructions) {
 							params.set('instructions', instructions)
 						}
+
+						params.set('model', this.env.OPENAI_MODEL_ID || defaultOpenAIModelID)
 
 						// The Calls's offer is sent to OpenAI
 						const openaiAnswer = await requestOpenAIService(
