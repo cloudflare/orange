@@ -25,7 +25,8 @@ import {
 } from '~/utils/openai.server'
 
 const alarmInterval = 15_000
-const defaultOpenAIModelID = 'gpt-4o-realtime-preview-2024-10-01'
+const defaultOpenAIModelID = 'gpt-4o-realtime-preview-2024-12-17'
+const defaultOpenAIModelEndpoint = 'https://api.openai.com/v1/realtime'
 
 /**
  * The ChatRoom Durable Object Class
@@ -408,6 +409,8 @@ export class ChatRoom extends Server<Env> {
 
 						invariant(this.env.OPENAI_MODEL_ENDPOINT)
 						invariant(this.env.OPENAI_API_TOKEN)
+						const modelEndpoint =
+							this.env.OPENAI_MODEL_ENDPOINT || defaultOpenAIModelEndpoint
 
 						const params = new URLSearchParams()
 						const { voice, instructions } = data
@@ -418,14 +421,17 @@ export class ChatRoom extends Server<Env> {
 							params.set('instructions', instructions)
 						}
 
-						params.set('model', this.env.OPENAI_MODEL_ID || defaultOpenAIModelID)
+						params.set(
+							'model',
+							this.env.OPENAI_MODEL_ID || defaultOpenAIModelID
+						)
 
 						// The Calls's offer is sent to OpenAI
 						const openaiAnswer = await requestOpenAIService(
 							openAiTracksResponse.sessionDescription ||
 								({} as SessionDescription),
 							this.env.OPENAI_API_TOKEN,
-							this.env.OPENAI_MODEL_ENDPOINT,
+							modelEndpoint,
 							params
 						)
 

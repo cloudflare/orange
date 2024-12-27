@@ -66,6 +66,28 @@ echo REPLACE_WITH_YOUR_SECRET | wrangler secret put CALLS_APP_SECRET
 
 4. Optionally, you can also use [Cloudflare's TURN Service](https://developers.cloudflare.com/calls/turn/) by setting the `TURN_SERVICE_ID` variable in `wrangler.toml` and `TURN_SERVICE_TOKEN` secret using `wrangler secret put TURN_SERVICE_TOKEN`
 
+# Orange Meets
+
+...existing code...
+
+## Configuration
+
+### OpenAI Integration
+
+To enable AI features, you need to configure the following secrets using wrangler:
+
+```sh
+# Set OpenAI API token i.e your API_KEY
+wrangler secret put OPENAI_API_TOKEN
+
+# Set OpenAI model endpoint (default: https://api.openai.com/v1/realtime)
+wrangler secret put OPENAI_MODEL_ENDPOINT
+
+# Set OpenAI model ID (default: gpt-4o-realtime-preview-2024-12-17)
+wrangler secret put OPENAI_MODEL_ID
+
+```
+
 5. Finally you can run the following to deploy
 
 ```sh

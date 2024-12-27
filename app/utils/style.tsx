@@ -1,25 +1,33 @@
-import { clsx, type ClassValue } from 'clsx'
-import type { ComponentType } from 'react'
-import { forwardRef } from 'react'
+import clsx, { type ClassValue } from 'clsx'
+import { forwardRef, type ComponentType, type ForwardedRef } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-export const cn = (...classValues: ClassValue[]) =>
-	twMerge(clsx(...classValues))
+/** Merges class names and handles conditional objects */
+export function cn(...classes: ClassValue[]): string {
+	return twMerge(clsx(...classes))
+}
 
-export function style<Props extends { className?: string }, T>(
-	Component: ComponentType<Props>,
-	...styles: ClassValue[]
+type WithClassName = {
+	className?: string
+}
+
+export function style<P extends object & WithClassName>(
+	Component: ComponentType<P>,
+	defaultClassName?: string
 ) {
-	const StyledComponent = forwardRef<T, Props>((props, ref) => (
-		<Component
-			ref={ref}
-			{...props}
-			className={cn(...styles, props.className)}
-		/>
-	))
-	StyledComponent.displayName = `styled(${
-		Component.displayName ?? Component.name
-	})`
+	const StyledComponent = forwardRef<unknown, P>(
+		(props, ref: ForwardedRef<unknown>) => {
+			const { className, ...rest } = props
+			return (
+				<Component
+					ref={ref}
+					{...(rest as P)}
+					className={twMerge(defaultClassName, className)}
+				/>
+			)
+		}
+	)
 
+	StyledComponent.displayName = `Styled(${Component.displayName || Component.name || 'Component'})`
 	return StyledComponent
 }
