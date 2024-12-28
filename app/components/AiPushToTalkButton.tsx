@@ -34,12 +34,14 @@ function useButtonIsHeldDown({
 
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key.toLowerCase() === key.toLowerCase()) {
+				e.preventDefault()
 				setTrue()
 			}
 		}
 
 		const onKeyUp = (e: KeyboardEvent) => {
 			if (e.key.toLowerCase() === key.toLowerCase()) {
+				e.preventDefault()
 				setFalse()
 			}
 		}
@@ -77,7 +79,7 @@ export function AiPushToTalkButtion() {
 	const hasControl = controllingUser === websocket.id
 	const disabled = !hasControl && controllingUser !== undefined
 	const [holdingTalkButton, talkButtonRef] = useButtonIsHeldDown({
-		key: 'a',
+		key: ' ',
 		disabled,
 	})
 
