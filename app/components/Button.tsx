@@ -31,7 +31,7 @@ export type ButtonProps = Omit<JSX.IntrinsicElements['button'], 'ref'> & {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-	({ className, displayType = 'primary', disabled, ...rest }, ref) => (
+	({ className, displayType = 'primary', disabled, onClick, ...rest }, ref) => (
 		<button
 			className={cn(
 				'border-4',
@@ -44,7 +44,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 				displayTypeMap[displayType].join(' '),
 				className
 			)}
-			disabled={disabled}
+			aria-disabled={disabled}
+			onClick={disabled ? (e) => e.preventDefault() : onClick}
 			{...rest}
 			ref={ref}
 		/>

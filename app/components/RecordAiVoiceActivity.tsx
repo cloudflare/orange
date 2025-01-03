@@ -11,7 +11,6 @@ export function RecordAiVoiceActivity(props: {
 	const isSpeaking = useIsSpeaking(audioTrack)
 
 	useEffect(() => {
-		console.log(props.recordActivity)
 		if (isSpeaking) {
 			props.recordActivity(props.user)
 		}

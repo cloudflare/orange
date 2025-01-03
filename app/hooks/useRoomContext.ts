@@ -11,6 +11,10 @@ export type RoomContextType = {
 	userDirectoryUrl?: string
 	joined: boolean
 	setJoined: Dispatch<SetStateAction<boolean>>
+	pinnedTileIds: string[]
+	setPinnedTileIds: Dispatch<SetStateAction<string[]>>
+	showDebugInfo: boolean
+	setShowDebugInfo: Dispatch<SetStateAction<boolean>>
 	dataSaverMode: boolean
 	setDataSaverMode: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
