@@ -288,4 +288,4 @@ export const Participant = forwardRef<
 	)
 })
 
-Participant.displayName = 'CallGridChild'
+Participant.displayName = 'Participant'
