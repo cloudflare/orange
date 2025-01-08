@@ -15,7 +15,7 @@ const displayTypeMap = {
 		'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600',
 	],
 	ghost: [
-		'text-white dark:text-zinc-800 hover:text-zinc-900',
+		'text-white hover:text-zinc-900',
 		'bg-transparent hover:bg-white',
 		'border-transparent hover:border-white',
 	],
