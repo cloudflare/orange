@@ -79,7 +79,7 @@ export const Participant = forwardRef<
 		isScreenShare ? undefined : user.tracks.audio
 	)
 	const pulledVideoTrack = usePulledVideoTrack(
-		!isScreenShare && dataSaverMode ? undefined : user.tracks.video
+		isSelf || (!isScreenShare && dataSaverMode) ? undefined : user.tracks.video
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
