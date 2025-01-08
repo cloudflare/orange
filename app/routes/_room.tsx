@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
+import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useMemo, useState } from 'react'
 import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
@@ -8,7 +9,6 @@ import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
 import { Icon } from '~/components/Icon/Icon'
 import { Spinner } from '~/components/Spinner'
-import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
@@ -140,13 +140,13 @@ function Room({ room, userMedia }: RoomProps) {
 	invariant(room.roomState.meetingId, 'Meeting ID cannot be missing')
 	params.set('correlationId', room.roomState.meetingId)
 
-	const { peer, iceConnectionState } = usePeerConnection({
+	const { partyTracks, iceConnectionState } = usePeerConnection({
 		maxApiHistory,
 		apiExtraParams: params.toString(),
 		iceServers,
 		apiBase: '/api/calls',
 	})
-	const roomHistory = useRoomHistory(peer, room)
+	const roomHistory = useRoomHistory(partyTracks, room)
 
 	const scaleResolutionDownBy = useMemo(() => {
 		const videoStreamTrack = userMedia.videoStreamTrack
@@ -164,17 +164,17 @@ function Room({ room, userMedia }: RoomProps) {
 		},
 	])
 	const videoTrackEncodingParams$ =
-		useStateObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
+		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
-		() => peer.pushTrack(userMedia.videoTrack$, videoTrackEncodingParams$),
-		[peer, userMedia.videoTrack$, videoTrackEncodingParams$]
+		() => partyTracks.push(userMedia.videoTrack$, videoTrackEncodingParams$),
+		[partyTracks, userMedia.videoTrack$, videoTrackEncodingParams$]
 	)
 
-	const pushedVideoTrack = useSubscribedState(pushedVideoTrack$)
+	const pushedVideoTrack = useObservableAsValue(pushedVideoTrack$)
 
 	const pushedAudioTrack$ = useMemo(
 		() =>
-			peer.pushTrack(
+			partyTracks.push(
 				userMedia.publicAudioTrack$,
 				of<RTCRtpEncodingParameters[]>([
 					{
@@ -182,18 +182,20 @@ function Room({ room, userMedia }: RoomProps) {
 					},
 				])
 			),
-		[peer, userMedia.publicAudioTrack$]
+		[partyTracks, userMedia.publicAudioTrack$]
 	)
-	const pushedAudioTrack = useSubscribedState(pushedAudioTrack$)
+	const pushedAudioTrack = useObservableAsValue(pushedAudioTrack$)
 
 	const pushedScreenSharingTrack$ = useMemo(() => {
 		return userMedia.screenShareVideoTrack$.pipe(
 			switchMap((track) =>
-				track ? from(peer.pushTrack(of(track))) : of(undefined)
+				track ? from(partyTracks.push(of(track))) : of(undefined)
 			)
 		)
-	}, [peer, userMedia.screenShareVideoTrack$])
-	const pushedScreenSharingTrack = useSubscribedState(pushedScreenSharingTrack$)
+	}, [partyTracks, userMedia.screenShareVideoTrack$])
+	const pushedScreenSharingTrack = useObservableAsValue(
+		pushedScreenSharingTrack$
+	)
 	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
 	const [showDebugInfo, setShowDebugInfo] = useState(false)
 
@@ -210,7 +212,7 @@ function Room({ room, userMedia }: RoomProps) {
 		userMedia,
 		userDirectoryUrl,
 		feedbackEnabled,
-		peer,
+		partyTracks: partyTracks,
 		roomHistory,
 		iceConnectionState,
 		room,

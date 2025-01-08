@@ -1,3 +1,4 @@
+import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useCallback, useMemo, useState } from 'react'
 import { useLocalStorage } from 'react-use'
 import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
@@ -9,7 +10,6 @@ import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization
 import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
 import { mutedAudioTrack$ } from '~/utils/rxjs/mutedAudioTrack$'
-import { useStateObservable, useSubscribedState } from './rxjsHooks'
 
 export const errorMessageMap = {
 	NotAllowedError:
@@ -44,8 +44,8 @@ export default function useUserMedia() {
 	const startScreenShare = useCallback(() => setScreenShareEnabled(true), [])
 	const endScreenShare = useCallback(() => setScreenShareEnabled(false), [])
 
-	const blurVideo$ = useStateObservable(blurVideo)
-	const videoEnabled$ = useStateObservable(videoEnabled)
+	const blurVideo$ = useValueAsObservable(blurVideo)
+	const videoEnabled$ = useValueAsObservable(videoEnabled)
 	const videoTrack$ = useMemo(
 		() =>
 			combineLatest([
@@ -83,10 +83,10 @@ export default function useUserMedia() {
 			),
 		[videoEnabled$, blurVideo$]
 	)
-	const videoTrack = useSubscribedState(videoTrack$)
+	const videoTrack = useObservableAsValue(videoTrack$)
 	const videoDeviceId = videoTrack?.getSettings().deviceId
 
-	const suppressNoiseEnabled$ = useStateObservable(suppressNoise)
+	const suppressNoiseEnabled$ = useValueAsObservable(suppressNoise)
 	const audioTrack$ = useMemo(() => {
 		return combineLatest([
 			getUserMediaTrack$('audioinput').pipe(
@@ -117,9 +117,9 @@ export default function useUserMedia() {
 		)
 	}, [suppressNoiseEnabled$])
 
-	const alwaysOnAudioStreamTrack = useSubscribedState(audioTrack$)
+	const alwaysOnAudioStreamTrack = useObservableAsValue(audioTrack$)
 	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId
-	const audioEnabled$ = useStateObservable(audioEnabled)
+	const audioEnabled$ = useValueAsObservable(audioEnabled)
 	const publicAudioTrack$ = useMemo(
 		() =>
 			audioEnabled$.pipe(
@@ -131,7 +131,7 @@ export default function useUserMedia() {
 			),
 		[audioEnabled$, audioTrack$]
 	)
-	const audioStreamTrack = useSubscribedState(publicAudioTrack$)
+	const audioStreamTrack = useObservableAsValue(publicAudioTrack$)
 
 	const screenShareVideoTrack$ = useMemo(
 		() =>
@@ -150,7 +150,7 @@ export default function useUserMedia() {
 				: of(undefined),
 		[screenShareEnabled]
 	)
-	const screenShareVideoTrack = useSubscribedState(screenShareVideoTrack$)
+	const screenShareVideoTrack = useObservableAsValue(screenShareVideoTrack$)
 
 	const setVideoDeviceId = (deviceId: string) =>
 		navigator.mediaDevices.enumerateDevices().then((devices) => {

@@ -1,5 +1,5 @@
+import { useObservableAsValue } from 'partytracks/react'
 import { useMemo, type FC } from 'react'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import useMediaDevices from '~/hooks/useMediaDevices'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { errorMessageMap } from '~/hooks/useUserMedia'
@@ -12,7 +12,7 @@ export const VideoInputSelector: FC<{ id?: string }> = ({ id }) => {
 		() => getSortedDeviceListObservable(),
 		[]
 	)
-	const sortedDeviceList = useSubscribedState(sortedDeviceListObservable$, [])
+	const sortedDeviceList = useObservableAsValue(sortedDeviceListObservable$, [])
 
 	const {
 		userMedia: {

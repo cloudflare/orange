@@ -3,14 +3,14 @@ import { useUnmount } from 'react-use'
 import type { ClientMessage, User } from '~/types/Messages'
 
 import type PartySocket from 'partysocket'
-import type { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
-import { useSubscribedState } from './rxjsHooks'
+import type { PartyTracks } from 'partytracks/client'
+import { useObservableAsValue } from 'partytracks/react'
 import type { RoomContextType } from './useRoomContext'
 import type { UserMedia } from './useUserMedia'
 
 interface Config {
 	userMedia: UserMedia
-	peer: RxjsPeer
+	partyTracks: PartyTracks
 	identity?: User
 	websocket: PartySocket
 	pushedTracks: RoomContextType['pushedTracks']
@@ -22,7 +22,7 @@ export default function useBroadcastStatus({
 	userMedia,
 	identity,
 	websocket,
-	peer,
+	partyTracks,
 	pushedTracks,
 	raisedHand,
 	speaking,
@@ -34,7 +34,7 @@ export default function useBroadcastStatus({
 		audioUnavailableReason,
 	} = userMedia
 	const { audio, video, screenshare } = pushedTracks
-	const { sessionId } = useSubscribedState(peer.session$) ?? {}
+	const { sessionId } = useObservableAsValue(partyTracks.session$) ?? {}
 	const audioUnavailable = audioUnavailableReason !== undefined
 
 	const id = identity?.id

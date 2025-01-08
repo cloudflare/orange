@@ -1,8 +1,8 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
+import { useObservableAsValue } from 'partytracks/react'
 import { forwardRef, useEffect, useMemo } from 'react'
 import { Flipped } from 'react-flip-toolkit'
 import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -30,18 +30,18 @@ import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
 
 function useMid(track?: MediaStreamTrack) {
-	const { peer } = useRoomContext()
+	const { partyTracks } = useRoomContext()
 	const transceivers$ = useMemo(
 		() =>
 			combineLatest([
-				peer.peerConnection$,
-				peer.peerConnection$.pipe(
+				partyTracks.peerConnection$,
+				partyTracks.peerConnection$.pipe(
 					switchMap((peerConnection) => fromEvent(peerConnection, 'track'))
 				),
 			]).pipe(map(([pc]) => pc.getTransceivers())),
-		[peer.peerConnection$]
+		[partyTracks.peerConnection$]
 	)
-	const transceivers = useSubscribedState(transceivers$, [])
+	const transceivers = useObservableAsValue(transceivers$, [])
 	if (!track) return null
 	return transceivers.find(
 		(t) => t.sender.track === track || t.receiver.track === track
@@ -59,7 +59,7 @@ export const Participant = forwardRef<
 	const { data } = useUserMetadata(user.name)
 	const {
 		traceLink,
-		peer,
+		partyTracks,
 		dataSaverMode,
 		pinnedTileIds,
 		setPinnedTileIds,
@@ -67,7 +67,7 @@ export const Participant = forwardRef<
 		userMedia,
 		room: { identity },
 	} = useRoomContext()
-	const peerConnection = useSubscribedState(peer.peerConnection$)
+	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
 	const id = user.id
 	const isSelf = identity && id.startsWith(identity.id)
 	const isScreenShare = id.endsWith(screenshareSuffix)
@@ -112,13 +112,13 @@ export const Participant = forwardRef<
 	const packetLoss$ = useMemo(
 		() =>
 			getPacketLoss$(
-				peer.peerConnection$,
+				partyTracks.peerConnection$,
 				of([audioTrack, videoTrack].filter(isNonNullable))
 			).pipe(ewma(5000)),
-		[audioTrack, peer.peerConnection$, videoTrack]
+		[audioTrack, partyTracks.peerConnection$, videoTrack]
 	)
 
-	const packetLoss = useSubscribedState(packetLoss$, 0)
+	const packetLoss = useObservableAsValue(packetLoss$, 0)
 
 	const audioMid = useMid(audioTrack)
 	const videoMid = useMid(videoTrack)

@@ -2,6 +2,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { useNavigate, useParams, useSearchParams } from '@remix-run/react'
+import { useObservableAsValue } from 'partytracks/react'
 import invariant from 'tiny-invariant'
 import { AudioIndicator } from '~/components/AudioIndicator'
 import { Button } from '~/components/Button'
@@ -15,10 +16,8 @@ import { SelfView } from '~/components/SelfView'
 import { SettingsButton } from '~/components/SettingsDialog'
 import { Spinner } from '~/components/Spinner'
 import { Tooltip } from '~/components/Tooltip'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useRoomUrl } from '~/hooks/useRoomUrl'
-import { errorMessageMap } from '~/hooks/useUserMedia'
 import getUsername from '~/utils/getUsername.server'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
@@ -49,19 +48,15 @@ function trackRefreshes() {
 export default function Lobby() {
 	const { roomName } = useParams()
 	const navigate = useNavigate()
-	const { setJoined, userMedia, room, peer } = useRoomContext()
+	const { setJoined, userMedia, room, partyTracks } = useRoomContext()
 	const { videoStreamTrack, audioStreamTrack, audioEnabled } = userMedia
-	const session = useSubscribedState(peer.session$)
-	const sessionError = useSubscribedState(peer.sessionError$)
+	const session = useObservableAsValue(partyTracks.session$)
+	const sessionError = useObservableAsValue(partyTracks.sessionError$)
 	trackRefreshes()
 
 	const joinedUsers = new Set(
 		room.otherUsers.filter((u) => u.tracks.audio).map((u) => u.name)
 	).size
-
-	const audioUnavailableMessage = userMedia.audioUnavailableReason
-		? errorMessageMap[userMedia.audioUnavailableReason]
-		: null
 
 	const roomUrl = useRoomUrl()
 

@@ -1,7 +1,7 @@
+import { useObservableAsValue } from 'partytracks/react'
 import { useEffect, useRef, useState } from 'react'
 import type { DeadTrackInfo } from '~/routes/api.deadTrack'
 import populateTraceLink from '~/utils/populateTraceLink'
-import { useSubscribedState } from './rxjsHooks'
 import { useRoomContext } from './useRoomContext'
 
 export function useDeadPulledTrackMonitor(
@@ -12,8 +12,8 @@ export function useDeadPulledTrackMonitor(
 	name?: string
 ) {
 	const [deadTrack, setDeadTrack] = useState(false)
-	const { peer, traceLink, room, feedbackEnabled } = useRoomContext()
-	const peerConnection = useSubscribedState(peer.peerConnection$)
+	const { partyTracks, traceLink, room, feedbackEnabled } = useRoomContext()
+	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
 	const timeoutRef = useRef(-1)
 
 	useEffect(() => {
@@ -37,7 +37,7 @@ export function useDeadPulledTrackMonitor(
 			// reset this to -1 for the check above
 			timeoutRef.current = -1
 		}
-	}, [deadTrack, enabled, feedbackEnabled, peer, peerConnection, track])
+	}, [deadTrack, enabled, feedbackEnabled, partyTracks, peerConnection, track])
 
 	useEffect(() => {
 		if (!sessionId || !deadTrack || !feedbackEnabled) return

@@ -1,7 +1,7 @@
 import { useOutletContext } from '@remix-run/react'
+import type { PartyTracks } from 'partytracks/client'
 import type { Dispatch, SetStateAction } from 'react'
 import type { UserMedia } from '~/hooks/useUserMedia'
-import type { RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
 import type useRoom from './useRoom'
 import type { useRoomHistory } from './useRoomHistory'
 
@@ -18,7 +18,7 @@ export type RoomContextType = {
 	dataSaverMode: boolean
 	setDataSaverMode: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
-	peer: RxjsPeer
+	partyTracks: PartyTracks
 	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>

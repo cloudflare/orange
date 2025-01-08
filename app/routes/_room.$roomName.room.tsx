@@ -75,7 +75,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
-		peer,
+		partyTracks,
 		pushedTracks,
 		showDebugInfo,
 		pinnedTileIds,
@@ -100,7 +100,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 
 	useBroadcastStatus({
 		userMedia,
-		peer,
+		partyTracks: partyTracks,
 		websocket,
 		identity,
 		pushedTracks,

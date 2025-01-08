@@ -1,12 +1,15 @@
+import { PartyTracks, type PartyTracksConfig } from 'partytracks/client'
+import { useObservableAsValue } from 'partytracks/react'
 import { useEffect, useMemo, useState } from 'react'
-import { RxjsPeer, type PeerConfig } from '~/utils/rxjs/RxjsPeer.client'
-import { useSubscribedState } from './rxjsHooks'
 import { useStablePojo } from './useStablePojo'
 
-export const usePeerConnection = (config: PeerConfig) => {
+export const usePeerConnection = (config: PartyTracksConfig) => {
 	const stableConfig = useStablePojo(config)
-	const peer = useMemo(() => new RxjsPeer(stableConfig), [stableConfig])
-	const peerConnection = useSubscribedState(peer.peerConnection$)
+	const partyTracks = useMemo(
+		() => new PartyTracks(stableConfig),
+		[stableConfig]
+	)
+	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
 
 	const [iceConnectionState, setIceConnectionState] =
 		useState<RTCIceConnectionState>('new')
@@ -30,7 +33,7 @@ export const usePeerConnection = (config: PeerConfig) => {
 	}, [peerConnection])
 
 	return {
-		peer,
+		partyTracks,
 		iceConnectionState,
 	}
 }

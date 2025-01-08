@@ -1,11 +1,11 @@
+import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useMemo } from 'react'
 import { of, switchMap } from 'rxjs'
-import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import type { TrackObject } from '~/utils/callsTypes'
 
 export function usePulledVideoTrack(video: string | undefined) {
-	const { peer } = useRoomContext()
+	const { partyTracks } = useRoomContext()
 
 	const [sessionId, trackName] = video?.split('/') ?? []
 	const trackObject = useMemo(
@@ -20,15 +20,15 @@ export function usePulledVideoTrack(video: string | undefined) {
 		[sessionId, trackName]
 	)
 
-	const trackObject$ = useStateObservable(trackObject)
+	const trackObject$ = useValueAsObservable(trackObject)
 	const pulledTrack$ = useMemo(
 		() =>
 			trackObject$.pipe(
 				switchMap((track) =>
-					track ? peer.pullTrack(of(track)) : of(undefined)
+					track ? partyTracks.pull(of(track)) : of(undefined)
 				)
 			),
-		[peer, trackObject$]
+		[partyTracks, trackObject$]
 	)
-	return useSubscribedState(pulledTrack$)
+	return useObservableAsValue(pulledTrack$)
 }
