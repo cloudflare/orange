@@ -152,6 +152,9 @@ pub async fn processEvent(event: Object) -> JsValue {
         sender_id,
     }) = ret
     {
+        // The ordering of our objects is as follows: safety number, key package, welcome, add/remove
+        // Within add/remove, it is always add, then remove, since it is the order of their creation
+
         // Make the safety number object if a new safety number is given
         if let Some(sn) = new_safety_number {
             let (o, buffers) = make_obj_and_save_buffers("newSafetyNumber", &[("hash", &sn)]);
@@ -241,7 +244,6 @@ async fn process_stream<F>(
 
         // Process the frame data
         let frame_data = get_frame_data(&frame);
-        let chunk_len = frame_data.len();
         let new_frame_data = f(&frame_data);
 
         // Set the new frame data value
