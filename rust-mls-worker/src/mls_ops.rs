@@ -231,17 +231,25 @@ impl WorkerState {
             panic!("expected Welcome message in join_group")
         }
 
-        // Collect all the users in the group who will be the DC before me
-        // This includes users who were included in the same Welcome that welcomed me
-        let my_leaf_idx = self.mls_group.as_ref().unwrap().own_leaf_index();
+        // Collect all the users in the group who will be the DC before me. This is simply all the
+        // users who were in the group before my Welcome
+        // Note: there is an optimization we're not doing. You can Welcome multiple people at once
+        // in MLS. This requires a more careful definition of "before" for determining DC. We can
+        // update it to mean "a user becomes DC before me iff the user was in the group prior to my
+        // welcome, OR they were welcomed at the same time as me and have a lower leaf index". This
+        // would require us to also send the list of UIDs being welcomed in every WelcomePackage,
+        // and remove this set from our pending adds once we're welcomed. We can leave this for
+        // future work. In practice, Welcomes almost never have more than 1 user in them anyway.
+        let my_uid = self.uid();
         self.users_alive_before_i_was_welcomed = Some(
             self.mls_group
                 .as_ref()
                 .unwrap()
                 .members()
                 .filter_map(|m| {
-                    if m.index < my_leaf_idx {
-                        let uid = m.credential.serialized_content().to_vec();
+                    let uid = m.credential.serialized_content().to_vec();
+                    // Don't collect my own UID
+                    if uid != my_uid {
                         Some(uid)
                     } else {
                         None
@@ -249,18 +257,6 @@ impl WorkerState {
                 })
                 .collect(),
         );
-
-        // We also don't need to add users who were part of our Welcome. Remove them from our
-        // pendings
-        let users_in_tree: BTreeSet<Vec<u8>> = self
-            .mls_group
-            .as_ref()
-            .unwrap()
-            .members()
-            .map(|m| m.credential.serialized_content().to_vec())
-            .collect();
-        self.pending_adds
-            .retain(|kp| !users_in_tree.contains(kp_to_uid(kp)));
 
         // Return the new safety number
         WorkerResponse {
@@ -276,46 +272,62 @@ impl WorkerState {
             return WorkerResponse::default();
         }
 
+        let uid = self.uid_as_str();
         let group = self.mls_group.as_mut().unwrap();
 
-        // Process all the pending additions
-        let (additions, welcome) = if !self.pending_adds.is_empty() {
-            let (additions, welcome, _) = group
-                .add_members(
-                    &self.mls_provider,
-                    self.my_signing_keys.as_ref().unwrap(),
-                    &self.pending_adds,
-                )
-                .expect("couldn't add user to group");
+        // Process all the pending additions. This is drained, meaning the vec is empty after this
+        println!(
+            "{} Pending adds: {:?}",
+            uid,
+            self.pending_adds
+                .iter()
+                .map(|kp| String::from_utf8_lossy(kp_to_uid(kp)))
+                .collect::<Vec<_>>()
+        );
+        let adds = self
+            .pending_adds
+            .drain(0..)
+            .map(|kp| {
+                let (add, welcome, _) = group
+                    .add_members(
+                        &self.mls_provider,
+                        self.my_signing_keys.as_ref().unwrap(),
+                        &[kp],
+                    )
+                    .expect("couldn't add user to group");
 
-            (Some(additions), Some(welcome))
-        } else {
-            (None, None)
-        };
+                // Merge the pending proposal we just made so we can export the new ratchet tree and
+                // give it to the new user(s)
+                group.merge_pending_commit(&self.mls_provider).unwrap();
+                let ratchet_tree = group.export_ratchet_tree();
 
-        // Merge the pending proposal we just made so we can export the new ratchet tree and
-        // give it to the new user(s)
-        group.merge_pending_commit(&self.mls_provider).unwrap();
-        let ratchet_tree = group.export_ratchet_tree();
+                let wp = WelcomePackageOut {
+                    welcome,
+                    ratchet_tree,
+                };
+
+                (wp, add)
+            })
+            .collect();
 
         // Now process the pending removes
-        let removal = if !self.pending_removes.is_empty() {
+        let remove = if !self.pending_removes.is_empty() {
             // Get the indices for all the users we're supposed to remove
-            let pending_remove_idxs = {
-                let uid_idx_map: BTreeMap<Vec<u8>, LeafNodeIndex> = group
-                    .members()
-                    .map(|member| {
-                        (
-                            member.credential.serialized_content().to_vec(),
-                            member.index,
-                        )
-                    })
-                    .collect();
-                self.pending_removes
-                    .iter()
-                    .filter_map(|uid| uid_idx_map.get(uid).copied())
-                    .collect::<Vec<_>>()
-            };
+            let uid_idx_map: BTreeMap<Vec<u8>, LeafNodeIndex> = group
+                .members()
+                .map(|member| {
+                    (
+                        member.credential.serialized_content().to_vec(),
+                        member.index,
+                    )
+                })
+                .collect();
+            // Drain the pending removes. It's empty after this
+            let pending_remove_idxs = self
+                .pending_removes
+                .drain(0..)
+                .filter_map(|uid| uid_idx_map.get(&uid).copied())
+                .collect::<Vec<_>>();
 
             // Remove them
             let (commit, _, _) = group
@@ -331,19 +343,9 @@ impl WorkerState {
         };
         group.merge_pending_commit(&self.mls_provider).unwrap();
 
-        // Make a vec of the adds and removes
-        let proposals = additions.into_iter().chain(removal).collect();
-
-        // Clear the pendings now that they've been processed
-        self.pending_adds.clear();
-        self.pending_removes.clear();
-
         WorkerResponse {
-            welcome: welcome.map(|w| WelcomePackageOut {
-                welcome: w,
-                ratchet_tree,
-            }),
-            proposals,
+            adds,
+            remove,
             new_safety_number: Some(self.safety_number()),
             sender_id: Some(self.uid_as_str()),
             ..Default::default()
@@ -360,6 +362,13 @@ impl WorkerState {
             .validate(self.mls_provider.crypto(), PROT_VERSION)
             .unwrap();
         // Add the user to the pending list
+        if self.uid_as_str() == "Dave" {
+            println!(
+                "\t{}: Adding {} to pending adds",
+                self.uid_as_str(),
+                String::from_utf8_lossy(kp_to_uid(&user_kp))
+            );
+        }
         self.pending_adds.push(user_kp);
 
         // Process pending adds/removes (only does anything if we're the DC)
@@ -389,7 +398,10 @@ impl WorkerState {
 
     /// Applies the given MLS commit to the group state
     fn handle_commit(&mut self, msg: MlsMessageIn) -> WorkerResponse {
-        let group = self.mls_group.as_mut().unwrap();
+        // If we haven't been welcomed, just ignore this message
+        let Some(group) = self.mls_group.as_mut() else {
+            return WorkerResponse::default();
+        };
 
         // Process the message into a Staged Commit
         let prot_msg = msg.try_into_protocol_message().unwrap();
@@ -516,10 +528,16 @@ thread_local! {
 /// proposals, a new safety number, and/or a user key pacakge
 #[derive(Default)]
 pub(crate) struct WorkerResponse {
-    pub(crate) welcome: Option<WelcomePackageOut>,
-    pub(crate) proposals: Vec<MlsMessageOut>,
+    /// Contains Welcomes and Adds for individual users. This must be processed in the same sequence
+    /// as it appears
+    pub(crate) adds: Vec<(WelcomePackageOut, MlsMessageOut)>,
+    /// Contains an optional Remove operation. This might remove many users at once
+    pub(crate) remove: Option<MlsMessageOut>,
+    /// The new safety number for this group
     pub(crate) new_safety_number: Option<SafetyNumber>,
+    /// The key package for a joining user
     pub(crate) key_pkg: Option<KeyPackage>,
+    /// The ID of this user if it's the DC
     pub(crate) sender_id: Option<String>,
 }
 
@@ -663,15 +681,6 @@ mod tests {
     use openmls::prelude::tls_codec::Serialize;
     use rand::{seq::SliceRandom, Rng};
 
-    impl WorkerResponse {
-        fn is_default(&self) -> bool {
-            self.welcome.is_none()
-                && self.proposals.is_empty()
-                && self.new_safety_number.is_none()
-                && self.key_pkg.is_none()
-        }
-    }
-
     // Converts an MlsMessageOut to an MlsMessageIn
     fn msg_out_to_in(m: &MlsMessageOut) -> MlsMessageIn {
         let bytes = m.tls_serialize_detached().unwrap();
@@ -703,62 +712,65 @@ mod tests {
     struct TestRoom {
         /// Users states. If the user has left, this is None
         states: Vec<Option<WorkerState>>,
-        key_pkgs: Vec<KeyPackageBundle>,
     }
 
     impl TestRoom {
-        /// Makes a new user and returns their index
-        fn new_user(&mut self, uid: &[u8]) -> usize {
+        /// Makes a new room whose first user has the given UID. Returns their user index (0)
+        fn new(uid: &[u8]) -> (TestRoom, usize) {
+            // Make a new state and start a group
+            let (mut state, _) = WorkerState::new(uid.to_vec());
+            state.start_group();
+
+            (
+                TestRoom {
+                    states: vec![Some(state)],
+                },
+                0,
+            )
+        }
+
+        /// User at the given index joins. Returns the DC's response and the new user's idx
+        fn user_joins(&mut self, uid: &[u8]) -> (WorkerResponse, usize) {
+            // Make the new user
             let (state, kp) = WorkerState::new(uid.to_vec());
-            self.states.push(Some(state));
-            self.key_pkgs.push(kp);
 
-            self.states.len() - 1
-        }
-
-        /// User at the given idx starts the group
-        fn start(&mut self, idx: usize) {
-            self.states[idx].as_mut().unwrap().start_group();
-        }
-
-        /// User at the given index joins
-        fn user_joins(&mut self, idx: usize) -> WorkerResponse {
-            let key_pkg = key_pkg_out_to_in(self.key_pkgs[idx].key_package());
+            // Tell everyone alive that the user joined
             let mut responses = Vec::new();
-            // Tell everyone that the user joined
-            for (i, state) in self.states.iter_mut().enumerate() {
-                if i == idx {
-                    continue;
+            for state in self.states.iter_mut().filter(|s| s.is_some()) {
+                let state = state.as_mut().unwrap();
+                let resp = state.user_joined(key_pkg_out_to_in(kp.key_package()));
+                // If this responses is non-empty, make sure it's the DC
+                if !resp.adds.is_empty() || resp.remove.is_some() {
+                    assert!(state.is_designated_committer());
+                    // Also make sure it's only 1 add and 0 removes
+                    assert_eq!(resp.adds.len(), 1);
+                    assert!(resp.remove.is_none());
                 }
-
-                if let Some(ref mut s) = state {
-                    let resp = s.user_joined(key_pkg.clone());
-                    // If this responses is non-empty, make sure it's the DC
-                    if resp.welcome.is_some() || !resp.proposals.is_empty() {
-                        assert!(s.is_designated_committer());
-                        // Also make sure it's only 1 proposal, the Add
-                        assert_eq!(resp.proposals.len(), 1);
-                    }
-                    responses.push(resp);
-                };
+                responses.push(resp);
             }
+
+            // Add this state to the room states
+            self.states.push(Some(state));
 
             // Make sure only 1 response is nonempty. This is the (new) DC
             let response_with_proposal = responses
                 .iter()
-                .position(|r| !r.proposals.is_empty())
+                .position(|r| !r.adds.is_empty())
                 .expect("no proposal was produced after a join");
             assert!(responses
                 .iter()
                 .enumerate()
                 .all(|(i, r)| if i != response_with_proposal {
-                    r.welcome.is_none() && r.key_pkg.is_none() && r.proposals.is_empty()
+                    r.adds.is_empty() && r.remove.is_none() && r.key_pkg.is_none()
                 } else {
                     true
                 }));
 
             // Return the unique nonempty response
-            core::mem::take(&mut responses[response_with_proposal])
+            let resp = core::mem::take(&mut responses[response_with_proposal]);
+            let new_idx = self.states.len() - 1;
+
+            (resp, new_idx)
         }
 
         /// User at the given index leaves
@@ -775,33 +787,28 @@ mod tests {
             // Clear the removed user's state
             self.states[idx] = None;
 
-            // Tell everyone that the user left
+            // Tell everyone alive that the user left
             let mut responses = Vec::new();
-            for (i, state) in self.states.iter_mut().enumerate() {
-                if i == idx {
-                    continue;
+            for state in self.states.iter_mut().filter(|s| s.is_some()) {
+                let state = state.as_mut().unwrap();
+                let resp = state.user_left(&uid_to_remove);
+                // If this responses is non-empty, make sure it's the DC
+                if !resp.adds.is_empty() || resp.remove.is_some() {
+                    assert!(state.is_designated_committer());
                 }
-
-                if let Some(ref mut s) = state {
-                    let resp = s.user_left(&uid_to_remove);
-                    // If this responses is non-empty, make sure it's the DC
-                    if resp.welcome.is_some() || !resp.proposals.is_empty() {
-                        assert!(s.is_designated_committer());
-                    }
-                    responses.push(resp);
-                };
+                responses.push(resp);
             }
 
             // Make sure only 1 response is nonempty. This is the (new) DC
             let response_with_proposal = responses
                 .iter()
-                .position(|r| !r.proposals.is_empty())
+                .position(|r| r.remove.is_some())
                 .expect("no proposal was produced after a leave");
             assert!(responses
                 .iter()
                 .enumerate()
                 .all(|(i, r)| if i != response_with_proposal {
-                    r.welcome.is_none() && r.key_pkg.is_none() && r.proposals.is_empty()
+                    r.adds.is_empty() && r.remove.is_none() && r.key_pkg.is_none()
                 } else {
                     true
                 }));
@@ -812,16 +819,50 @@ mod tests {
 
         /// Welcomes the joining user with the given worker response
         fn user_accepts_welcome(&mut self, idx: usize, resp: &WorkerResponse) {
-            let wp = welcome_out_to_in(resp.welcome.as_ref().unwrap());
-            self.states[idx].as_mut().map(|s| s.join_group(wp));
+            // Let the user try to accept every welcome. Only the one intended  for them will work
+            for (welcome, _) in &resp.adds {
+                let wp = welcome_out_to_in(welcome);
+                self.states[idx].as_mut().map(|s| s.join_group(wp));
+            }
         }
 
         /// Has the user at the given index process the commits in the given worker repsonse
         fn user_processes_commits(&mut self, idx: usize, resp: &WorkerResponse) {
-            for proposal in resp.proposals.iter().map(msg_out_to_in) {
+            // Process adds
+            for (_, add) in &resp.adds {
                 if let Some(ref mut s) = self.states[idx] {
-                    s.handle_commit(proposal);
+                    s.handle_commit(msg_out_to_in(add));
                 }
+            }
+            // Process remove
+            if let Some(remove) = resp.remove.as_ref() {
+                if let Some(ref mut s) = self.states[idx] {
+                    s.handle_commit(msg_out_to_in(remove));
+                }
+            };
+        }
+
+        /// All users in the room process the welcome, adds, and remove of the given response
+        fn all_users_process_catch_up(&mut self, resp: &WorkerResponse) {
+            for state in self.states.iter_mut() {
+                let Some(ref mut s) = state else {
+                    continue;
+                };
+                println!("{} catching up", s.uid_as_str());
+
+                // Process welcomes and adds
+                for (welcome, add) in &resp.adds {
+                    let wp = welcome_out_to_in(welcome);
+                    // Join if possible
+                    s.join_group(wp);
+                    // Process the add if possible
+                    s.handle_commit(msg_out_to_in(add));
+                }
+                // Process remove
+                if let Some(remove) = resp.remove.as_ref() {
+                    s.handle_commit(msg_out_to_in(remove));
+                };
+                println!("Done");
             }
         }
 
@@ -829,62 +870,65 @@ mod tests {
         fn test_app_msg_encryption(&mut self, rng: &mut impl Rng) {
             let msg = b"hello world";
 
-            for _ in 0..1 {
-                // Pick a distinct sender and receiver at random
-                let sender_idx = loop {
-                    let idx: usize = rng.gen_range(0..self.states.len());
-                    if self.states[idx].is_some() {
-                        break idx;
-                    }
-                };
-                let receiver_idx = loop {
-                    let idx: usize = rng.gen_range(0..self.states.len());
-                    if self.states[idx].is_some() && idx != sender_idx {
-                        break idx;
-                    }
-                };
+            // Pick a distinct sender and receiver at random
+            let sender_idx = loop {
+                let idx: usize = rng.gen_range(0..self.states.len());
+                // Only select states of users that have been welcomed
+                if self.states[idx]
+                    .as_ref()
+                    .map(|s| s.mls_group.is_some())
+                    .unwrap_or(false)
+                {
+                    break idx;
+                }
+            };
+            let receiver_idx = loop {
+                let idx: usize = rng.gen_range(0..self.states.len());
+                if self.states[idx]
+                    .as_ref()
+                    .map(|s| s.mls_group.is_some())
+                    .unwrap_or(false)
+                    && idx != sender_idx
+                {
+                    break idx;
+                }
+            };
 
-                // Take the sender and receiver states
-                let mut sender = core::mem::take(&mut self.states[sender_idx]);
-                let mut receiver = core::mem::take(&mut self.states[receiver_idx]);
+            // Take the sender and receiver states
+            let mut sender = core::mem::take(&mut self.states[sender_idx]);
+            let mut receiver = core::mem::take(&mut self.states[receiver_idx]);
 
-                // Test that we can decrypt messages out of order. We'll deliver a bunch of messages in
-                // a totally random order
-                let mut ciphertexts: Vec<_> =
-                    (0..core::cmp::min(OUT_OF_ORDER_TOLERANCE, MAX_MESSAGE_SEQ_JUMP))
-                        .map(|_| sender.as_mut().unwrap().encrypt_app_msg_nofail(msg))
-                        .collect();
-                ciphertexts.shuffle(&mut rand::thread_rng());
-                // Open the ciphertexts
-                ciphertexts.into_iter().for_each(|ct| {
-                    receiver.as_mut().unwrap().decrypt_app_msg(&ct).unwrap();
-                });
+            // Test that we can decrypt messages out of order. We'll deliver a bunch of messages in
+            // a totally random order
+            let mut ciphertexts: Vec<_> =
+                (0..core::cmp::min(OUT_OF_ORDER_TOLERANCE, MAX_MESSAGE_SEQ_JUMP))
+                    .map(|_| sender.as_mut().unwrap().encrypt_app_msg_nofail(msg))
+                    .collect();
+            ciphertexts.shuffle(&mut rand::thread_rng());
+            // Open the ciphertexts
+            ciphertexts.into_iter().for_each(|ct| {
+                receiver.as_mut().unwrap().decrypt_app_msg(&ct).unwrap();
+            });
 
-                // Set the sender and receiver states back where they were
-                self.states[sender_idx] = sender;
-                self.states[receiver_idx] = receiver;
-            }
+            // Set the sender and receiver states back where they were
+            self.states[sender_idx] = sender;
+            self.states[receiver_idx] = receiver;
         }
     }
 
     #[test]
-    fn new_normal_join_leave() {
+    fn normal_join_leave() {
         let mut rng = rand::thread_rng();
-        let mut room = TestRoom::default();
-
-        let alice_idx = room.new_user(b"Alice");
-        let bob_idx = room.new_user(b"Bob");
-        let charlie_idx = room.new_user(b"Charlie");
 
         // Alice is the first member
-        room.start(alice_idx);
+        let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
         // Alice adds Bob
-        let msg = room.user_joins(bob_idx);
+        let (msg, bob_idx) = room.user_joins(b"Bob");
         room.user_accepts_welcome(bob_idx, &msg);
 
         // Alice adds Charlie
-        let msg = room.user_joins(charlie_idx);
+        let (msg, charlie_idx) = room.user_joins(b"Charlie");
         room.user_accepts_welcome(charlie_idx, &msg);
         room.user_processes_commits(bob_idx, &msg);
 
@@ -897,173 +941,56 @@ mod tests {
     }
 
     #[test]
-    fn normal_join_leave() {
-        let (mut alice_group, _alice_key_pkg) = WorkerState::new(b"Alice".to_vec());
-        let (mut bob_group, bob_key_pkg) = WorkerState::new(b"Bob".to_vec());
-        let (mut charlie_group, charlie_key_pkg) = WorkerState::new(b"Charlie".to_vec());
-
-        // Alice starts the group
-        alice_group.start_group();
-
-        // Alice adds Bob
-        let add_op = alice_group.user_joined(key_pkg_out_to_in(bob_key_pkg.key_package()));
-        // The Add op is a welcome package and 1 proposal
-        assert!(add_op.welcome.is_some());
-        assert_eq!(add_op.proposals.len(), 1);
-
-        // Pretend Bob parsed the welcome package
-        let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
-        // Bob joins the group
-        bob_group.join_group(wp);
-
-        // Now Alice adds Charlie
-        let add_op = alice_group.user_joined(key_pkg_out_to_in(charlie_key_pkg.key_package()));
-        // Bob sees that the Add came in but Alice hasn't sent a proposal yet
-        bob_group.user_joined(key_pkg_out_to_in(charlie_key_pkg.key_package()));
-        // Pretend Bob parsed the Add and Charlie parsed the welcome package
-        let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
-        let add = msg_out_to_in(&add_op.proposals[0]);
-        // Charlie joins the group
-        charlie_group.join_group(wp);
-        // Bob processes that Charlie was added
-        bob_group.handle_commit(add);
-
-        // Now encrypt something
-        let msg = b"hello world";
-        let ct = alice_group.encrypt_app_msg_nofail(msg);
-        assert_eq!(bob_group.decrypt_app_msg(&ct).unwrap(), msg);
-        assert_eq!(charlie_group.decrypt_app_msg(&ct).unwrap(), msg);
-
-        // Now Alice gets removed. Everyone removes her
-        let bob_out = bob_group.user_left(b"Alice");
-        let charlie_out = charlie_group.user_left(b"Alice");
-        // Bob is the DC, so Charlie's output should be empty
-        assert!(bob_group.is_designated_committer());
-        assert!(charlie_out.is_default());
-        // Bob's output should be 1 Add proposal
-        assert_eq!(bob_out.proposals.len(), 1);
-
-        // Let Charlie process Bob's new message
-        charlie_group.handle_commit(msg_out_to_in(&bob_out.proposals[0]));
-
-        // Now encrypt something
-        let msg = b"hello world";
-        let ct = bob_group.encrypt_app_msg_nofail(msg);
-        assert_eq!(charlie_group.decrypt_app_msg(&ct).unwrap(), msg);
-
-        // Now test that we can decrypt messages out of order. We'll deliver a bunch of messages in
-        // a totally random order
-        let mut ciphertexts: Vec<_> =
-            (0..core::cmp::min(OUT_OF_ORDER_TOLERANCE, MAX_MESSAGE_SEQ_JUMP))
-                .map(|_| bob_group.encrypt_app_msg_nofail(msg))
-                .collect();
-        ciphertexts.shuffle(&mut rand::thread_rng());
-        // Open the ciphertexts
-        ciphertexts.into_iter().for_each(|ct| {
-            charlie_group.decrypt_app_msg(&ct).unwrap();
-        })
-    }
-
-    #[test]
-    fn new_multi_pending() {
+    fn multi_pending() {
         let mut rng = rand::thread_rng();
-        let mut room = TestRoom::default();
-
-        let alice_idx = room.new_user(b"Alice");
-        let bob_idx = room.new_user(b"Bob");
-        let charlie_idx = room.new_user(b"Charlie");
-        let dave_idx = room.new_user(b"Dave");
-        let eve_idx = room.new_user(b"Eve");
 
         // Alice is the first member
-        room.start(alice_idx);
+        let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
         // Alice adds Bob
-        let msg = room.user_joins(bob_idx);
-        room.user_accepts_welcome(bob_idx, &msg);
+        let (msg, bob_idx) = room.user_joins(b"Bob");
+        room.all_users_process_catch_up(&msg);
+        //room.user_accepts_welcome(bob_idx, &msg);
 
         // Charlie and Dave join, but Alice isn't responding
-        room.user_joins(charlie_idx);
-        room.user_joins(dave_idx);
+        let (_, charlie_idx) = room.user_joins(b"Charlie");
+        let (_, _dave_idx) = room.user_joins(b"Dave");
 
         // Alice leaves, making Bob the DC. Bob welcomes Charlie and Dave
         let msg = room.user_leaves(alice_idx);
-        room.user_accepts_welcome(charlie_idx, &msg);
-        room.user_accepts_welcome(dave_idx, &msg);
+        room.all_users_process_catch_up(&msg);
+        //room.user_accepts_welcome(charlie_idx, &msg);
+        //room.user_accepts_welcome(dave_idx, &msg);
+        //room.user_processes_commits(bob_idx, &msg);
+        //room.user_processes_commits(charlie_idx, &msg);
+        //room.user_processes_commits(dave_idx, &msg);
+        room.test_app_msg_encryption(&mut rng);
 
         // Eve joins. Charlie and Dave process Bob's Add
-        let msg = room.user_joins(eve_idx);
-        room.user_accepts_welcome(eve_idx, &msg);
-        room.user_processes_commits(charlie_idx, &msg);
-        room.user_processes_commits(dave_idx, &msg);
+        let (msg, _eve_idx) = room.user_joins(b"Eve");
+        room.all_users_process_catch_up(&msg);
+        //room.user_accepts_welcome(eve_idx, &msg);
+        //room.user_processes_commits(bob_idx, &msg);
+        //room.user_processes_commits(charlie_idx, &msg);
+        //room.user_processes_commits(dave_idx, &msg);
+        //room.user_processes_commits(eve_idx, &msg);
 
         // Charlie leaves. Bob is still the DC
         let msg = room.user_leaves(charlie_idx);
-        room.user_processes_commits(dave_idx, &msg);
-        room.user_processes_commits(eve_idx, &msg);
+        room.all_users_process_catch_up(&msg);
+        //room.user_processes_commits(bob_idx, &msg);
+        //room.user_processes_commits(charlie_idx, &msg);
+        //room.user_processes_commits(dave_idx, &msg);
+        //room.user_processes_commits(eve_idx, &msg);
 
         // Bob leaves. Dave is the DC
         let msg = room.user_leaves(bob_idx);
-        room.user_processes_commits(dave_idx, &msg);
-        room.user_processes_commits(eve_idx, &msg);
+        room.all_users_process_catch_up(&msg);
+        //room.user_processes_commits(bob_idx, &msg);
+        //room.user_processes_commits(charlie_idx, &msg);
+        //room.user_processes_commits(dave_idx, &msg);
+        //room.user_processes_commits(eve_idx, &msg);
 
         room.test_app_msg_encryption(&mut rng);
-    }
-
-    // Tests the case where there are more than one pending adds
-    #[test]
-    fn multi_pending() {
-        let (mut alice_group, _alice_key_pkg) = WorkerState::new(b"Alice".to_vec());
-        let (mut bob_group, bob_key_pkg) = WorkerState::new(b"Bob".to_vec());
-        let (mut charlie_group, charlie_key_pkg) = WorkerState::new(b"Charlie".to_vec());
-        let (mut dave_group, dave_key_pkg) = WorkerState::new(b"Dave".to_vec());
-
-        // Alice starts the group
-        alice_group.start_group();
-
-        // Alice adds Bob
-        let add_op = alice_group.user_joined(key_pkg_out_to_in(bob_key_pkg.key_package()));
-        // The Add op is a welcome package and 1 proposal
-
-        // Pretend Bob parsed the welcome package
-        let wp = welcome_out_to_in(add_op.welcome.as_ref().unwrap());
-        // Bob joins the group
-        bob_group.join_group(wp);
-
-        // Now say Charlie and Dave join, but Alice doesn't add them because she's dead
-        bob_group.user_joined(key_pkg_out_to_in(charlie_key_pkg.key_package()));
-        bob_group.user_joined(key_pkg_out_to_in(dave_key_pkg.key_package()));
-        charlie_group.user_joined(key_pkg_out_to_in(dave_key_pkg.key_package()));
-        // Alice officially dies. This makes Bob the DC. Charlie and Dave haven't been Welcomed yet
-        let bob_out = bob_group.user_left(b"Alice");
-        let charlie_out = charlie_group.user_left(b"Alice");
-        let dave_out = dave_group.user_left(b"Alice");
-        // Bob's output should be an Add and Remove proposal. Also a Welcome
-        assert_eq!(bob_out.proposals.len(), 2);
-        assert!(bob_out.welcome.is_some());
-        assert!(charlie_out.proposals.is_empty());
-        assert!(dave_out.proposals.is_empty());
-
-        let wp = welcome_out_to_in(bob_out.welcome.as_ref().unwrap());
-        let wp_clone = welcome_out_to_in(bob_out.welcome.as_ref().unwrap());
-        // Charlie and Dave join the group
-        charlie_group.join_group(wp);
-        dave_group.join_group(wp_clone);
-        // They both then process the Add (does nothing for them) and remove
-        for proposal in bob_out.proposals.iter().map(msg_out_to_in) {
-            charlie_group.handle_commit(proposal.clone());
-            dave_group.handle_commit(proposal);
-        }
-
-        // Okay now Bob dies. Make sure Charlie knows he's the DC
-        let charlie_out = charlie_group.user_left(b"Bob");
-        let dave_out = dave_group.user_left(b"Bob");
-        assert!(charlie_group.is_designated_committer());
-        assert_eq!(charlie_out.proposals.len(), 1);
-        assert!(!dave_group.is_designated_committer());
-        assert!(dave_out.proposals.is_empty());
-        dave_group.handle_commit(msg_out_to_in(&charlie_out.proposals[0]));
-
-        // Now Charlie dies. Make sure Dave knows he's the DC
     }
 }
