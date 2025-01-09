@@ -361,15 +361,10 @@ impl WorkerState {
         let user_kp = user_kp
             .validate(self.mls_provider.crypto(), PROT_VERSION)
             .unwrap();
-        // Add the user to the pending list
-        if self.uid_as_str() == "Dave" {
-            println!(
-                "\t{}: Adding {} to pending adds",
-                self.uid_as_str(),
-                String::from_utf8_lossy(kp_to_uid(&user_kp))
-            );
+        // Add the user to the pending list, as long as it's not us (we might get this event when we join)
+        if self.uid() != kp_to_uid(&user_kp) {
+            self.pending_adds.push(user_kp);
         }
-        self.pending_adds.push(user_kp);
 
         // Process pending adds/removes (only does anything if we're the DC)
         self.process_pendings()
@@ -708,10 +703,23 @@ mod tests {
         }
     }
 
+    /// A message sent from the service provider to users
+    enum Msg {
+        UserJoined(KeyPackageBundle),
+        UserLeft(usize),
+        AddRemove(MlsMessageOut),
+        Welcome(WelcomePackageOut),
+    }
+
     #[derive(Default)]
     struct TestRoom {
-        /// Users states. If the user has left, this is None
-        states: Vec<Option<WorkerState>>,
+        /// Users states and current position in message queue (idx being the first message they
+        /// haven't read). If the user has left, this is None
+        states: Vec<Option<(WorkerState, usize)>>,
+        /// UIDs of the users in `states`
+        uids: Vec<Vec<u8>>,
+        /// The message queue
+        messages: Vec<Msg>,
     }
 
     impl TestRoom {
@@ -723,146 +731,108 @@ mod tests {
 
             (
                 TestRoom {
-                    states: vec![Some(state)],
+                    states: vec![Some((state, 0))],
+                    uids: vec![uid.to_vec()],
+                    messages: Vec::new(),
                 },
                 0,
             )
         }
 
-        /// User at the given index joins. Returns the DC's response and the new user's idx
-        fn user_joins(&mut self, uid: &[u8]) -> (WorkerResponse, usize) {
-            // Make the new user
-            let (state, kp) = WorkerState::new(uid.to_vec());
+        /// Unpacks the given worker response and adds it to the message queue. Ordering is
+        /// (welcome, add), (welcome, add), ..., remove
+        fn queue_response(&mut self, resp: WorkerResponse) {
+            let WorkerResponse { adds, remove, .. } = resp;
 
-            // Tell everyone alive that the user joined
-            let mut responses = Vec::new();
-            for state in self.states.iter_mut().filter(|s| s.is_some()) {
-                let state = state.as_mut().unwrap();
-                let resp = state.user_joined(key_pkg_out_to_in(kp.key_package()));
-                // If this responses is non-empty, make sure it's the DC
-                if !resp.adds.is_empty() || resp.remove.is_some() {
-                    assert!(state.is_designated_committer());
-                    // Also make sure it's only 1 add and 0 removes
-                    assert_eq!(resp.adds.len(), 1);
-                    assert!(resp.remove.is_none());
-                }
-                responses.push(resp);
+            for (wp, add) in adds {
+                self.messages.push(Msg::Welcome(wp));
+                self.messages.push(Msg::AddRemove(add));
             }
-
-            // Add this state to the room states
-            self.states.push(Some(state));
-
-            // Make sure only 1 response is nonempty. This is the (new) DC
-            let response_with_proposal = responses
-                .iter()
-                .position(|r| !r.adds.is_empty())
-                .expect("no proposal was produced after a join");
-            assert!(responses
-                .iter()
-                .enumerate()
-                .all(|(i, r)| if i != response_with_proposal {
-                    r.adds.is_empty() && r.remove.is_none() && r.key_pkg.is_none()
-                } else {
-                    true
-                }));
-
-            // Return the unique nonempty response
-            let resp = core::mem::take(&mut responses[response_with_proposal]);
-            let new_idx = self.states.len() - 1;
-
-            (resp, new_idx)
+            if let Some(r) = remove {
+                self.messages.push(Msg::AddRemove(r));
+            }
         }
 
-        /// User at the given index leaves
-        fn user_leaves(&mut self, idx: usize) -> WorkerResponse {
-            let uid_to_remove = self.states[idx]
-                .as_ref()
-                .unwrap()
-                .my_credential
-                .as_ref()
-                .unwrap()
-                .credential
-                .serialized_content()
-                .to_vec();
-            // Clear the removed user's state
+        /// The user at the given index stops responding. They have not officially left yet though
+        fn user_dies(&mut self, idx: usize) {
             self.states[idx] = None;
-
-            // Tell everyone alive that the user left
-            let mut responses = Vec::new();
-            for state in self.states.iter_mut().filter(|s| s.is_some()) {
-                let state = state.as_mut().unwrap();
-                let resp = state.user_left(&uid_to_remove);
-                // If this responses is non-empty, make sure it's the DC
-                if !resp.adds.is_empty() || resp.remove.is_some() {
-                    assert!(state.is_designated_committer());
-                }
-                responses.push(resp);
-            }
-
-            // Make sure only 1 response is nonempty. This is the (new) DC
-            let response_with_proposal = responses
-                .iter()
-                .position(|r| r.remove.is_some())
-                .expect("no proposal was produced after a leave");
-            assert!(responses
-                .iter()
-                .enumerate()
-                .all(|(i, r)| if i != response_with_proposal {
-                    r.adds.is_empty() && r.remove.is_none() && r.key_pkg.is_none()
-                } else {
-                    true
-                }));
-
-            // Return the unique nonempty response
-            core::mem::take(&mut responses[response_with_proposal])
         }
 
-        /// Welcomes the joining user with the given worker response
-        fn user_accepts_welcome(&mut self, idx: usize, resp: &WorkerResponse) {
-            // Let the user try to accept every welcome. Only the one intended  for them will work
-            for (welcome, _) in &resp.adds {
-                let wp = welcome_out_to_in(welcome);
-                self.states[idx].as_mut().map(|s| s.join_group(wp));
-            }
+        /// User at the given index joins. Returns the new user's idx and adds the response to the
+        /// message queue
+        fn user_joins(&mut self, uid: &[u8]) -> usize {
+            // Make the new user. Their idx in the queue is the very end
+            let (state, kp) = WorkerState::new(uid.to_vec());
+            // Add this state to the room states. The index into the queue is the very end
+            self.states.push(Some((state, self.messages.len())));
+            self.uids.push(uid.to_vec());
+
+            // Add this event to the message queue
+            self.messages.push(Msg::UserJoined(kp));
+
+            // New user idx is the last in the vec
+            self.states.len() - 1
         }
 
-        /// Has the user at the given index process the commits in the given worker repsonse
-        fn user_processes_commits(&mut self, idx: usize, resp: &WorkerResponse) {
-            // Process adds
-            for (_, add) in &resp.adds {
-                if let Some(ref mut s) = self.states[idx] {
-                    s.handle_commit(msg_out_to_in(add));
-                }
-            }
-            // Process remove
-            if let Some(remove) = resp.remove.as_ref() {
-                if let Some(ref mut s) = self.states[idx] {
-                    s.handle_commit(msg_out_to_in(remove));
-                }
-            };
+        /// User at the given index leaves. Adds the resulting response to the message queue
+        fn user_leaves(&mut self, idx: usize) {
+            // First kill the user if they're not already dead
+            self.user_dies(idx);
+
+            // Now add the event to the queue
+            self.messages.push(Msg::UserLeft(idx));
         }
 
-        /// All users in the room process the welcome, adds, and remove of the given response
-        fn all_users_process_catch_up(&mut self, resp: &WorkerResponse) {
-            for state in self.states.iter_mut() {
-                let Some(ref mut s) = state else {
+        /// All users in the room process the messages in the queue they haven't yet seen. They also
+        /// respond to these messages, adding to the queue as necessary
+        fn all_users_process_catch_up(&mut self) {
+            for i in 0..self.states.len() {
+                let Some((ref mut s, next_msg_idx)) = &mut self.states[i] else {
                     continue;
                 };
                 println!("{} catching up", s.uid_as_str());
+                println!("{} queue idx is {}", s.uid_as_str(), *next_msg_idx);
 
-                // Process welcomes and adds
-                for (welcome, add) in &resp.adds {
-                    let wp = welcome_out_to_in(welcome);
-                    // Join if possible
-                    s.join_group(wp);
-                    // Process the add if possible
-                    s.handle_commit(msg_out_to_in(add));
-                }
-                // Process remove
-                if let Some(remove) = resp.remove.as_ref() {
-                    s.handle_commit(msg_out_to_in(remove));
-                };
-                println!("Done");
+                // Go through the unprocessed messages and collect the responses
+                let resps: Vec<WorkerResponse> = self
+                    .messages
+                    .iter()
+                    .skip(*next_msg_idx)
+                    .filter_map(|msg| {
+                        let out = match msg {
+                            // Join if possible
+                            Msg::Welcome(w) => {
+                                println!("{} processing welcome", s.uid_as_str());
+                                let wp = welcome_out_to_in(w);
+                                s.join_group(wp);
+                                None
+                            }
+                            // Process a commit if possible
+                            Msg::AddRemove(commit) => {
+                                println!("{} processing add/remove", s.uid_as_str());
+                                s.handle_commit(msg_out_to_in(commit));
+                                None
+                            }
+                            Msg::UserJoined(kp) => {
+                                println!("{} processing join", s.uid_as_str());
+                                let resp = s.user_joined(key_pkg_out_to_in(kp.key_package()));
+                                Some(resp)
+                            }
+                            Msg::UserLeft(idx) => {
+                                println!("{} processing leave", s.uid_as_str());
+                                let uid_to_remove = &self.uids[*idx];
+                                let resp = s.user_left(uid_to_remove);
+                                Some(resp)
+                            }
+                        };
+                        // Update the next message index
+                        *next_msg_idx += 1;
+                        out
+                    })
+                    .collect();
+
+                // Queue the responses we collected
+                resps.into_iter().for_each(|r| self.queue_response(r));
             }
         }
 
@@ -876,7 +846,7 @@ mod tests {
                 // Only select states of users that have been welcomed
                 if self.states[idx]
                     .as_ref()
-                    .map(|s| s.mls_group.is_some())
+                    .map(|(s, _)| s.mls_group.is_some())
                     .unwrap_or(false)
                 {
                     break idx;
@@ -886,7 +856,7 @@ mod tests {
                 let idx: usize = rng.gen_range(0..self.states.len());
                 if self.states[idx]
                     .as_ref()
-                    .map(|s| s.mls_group.is_some())
+                    .map(|(s, _)| s.mls_group.is_some())
                     .unwrap_or(false)
                     && idx != sender_idx
                 {
@@ -902,12 +872,12 @@ mod tests {
             // a totally random order
             let mut ciphertexts: Vec<_> =
                 (0..core::cmp::min(OUT_OF_ORDER_TOLERANCE, MAX_MESSAGE_SEQ_JUMP))
-                    .map(|_| sender.as_mut().unwrap().encrypt_app_msg_nofail(msg))
+                    .map(|_| sender.as_mut().unwrap().0.encrypt_app_msg_nofail(msg))
                     .collect();
             ciphertexts.shuffle(&mut rand::thread_rng());
             // Open the ciphertexts
             ciphertexts.into_iter().for_each(|ct| {
-                receiver.as_mut().unwrap().decrypt_app_msg(&ct).unwrap();
+                receiver.as_mut().unwrap().0.decrypt_app_msg(&ct).unwrap();
             });
 
             // Set the sender and receiver states back where they were
@@ -924,18 +894,16 @@ mod tests {
         let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
         // Alice adds Bob
-        let (msg, bob_idx) = room.user_joins(b"Bob");
-        room.user_accepts_welcome(bob_idx, &msg);
+        let _bob_idx = room.user_joins(b"Bob");
+        room.all_users_process_catch_up();
 
         // Alice adds Charlie
-        let (msg, charlie_idx) = room.user_joins(b"Charlie");
-        room.user_accepts_welcome(charlie_idx, &msg);
-        room.user_processes_commits(bob_idx, &msg);
+        let _charlie_idx = room.user_joins(b"Charlie");
+        room.all_users_process_catch_up();
 
         // Alice leaves. Everyone removes her
-        let msg = room.user_leaves(alice_idx);
-        room.user_processes_commits(bob_idx, &msg);
-        room.user_processes_commits(charlie_idx, &msg);
+        room.user_leaves(alice_idx);
+        room.all_users_process_catch_up();
 
         room.test_app_msg_encryption(&mut rng);
     }
@@ -948,48 +916,30 @@ mod tests {
         let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
         // Alice adds Bob
-        let (msg, bob_idx) = room.user_joins(b"Bob");
-        room.all_users_process_catch_up(&msg);
-        //room.user_accepts_welcome(bob_idx, &msg);
+        let bob_idx = room.user_joins(b"Bob");
+        room.all_users_process_catch_up();
 
         // Charlie and Dave join, but Alice isn't responding
-        let (_, charlie_idx) = room.user_joins(b"Charlie");
-        let (_, _dave_idx) = room.user_joins(b"Dave");
+        room.user_dies(alice_idx);
+        let charlie_idx = room.user_joins(b"Charlie");
+        let _dave_idx = room.user_joins(b"Dave");
 
         // Alice leaves, making Bob the DC. Bob welcomes Charlie and Dave
-        let msg = room.user_leaves(alice_idx);
-        room.all_users_process_catch_up(&msg);
-        //room.user_accepts_welcome(charlie_idx, &msg);
-        //room.user_accepts_welcome(dave_idx, &msg);
-        //room.user_processes_commits(bob_idx, &msg);
-        //room.user_processes_commits(charlie_idx, &msg);
-        //room.user_processes_commits(dave_idx, &msg);
+        room.user_leaves(alice_idx);
+        room.all_users_process_catch_up();
         room.test_app_msg_encryption(&mut rng);
 
         // Eve joins. Charlie and Dave process Bob's Add
-        let (msg, _eve_idx) = room.user_joins(b"Eve");
-        room.all_users_process_catch_up(&msg);
-        //room.user_accepts_welcome(eve_idx, &msg);
-        //room.user_processes_commits(bob_idx, &msg);
-        //room.user_processes_commits(charlie_idx, &msg);
-        //room.user_processes_commits(dave_idx, &msg);
-        //room.user_processes_commits(eve_idx, &msg);
+        let _eve_idx = room.user_joins(b"Eve");
+        room.all_users_process_catch_up();
 
         // Charlie leaves. Bob is still the DC
-        let msg = room.user_leaves(charlie_idx);
-        room.all_users_process_catch_up(&msg);
-        //room.user_processes_commits(bob_idx, &msg);
-        //room.user_processes_commits(charlie_idx, &msg);
-        //room.user_processes_commits(dave_idx, &msg);
-        //room.user_processes_commits(eve_idx, &msg);
+        room.user_leaves(charlie_idx);
+        room.all_users_process_catch_up();
 
         // Bob leaves. Dave is the DC
-        let msg = room.user_leaves(bob_idx);
-        room.all_users_process_catch_up(&msg);
-        //room.user_processes_commits(bob_idx, &msg);
-        //room.user_processes_commits(charlie_idx, &msg);
-        //room.user_processes_commits(dave_idx, &msg);
-        //room.user_processes_commits(eve_idx, &msg);
+        room.user_leaves(bob_idx);
+        room.all_users_process_catch_up();
 
         room.test_app_msg_encryption(&mut rng);
     }
