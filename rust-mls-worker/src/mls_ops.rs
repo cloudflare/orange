@@ -161,6 +161,7 @@ impl WorkerState {
                 alive_at_welcome.difference(&self.users_who_left_since_i_joined);
             other_dc_candiates.count() == 0
         } else {
+            println!("{} hasn't been welcomed", self.uid_as_str());
             // If I haven't been welcomed, I'm certainly not the DC
             false
         }
@@ -268,6 +269,11 @@ impl WorkerState {
     /// If this user is the designated committer, this catches up on the pending adds and removes.
     /// If not, this does nothing.
     fn process_pendings(&mut self) -> WorkerResponse {
+        println!(
+            "{} is DC? {}",
+            self.uid_as_str(),
+            self.is_designated_committer()
+        );
         if !self.is_designated_committer() {
             return WorkerResponse::default();
         }
@@ -386,6 +392,12 @@ impl WorkerState {
         // Mark this user as left
         self.users_who_left_since_i_joined
             .insert(uid_to_remove.to_vec());
+
+        println!(
+            "{} observes {} left",
+            self.uid_as_str(),
+            String::from_utf8_lossy(uid_to_remove)
+        );
 
         // Process pending adds/removes (only does anything if we're the DC)
         self.process_pendings()
@@ -739,6 +751,21 @@ mod tests {
             )
         }
 
+        // Returns the queue index of the user who is most behind on their messages
+        fn min_progress(&self) -> usize {
+            // Get all the queue indices of all the users
+            let idxs = self
+                .states
+                .iter()
+                .filter_map(|t| t.as_ref().map(|(_, i)| *i))
+                .collect::<Vec<_>>();
+
+            println!("idxs {:?}", idxs);
+
+            // Take the min
+            idxs.into_iter().min().expect("all users are dead")
+        }
+
         /// Unpacks the given worker response and adds it to the message queue. Ordering is
         /// (welcome, add), (welcome, add), ..., remove
         fn queue_response(&mut self, resp: WorkerResponse) {
@@ -783,14 +810,56 @@ mod tests {
             self.messages.push(Msg::UserLeft(idx));
         }
 
+        /// This user processes all the messages in the queue they haven't yet seen
+        fn user_catches_up(&mut self, idx: usize) {
+            // Make a one-hot vector where the desired user will be reading the whole queue
+            let mut num_msgs_to_read = vec![0; self.states.len()];
+            num_msgs_to_read[idx] = self.messages.len();
+            self.users_make_progress(&num_msgs_to_read);
+        }
+
         /// All users in the room process the messages in the queue they haven't yet seen. They also
-        /// respond to these messages, adding to the queue as necessary
-        fn all_users_process_catch_up(&mut self) {
-            for i in 0..self.states.len() {
+        /// respond to these messages, adding to the queue as necessary. This iterates this process until everyone has seen everything
+        fn all_users_catch_up(&mut self) {
+            // Everyone processes as many messages as possible until the most behind user is fully
+            // up to date
+            while self.min_progress() < self.messages.len() {
+                let num_msgs_to_read = vec![self.messages.len(); self.states.len()];
+                self.users_make_progress(&num_msgs_to_read);
+            }
+        }
+
+        /// Users process the queue in random increments
+        fn users_make_progress_randomly(&mut self, rng: &mut impl Rng) {
+            let queue_len = self.messages.len();
+            // For each user pick a random number of messages to read
+            let num_messages_to_read = self
+                .states
+                .iter()
+                .map(|t| {
+                    if let Some((_, idx)) = t.as_ref() {
+                        rng.gen_range(0..=queue_len - idx)
+                    } else {
+                        // If the user is dead, it doesn't matter what we pick
+                        0
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            self.users_make_progress(&num_messages_to_read);
+        }
+
+        /// All users in the room process the messages in the queue they haven't yet seen. They also
+        /// respond to these messages, adding to the queue as necessary. The user at index `i`
+        /// processes up to `num_messages_to_read[i]` messages from the queue.
+        fn users_make_progress(&mut self, num_messages_to_read: &[usize]) {
+            assert_eq!(num_messages_to_read.len(), self.states.len());
+
+            for (i, &num_msgs) in num_messages_to_read.iter().enumerate() {
                 let Some((ref mut s, next_msg_idx)) = &mut self.states[i] else {
                     continue;
                 };
-                println!("{} catching up", s.uid_as_str());
+                println!("{} reading {} messages", s.uid_as_str(), num_msgs);
                 println!("{} queue idx is {}", s.uid_as_str(), *next_msg_idx);
 
                 // Go through the unprocessed messages and collect the responses
@@ -798,6 +867,7 @@ mod tests {
                     .messages
                     .iter()
                     .skip(*next_msg_idx)
+                    .take(num_msgs)
                     .filter_map(|msg| {
                         let out = match msg {
                             // Join if possible
@@ -841,6 +911,7 @@ mod tests {
             let msg = b"hello world";
 
             // Pick a distinct sender and receiver at random
+            println!("picking a sender idx");
             let sender_idx = loop {
                 let idx: usize = rng.gen_range(0..self.states.len());
                 // Only select states of users that have been welcomed
@@ -852,6 +923,7 @@ mod tests {
                     break idx;
                 }
             };
+            println!("picking a receiver idx");
             let receiver_idx = loop {
                 let idx: usize = rng.gen_range(0..self.states.len());
                 if self.states[idx]
@@ -890,57 +962,70 @@ mod tests {
     fn normal_join_leave() {
         let mut rng = rand::thread_rng();
 
-        // Alice is the first member
-        let (mut room, alice_idx) = TestRoom::new(b"Alice");
+        // Our tests are nondeterministic, so run them a few times to catch possible weird cases
+        for _ in 0..10 {
+            // Alice is the first member
+            let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
-        // Alice adds Bob
-        let _bob_idx = room.user_joins(b"Bob");
-        room.all_users_process_catch_up();
+            // Bob joins. Make sure Alice adds him, because she'll leave later
+            let _bob_idx = room.user_joins(b"Bob");
+            room.users_make_progress_randomly(&mut rng);
+            room.user_catches_up(alice_idx);
 
-        // Alice adds Charlie
-        let _charlie_idx = room.user_joins(b"Charlie");
-        room.all_users_process_catch_up();
+            // Charlie joins
+            let _charlie_idx = room.user_joins(b"Charlie");
+            room.users_make_progress_randomly(&mut rng);
 
-        // Alice leaves. Everyone removes her
-        room.user_leaves(alice_idx);
-        room.all_users_process_catch_up();
+            // Alice leaves
+            room.user_leaves(alice_idx);
+            room.users_make_progress_randomly(&mut rng);
 
-        room.test_app_msg_encryption(&mut rng);
+            // Everyone catches up then exchanges some messages
+            room.all_users_catch_up();
+            room.test_app_msg_encryption(&mut rng);
+        }
     }
 
+    // Tests the case where multiple users join while one user is dead
     #[test]
     fn multi_pending() {
         let mut rng = rand::thread_rng();
 
-        // Alice is the first member
-        let (mut room, alice_idx) = TestRoom::new(b"Alice");
+        // Our tests are nondeterministic, so run them a few times to catch possible weird cases
+        for _ in 0..10 {
+            // Alice is the first member
+            let (mut room, alice_idx) = TestRoom::new(b"Alice");
 
-        // Alice adds Bob
-        let bob_idx = room.user_joins(b"Bob");
-        room.all_users_process_catch_up();
+            // Bob joins. Make sure Alice adds him, because she'll leave later
+            let bob_idx = room.user_joins(b"Bob");
+            room.users_make_progress_randomly(&mut rng);
+            room.user_catches_up(alice_idx);
 
-        // Charlie and Dave join, but Alice isn't responding
-        room.user_dies(alice_idx);
-        let charlie_idx = room.user_joins(b"Charlie");
-        let _dave_idx = room.user_joins(b"Dave");
+            // Charlie and Dave join. Alice isn't responding
+            room.user_dies(alice_idx);
+            let charlie_idx = room.user_joins(b"Charlie");
+            let _dave_idx = room.user_joins(b"Dave");
 
-        // Alice leaves, making Bob the DC. Bob welcomes Charlie and Dave
-        room.user_leaves(alice_idx);
-        room.all_users_process_catch_up();
-        room.test_app_msg_encryption(&mut rng);
+            // Alice leaves, making Bob the DC. Make sure Bob adds Dave, since Bob will leave later
+            room.user_leaves(alice_idx);
+            room.users_make_progress_randomly(&mut rng);
+            room.user_catches_up(bob_idx);
 
-        // Eve joins. Charlie and Dave process Bob's Add
-        let _eve_idx = room.user_joins(b"Eve");
-        room.all_users_process_catch_up();
+            // Eve joins
+            let _eve_idx = room.user_joins(b"Eve");
+            room.users_make_progress_randomly(&mut rng);
 
-        // Charlie leaves. Bob is still the DC
-        room.user_leaves(charlie_idx);
-        room.all_users_process_catch_up();
+            // Charlie leaves. Bob is still the DC
+            room.user_leaves(charlie_idx);
+            room.users_make_progress_randomly(&mut rng);
 
-        // Bob leaves. Dave is the DC
-        room.user_leaves(bob_idx);
-        room.all_users_process_catch_up();
+            // Bob leaves. Dave is the DC
+            room.user_leaves(bob_idx);
+            room.users_make_progress_randomly(&mut rng);
 
-        room.test_app_msg_encryption(&mut rng);
+            // Everyone catches up then exchanges some messages
+            room.all_users_catch_up();
+            room.test_app_msg_encryption(&mut rng);
+        }
     }
 }
