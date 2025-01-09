@@ -161,7 +161,6 @@ impl WorkerState {
                 alive_at_welcome.difference(&self.users_who_left_since_i_joined);
             other_dc_candiates.count() == 0
         } else {
-            println!("{} hasn't been welcomed", self.uid_as_str());
             // If I haven't been welcomed, I'm certainly not the DC
             false
         }
@@ -269,27 +268,12 @@ impl WorkerState {
     /// If this user is the designated committer, this catches up on the pending adds and removes.
     /// If not, this does nothing.
     fn process_pendings(&mut self) -> WorkerResponse {
-        println!(
-            "{} is DC? {}",
-            self.uid_as_str(),
-            self.is_designated_committer()
-        );
         if !self.is_designated_committer() {
             return WorkerResponse::default();
         }
 
-        let uid = self.uid_as_str();
-        let group = self.mls_group.as_mut().unwrap();
-
         // Process all the pending additions. This is drained, meaning the vec is empty after this
-        println!(
-            "{} Pending adds: {:?}",
-            uid,
-            self.pending_adds
-                .iter()
-                .map(|kp| String::from_utf8_lossy(kp_to_uid(kp)))
-                .collect::<Vec<_>>()
-        );
+        let group = self.mls_group.as_mut().unwrap();
         let adds = self
             .pending_adds
             .drain(0..)
@@ -392,12 +376,6 @@ impl WorkerState {
         // Mark this user as left
         self.users_who_left_since_i_joined
             .insert(uid_to_remove.to_vec());
-
-        println!(
-            "{} observes {} left",
-            self.uid_as_str(),
-            String::from_utf8_lossy(uid_to_remove)
-        );
 
         // Process pending adds/removes (only does anything if we're the DC)
         self.process_pendings()
@@ -757,13 +735,10 @@ mod tests {
             let idxs = self
                 .states
                 .iter()
-                .filter_map(|t| t.as_ref().map(|(_, i)| *i))
-                .collect::<Vec<_>>();
-
-            println!("idxs {:?}", idxs);
+                .filter_map(|t| t.as_ref().map(|(_, i)| *i));
 
             // Take the min
-            idxs.into_iter().min().expect("all users are dead")
+            idxs.min().expect("all users are dead")
         }
 
         /// Unpacks the given worker response and adds it to the message queue. Ordering is
@@ -781,6 +756,7 @@ mod tests {
         }
 
         /// The user at the given index stops responding. They have not officially left yet though
+        // TODO: this doesn't capture a user dying in between sending a Welcome and an Add
         fn user_dies(&mut self, idx: usize) {
             self.states[idx] = None;
         }
@@ -859,8 +835,6 @@ mod tests {
                 let Some((ref mut s, next_msg_idx)) = &mut self.states[i] else {
                     continue;
                 };
-                println!("{} reading {} messages", s.uid_as_str(), num_msgs);
-                println!("{} queue idx is {}", s.uid_as_str(), *next_msg_idx);
 
                 // Go through the unprocessed messages and collect the responses
                 let resps: Vec<WorkerResponse> = self
@@ -872,24 +846,20 @@ mod tests {
                         let out = match msg {
                             // Join if possible
                             Msg::Welcome(w) => {
-                                println!("{} processing welcome", s.uid_as_str());
                                 let wp = welcome_out_to_in(w);
                                 s.join_group(wp);
                                 None
                             }
                             // Process a commit if possible
                             Msg::AddRemove(commit) => {
-                                println!("{} processing add/remove", s.uid_as_str());
                                 s.handle_commit(msg_out_to_in(commit));
                                 None
                             }
                             Msg::UserJoined(kp) => {
-                                println!("{} processing join", s.uid_as_str());
                                 let resp = s.user_joined(key_pkg_out_to_in(kp.key_package()));
                                 Some(resp)
                             }
                             Msg::UserLeft(idx) => {
-                                println!("{} processing leave", s.uid_as_str());
                                 let uid_to_remove = &self.uids[*idx];
                                 let resp = s.user_left(uid_to_remove);
                                 Some(resp)
@@ -911,7 +881,6 @@ mod tests {
             let msg = b"hello world";
 
             // Pick a distinct sender and receiver at random
-            println!("picking a sender idx");
             let sender_idx = loop {
                 let idx: usize = rng.gen_range(0..self.states.len());
                 // Only select states of users that have been welcomed
@@ -923,7 +892,6 @@ mod tests {
                     break idx;
                 }
             };
-            println!("picking a receiver idx");
             let receiver_idx = loop {
                 let idx: usize = rng.gen_range(0..self.states.len());
                 if self.states[idx]
@@ -970,6 +938,8 @@ mod tests {
             // Bob joins. Make sure Alice adds him, because she'll leave later
             let _bob_idx = room.user_joins(b"Bob");
             room.users_make_progress_randomly(&mut rng);
+            // TODO: Alice might *eventually* add Bob and that'd be okay. This catchup means we miss
+            // some cases
             room.user_catches_up(alice_idx);
 
             // Charlie joins
