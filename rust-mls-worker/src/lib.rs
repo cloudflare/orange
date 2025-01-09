@@ -145,15 +145,15 @@ pub async fn processEvent(event: Object) -> JsValue {
     let obj_list = Array::new();
     let buffers_list = Array::new();
     if let Some(WorkerResponse {
-        welcome,
-        proposals,
+        adds,
+        remove,
         new_safety_number,
         key_pkg,
         sender_id,
     }) = ret
     {
-        // The ordering of our objects is as follows: safety number, key package, welcome, add/remove
-        // Within add/remove, it is always add, then remove, since it is the order of their creation
+        // The ordering of our objects is as follows: safety number, key package, (welcome, add),
+        // (welcome, add), ..., remove
 
         // Make the safety number object if a new safety number is given
         if let Some(sn) = new_safety_number {
@@ -176,12 +176,13 @@ pub async fn processEvent(event: Object) -> JsValue {
             buffers_list.push(&buffers);
         }
 
-        // Make the welcome object if a welcome package is given
-        if let Some(WelcomePackageOut {
-            welcome,
-            ratchet_tree,
-        }) = welcome
-        {
+        // Make the Welcome and Add objects
+        for (wp, add) in adds {
+            let WelcomePackageOut {
+                welcome,
+                ratchet_tree,
+            } = wp;
+
             let (o, buffers) = make_obj_and_save_buffers(
                 "sendMlsWelcome",
                 &[
@@ -191,20 +192,32 @@ pub async fn processEvent(event: Object) -> JsValue {
             );
             set_sender_id(&o, sender_id.as_ref().unwrap());
 
-            // Accumulate the object and buffers
+            // Accumulate the Welcome-related object and buffers
+            obj_list.push(&o);
+            buffers_list.push(&buffers);
+
+            // Make the Add object
+            let (o, buffers) = make_obj_and_save_buffers(
+                "sendMlsMessage",
+                &[("msg", &add.tls_serialize_detached().unwrap())],
+            );
+            set_sender_id(&o, sender_id.as_ref().unwrap());
+
+            // Accumulate the Add-related object and buffers
             obj_list.push(&o);
             buffers_list.push(&buffers);
         }
 
-        // Make MLS message objects if messages are given
-        for msg in proposals {
+        // Make the Remove object if sone is given
+        if let Some(remove) = remove {
+            // Make the Remove object
             let (o, buffers) = make_obj_and_save_buffers(
                 "sendMlsMessage",
-                &[("msg", &msg.tls_serialize_detached().unwrap())],
+                &[("msg", &remove.tls_serialize_detached().unwrap())],
             );
             set_sender_id(&o, sender_id.as_ref().unwrap());
 
-            // Accumulate the object and buffers
+            // Accumulate the Remove-related object and buffers
             obj_list.push(&o);
             buffers_list.push(&buffers);
         }
