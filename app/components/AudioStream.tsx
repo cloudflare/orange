@@ -1,7 +1,7 @@
+import { useObservableAsValue } from 'partytracks/react'
 import type { FC } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
 import { of } from 'rxjs'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 
 interface AudioStreamProps {
@@ -74,7 +74,7 @@ function AudioTrack({
 	const onTrackRemovedRef = useRef(onTrackRemoved)
 	onTrackRemovedRef.current = onTrackRemoved
 
-	const { peer } = useRoomContext()
+	const { partyTracks } = useRoomContext()
 	const trackObject = useMemo(() => {
 		const [sessionId, trackName] = track.split('/')
 		return {
@@ -85,10 +85,10 @@ function AudioTrack({
 	}, [track])
 
 	const pulledTrack$ = useMemo(() => {
-		return peer.pullTrack(of(trackObject))
-	}, [peer, trackObject])
+		return partyTracks.pull(of(trackObject))
+	}, [partyTracks, trackObject])
 
-	const audioTrack = useSubscribedState(pulledTrack$)
+	const audioTrack = useObservableAsValue(pulledTrack$)
 
 	useEffect(() => {
 		if (!audioTrack) return

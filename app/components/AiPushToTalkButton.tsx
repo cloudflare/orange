@@ -1,6 +1,6 @@
+import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { switchMap } from 'rxjs'
-import { useStateObservable, useSubscribedState } from '~/hooks/rxjsHooks'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import type { ClientMessage } from '~/types/Messages'
 import { playSound } from '~/utils/playSound'
@@ -65,7 +65,7 @@ function useButtonIsHeldDown({
 
 export function AiPushToTalkButtion() {
 	const {
-		peer,
+		partyTracks,
 		room: {
 			websocket,
 			roomState: {
@@ -81,7 +81,7 @@ export function AiPushToTalkButtion() {
 		disabled,
 	})
 
-	const holdingTalkButton$ = useStateObservable(holdingTalkButton)
+	const holdingTalkButton$ = useValueAsObservable(holdingTalkButton)
 	const audioTrack$ = useMemo(
 		() =>
 			holdingTalkButton$.pipe(
@@ -93,11 +93,11 @@ export function AiPushToTalkButtion() {
 	)
 
 	const pushedAiAudioTrack$ = useMemo(
-		() => peer.pushTrack(audioTrack$),
-		[audioTrack$, peer]
+		() => partyTracks.push(audioTrack$),
+		[audioTrack$, partyTracks]
 	)
 
-	const pushedAiAudioTrack = useSubscribedState(pushedAiAudioTrack$)
+	const pushedAiAudioTrack = useObservableAsValue(pushedAiAudioTrack$)
 
 	useEffect(() => {
 		if (holdingTalkButton && pushedAiAudioTrack) {

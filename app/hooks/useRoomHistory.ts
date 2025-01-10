@@ -1,5 +1,5 @@
+import type { ApiHistoryEntry, PartyTracks } from 'partytracks/client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ApiHistoryEntry, RxjsPeer } from '~/utils/rxjs/RxjsPeer.client'
 import type useRoom from './useRoom'
 
 interface UserSession {
@@ -13,7 +13,7 @@ export interface RoomHistory {
 }
 
 export function useRoomHistory(
-	peer: RxjsPeer,
+	partyTracks: PartyTracks,
 	room: ReturnType<typeof useRoom>
 ): RoomHistory {
 	const [apiHistory, setApiHistory] = useState<ApiHistoryEntry[]>([])
@@ -24,14 +24,14 @@ export function useRoomHistory(
 
 	useEffect(() => {
 		const handleHistory = () => {
-			setApiHistory(peer.history.entries)
+			setApiHistory(partyTracks.history.entries)
 		}
-		peer.history.addEventListener('logentry', handleHistory)
+		partyTracks.history.addEventListener('logentry', handleHistory)
 
 		return () => {
-			peer.history.removeEventListener('logentry', handleHistory)
+			partyTracks.history.removeEventListener('logentry', handleHistory)
 		}
-	}, [peer])
+	}, [partyTracks])
 
 	useEffect(() => {
 		room.otherUsers.forEach((user) => {

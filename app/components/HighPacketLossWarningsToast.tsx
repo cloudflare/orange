@@ -1,18 +1,18 @@
+import { useObservableAsValue } from 'partytracks/react'
 import { useMemo } from 'react'
 import Toast, { Root } from '~/components/Toast'
-import { useSubscribedState } from '~/hooks/rxjsHooks'
 import { useConditionForAtLeast } from '~/hooks/useConditionForAtLeast'
 import { getPacketLossStats$ } from '~/utils/rxjs/getPacketLossStats$'
 import { useRoomContext } from '../hooks/useRoomContext'
 import { Icon } from './Icon/Icon'
 
 function useStats() {
-	const { peer } = useRoomContext()
+	const { partyTracks } = useRoomContext()
 	const stats$ = useMemo(
-		() => getPacketLossStats$(peer.peerConnection$),
-		[peer.peerConnection$]
+		() => getPacketLossStats$(partyTracks.peerConnection$),
+		[partyTracks.peerConnection$]
 	)
-	const stats = useSubscribedState(stats$, {
+	const stats = useObservableAsValue(stats$, {
 		inboundPacketLossPercentage: 0,
 		outboundPacketLossPercentage: 0,
 	})
