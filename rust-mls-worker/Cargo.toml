@@ -40,17 +40,5 @@ features = [
     'RtcEncodedVideoFrame',
 ]
 
-[patch.crates-io.wasm-bindgen]
-git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
-
-[patch.crates-io.web-sys]
-git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
-
-[patch.crates-io.js-sys]
-git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
-
-[patch.crates-io.wasm-bindgen-futures]
-git = "ssh://git@github.com/rustwasm/wasm-bindgen.git"
-
 [dev-dependencies]
-rand = "0.8.5"
+rand = "0.8"
