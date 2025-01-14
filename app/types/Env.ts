@@ -18,4 +18,5 @@ export type Env = {
 	OPENAI_API_TOKEN?: string
 	OPENAI_MODEL_ENDPOINT?: string
 	OPENAI_MODEL_ID?: string
+	MAX_PARTICIPANTS?: number
 }
