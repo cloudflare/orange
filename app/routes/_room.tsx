@@ -144,7 +144,6 @@ function Room({ room, userMedia }: RoomProps) {
 		maxApiHistory,
 		apiExtraParams: params.toString(),
 		iceServers,
-		apiBase: '/api/calls',
 	})
 	const roomHistory = useRoomHistory(partyTracks, room)
 

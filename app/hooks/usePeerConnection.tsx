@@ -1,7 +1,13 @@
-import { PartyTracks, type PartyTracksConfig } from 'partytracks/client'
+import {
+	PartyTracks,
+	setLogLevel,
+	type PartyTracksConfig,
+} from 'partytracks/client'
 import { useObservableAsValue } from 'partytracks/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useStablePojo } from './useStablePojo'
+
+setLogLevel('debug')
 
 export const usePeerConnection = (config: PartyTracksConfig) => {
 	const stableConfig = useStablePojo(config)
