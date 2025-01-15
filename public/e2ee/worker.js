@@ -18,7 +18,6 @@ const wasmIsReady = initWasmInWorker()
 onmessage = async (event /* MessageEvent */) => {
 	// Need to load WASM before doing anything
 	await wasmIsReady
-	console.log('Worker received message:', event.data)
 
 	// Process the event and get a response of the form [objects, buffers]
 	// where objects are the values to post to the main thread, and buffers are the lists of of
@@ -30,5 +29,18 @@ onmessage = async (event /* MessageEvent */) => {
 		postMessage(objects[i], buffers[i])
 	}
 }
+
+// Handler for RTCRtpScriptTransforms (Firefox uses bc it doesn't have createEncodedStream).
+// This just repackages the event and sends it to onmessage.
+onrtctransform = async (event /* RTCTransformEvent */) => {
+		const transformer = event.transformer;
+		const repackagedEvent = {
+			"ty": transformer.options.operation,
+			"in": transformer.readable,
+			"out": transformer.writable
+		};
+		// Pass it to handler we defined above
+		await self.onmessage(repackagedEvent);
+};
 
 postMessage({ type: 'workerReady' })
