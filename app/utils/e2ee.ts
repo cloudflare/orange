@@ -295,7 +295,7 @@ function reviver(_key: string, value: any) {
 }
 
 export function useE2EE({
-	enabled = true,
+	enabled = false,
 	room,
 	partyTracks,
 }: {
@@ -384,7 +384,7 @@ export function useE2EE({
 		}
 	}, [enabled, encryptionWorker, room.websocket])
 
-	return safetyNumber
+	return enabled ? safetyNumber : undefined
 }
 
 function arrayBufferToDecimal(buffer: ArrayBuffer) {
