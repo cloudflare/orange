@@ -23,9 +23,7 @@ export function ParticipantLayout(props: { users: User[] }) {
 	)
 	const id = useId()
 
-	const [firstUser, ...otherUsers] = props.users
-
-	if (firstUser === undefined) {
+	if (props.users.length === 0) {
 		return null
 	}
 
@@ -43,9 +41,12 @@ export function ParticipantLayout(props: { users: User[] }) {
 				}
 				ref={containerRef}
 			>
-				<Participant user={firstUser} ref={firstFlexChildRef} />
-				{otherUsers.map((user) => (
-					<Participant key={user.id} user={user} />
+				{props.users.map((user, i) => (
+					<Participant
+						key={user.id}
+						user={user}
+						ref={i === 0 ? firstFlexChildRef : undefined}
+					/>
 				))}
 			</div>
 		</Flipper>
