@@ -5,6 +5,7 @@ const proxy = async ({ request, context }: LoaderFunctionArgs) =>
 	routePartyTracksRequest({
 		appId: context.env.CALLS_APP_ID,
 		token: context.env.CALLS_APP_SECRET,
+		baseUrl: context.env.CALLS_API_URL,
 		request,
 	})
 
