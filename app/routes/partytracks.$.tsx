@@ -6,6 +6,7 @@ const proxy = async ({ request, context }: LoaderFunctionArgs) =>
 		appId: context.env.CALLS_APP_ID,
 		token: context.env.CALLS_APP_SECRET,
 		baseUrl: context.env.CALLS_API_URL,
+		prefix: context.env.CALLS_API_PREFIX,
 		request,
 	})
 
