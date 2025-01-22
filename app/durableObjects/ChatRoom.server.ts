@@ -418,7 +418,10 @@ export class ChatRoom extends Server<Env> {
 							params.set('instructions', instructions)
 						}
 
-						params.set('model', this.env.OPENAI_MODEL_ID || defaultOpenAIModelID)
+						params.set(
+							'model',
+							this.env.OPENAI_MODEL_ID || defaultOpenAIModelID
+						)
 
 						// The Calls's offer is sent to OpenAI
 						const openaiAnswer = await requestOpenAIService(
