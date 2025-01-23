@@ -3,7 +3,6 @@ export type Env = {
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
 	CALLS_API_URL?: string
-	CALLS_API_PREFIX?: string
 	USER_DIRECTORY_URL?: string
 	FEEDBACK_URL?: string
 	FEEDBACK_QUEUE?: Queue
