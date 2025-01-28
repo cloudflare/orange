@@ -2,6 +2,7 @@ export type Env = {
 	rooms: DurableObjectNamespace
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
+	E2EE_ENABLED?: string
 	USER_DIRECTORY_URL?: string
 	FEEDBACK_URL?: string
 	FEEDBACK_QUEUE?: Queue
