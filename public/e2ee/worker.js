@@ -32,15 +32,17 @@ onmessage = async (event /* MessageEvent */) => {
 
 // Handler for RTCRtpScriptTransforms (Firefox uses bc it doesn't have createEncodedStream).
 // This just repackages the event and sends it to onmessage.
-onrtctransform = async (event /* RTCTransformEvent */) => {
-		const transformer = event.transformer;
-		const repackagedEvent = {
-			"ty": transformer.options.operation,
-			"in": transformer.readable,
-			"out": transformer.writable
-		};
-		// Pass it to handler we defined above
-		await self.onmessage(repackagedEvent);
-};
+self.onrtctransform = async (event /* RTCTransformEvent */) => {
+	const transformer = event.transformer
+	const repackagedEvent = {
+		data: {
+			type: transformer.options.operation,
+			in: transformer.readable,
+			out: transformer.writable,
+		},
+	}
+	// Pass it to handler we defined above
+	await self.onmessage(repackagedEvent)
+}
 
 postMessage({ type: 'workerReady' })
