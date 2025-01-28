@@ -45,6 +45,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 				context.env.FEEDBACK_STORAGE
 		),
 		mode: context.mode,
+		e2eeEnabled: context.env.E2EE_ENABLED === 'true',
 		hasDb: Boolean(context.env.DB),
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
@@ -74,7 +75,8 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
+	const { hasDb, hasAiCredentials, e2eeEnabled } =
+		useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		partyTracks,
@@ -89,7 +91,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		identity,
 		roomState: { meetingId },
 	} = room
-	const e2eeSafetyNumber = useE2EE({ room, partyTracks })
+	const e2eeSafetyNumber = useE2EE({ room, partyTracks, enabled: e2eeEnabled })
 
 	useShowDebugInfoShortcut()
 
