@@ -158,6 +158,15 @@ export class EncryptionWorker {
 	async setupSenderTransform(sender: RTCRtpSender) {
 		console.log('Setting up sender transform')
 
+		// If this is Firefox, we will have to use RTCRtpScriptTransform
+		if (window.RTCRtpScriptTransform) {
+			sender.transform = new RTCRtpScriptTransform(this.worker, {
+				operation: 'encryptStream',
+			})
+			return
+		}
+
+		// Otherwise if this is Chrome we'll have to use createEncodedStreams
 		if (
 			'createEncodedStreams' in sender &&
 			typeof sender.createEncodedStreams === 'function'
@@ -172,13 +181,28 @@ export class EncryptionWorker {
 				},
 				[readable, writable]
 			)
-		} else {
-			throw new Error('RTCRtpSender.createEncodedStreams method not supported')
+
+			return
 		}
+
+		throw new Error(
+			'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
+		)
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
 		console.log('Setting up receiver transform')
+
+		// If this is Firefox, we will have to use RTCRtpScriptTransform
+		if (window.RTCRtpScriptTransform) {
+			receiver.transform = new RTCRtpScriptTransform(this.worker, {
+				operation: 'decryptStream',
+			})
+
+			return
+		}
+
+		// Otherwise if this is Chrome we'll have to use createEncodedStreams
 		if (
 			'createEncodedStreams' in receiver &&
 			typeof receiver.createEncodedStreams === 'function'
@@ -193,9 +217,13 @@ export class EncryptionWorker {
 				},
 				[readable, writable]
 			)
-		} else {
-			throw new Error('e2ee not supported')
+
+			return
 		}
+
+		throw new Error(
+			'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
+		)
 	}
 
 	decryptStream(inStream: ReadableStream, outStream: WritableStream) {
