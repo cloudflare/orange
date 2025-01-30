@@ -1,6 +1,6 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { useObservableAsValue } from 'partytracks/react'
-import { forwardRef, useEffect, useMemo } from 'react'
+import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import { Flipped } from 'react-flip-toolkit'
 import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
@@ -8,6 +8,7 @@ import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { screenshareSuffix } from '~/hooks/useStageManager'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
+import { useVideoDimensions } from '~/hooks/useVideoDimensions'
 import type { User } from '~/types/Messages'
 import isNonNullable from '~/utils/isNonNullable'
 import populateTraceLink from '~/utils/populateTraceLink'
@@ -120,6 +121,9 @@ export const Participant = forwardRef<
 
 	const packetLoss = useObservableAsValue(packetLoss$, 0)
 
+	const videoRef = useRef<HTMLVideoElement>(null)
+	const { videoHeight, videoWidth } = useVideoDimensions(videoRef)
+
 	const audioMid = useMid(audioTrack)
 	const videoMid = useMid(videoTrack)
 
@@ -173,6 +177,7 @@ export const Participant = forwardRef<
 						</div>
 					)}
 					<VideoSrcObject
+						ref={videoRef}
 						className={cn(
 							'absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity',
 							isSelf && !isScreenShare && '-scale-x-100',
@@ -250,6 +255,7 @@ export const Participant = forwardRef<
 										{[
 											audioMid && `audio mid: ${audioMid}`,
 											videoMid && `video mid: ${videoMid}`,
+											`vid size: ${videoWidth}x${videoHeight}`,
 										]
 											.filter(Boolean)
 											.join(' ')}
