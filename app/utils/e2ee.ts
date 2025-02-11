@@ -356,26 +356,31 @@ export function useE2EE({
 	useEffect(() => {
 		if (!enabled) return
 
-		const subscription = partyTracks.sender$.subscribe((sender) => {
-			console.log('Setting up sender transform', sender)
-			encryptionWorker.setupSenderTransform(sender)
+		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
+			if (transceiver.direction === 'sendonly') {
+				// if (
+				// 	typeof RTCRtpSender.getCapabilities !== 'undefined' &&
+				// 	typeof transceiver.setCodecPreferences !== 'undefined' &&
+				// 	transceiver.sender.track?.kind === 'video'
+				// ) {
+				// 	const capability = RTCRtpSender.getCapabilities('video')
+				// 	const codecs = capability ? capability.codecs : []
+				// 	codecs.sort((a, b) =>
+				// 		a.mimeType === 'video/VP9' && b.mimeType !== 'video/VP9' ? -1 : 0
+				// 	)
+				// 	transceiver.setCodecPreferences(codecs)
+				// }
+				console.log('Setting up sender transform', transceiver.sender)
+				encryptionWorker.setupSenderTransform(transceiver.sender)
+			} else if (transceiver.direction === 'recvonly') {
+				encryptionWorker.setupReceiverTransform(transceiver.receiver)
+			}
 		})
 
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, encryptionWorker, partyTracks.sender$])
-
-	useEffect(() => {
-		if (!enabled) return
-		const subscription = partyTracks.receiver$.subscribe((receiver) => {
-			encryptionWorker.setupReceiverTransform(receiver)
-		})
-
-		return () => {
-			subscription.unsubscribe()
-		}
-	}, [enabled, encryptionWorker, partyTracks.receiver$])
+	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
 	// TODO: Broadcast MLS room messages
 
