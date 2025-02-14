@@ -10,6 +10,9 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 CALLS_APP_ID = "YOUR_CALLS_SFU_APP_ID_HERE"
 
+# Optional vars
+# OPENAI_MODEL_ENDPOINT = ""
+
 [[durable_objects.bindings]]
 name = "rooms"
 class_name = "ChatRoom"
@@ -22,3 +25,6 @@ new_classes = ["ChatRoom"]
 # The necessary secrets are:
 # - CALLS_APP_SECRET
 # To add secret, run `echo <VALUE> | wrangler secret put <NAME>`
+
+# Optional secrets:
+# OPENAI_API_TOKEN = ""
