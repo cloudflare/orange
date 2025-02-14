@@ -152,6 +152,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 								<ParticipantLayout
 									users={pinnedActors.filter(isNonNullable)}
 									gap={gridGap}
+									aspectRatio="16:9"
 								/>
 							</div>
 						)}
@@ -159,6 +160,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 							<ParticipantLayout
 								users={unpinnedActors.filter(isNonNullable)}
 								gap={gridGap}
+								aspectRatio="4:3"
 							/>
 						</div>
 					</div>

@@ -182,6 +182,7 @@ export const Participant = forwardRef<
 						className={cn(
 							'absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity',
 							isSelf && !isScreenShare && '-scale-x-100',
+							!isScreenShare && 'object-cover',
 							{
 								'opacity-100': isScreenShare
 									? user.tracks.screenShareEnabled
@@ -244,7 +245,7 @@ export const Participant = forwardRef<
 						<div className="flex items-center gap-2 absolute m-2 text-shadow left-1 bottom-1">
 							<ConnectionIndicator quality={getConnectionQuality(packetLoss)} />
 							<OptionalLink
-								className="leading-none"
+								className="leading-none text-sm"
 								href={populateTraceLink(user.transceiverSessionId, traceLink)}
 								target="_blank"
 								rel="noopener noreferrer"

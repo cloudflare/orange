@@ -8,9 +8,11 @@ import { Participant } from './Participant'
 export function ParticipantLayout({
 	users,
 	gap,
+	aspectRatio,
 }: {
 	users: User[]
 	gap: number
+	aspectRatio: string
 }) {
 	const $el = useRef<HTMLDivElement>(null)
 
@@ -21,7 +23,7 @@ export function ParticipantLayout({
 	const { width, height, getPosition } = createGrid({
 		dimensions,
 		count: users.length,
-		aspectRatio: '4:3',
+		aspectRatio,
 		gap,
 	})
 
