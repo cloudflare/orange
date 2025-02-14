@@ -116,7 +116,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const someScreenshare =
 		otherUsers.some((u) => u.tracks.screenshare) ||
 		Boolean(identity?.tracks.screenshare)
-	const stageLimit = width < 600 ? 2 : someScreenshare ? 5 : 8
+	const stageLimit = width < 600 ? 2 : someScreenshare ? 5 : 9
 
 	const { recordActivity, actorsOnStage } = useStageManager(
 		otherUsers,
@@ -135,6 +135,8 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		(u) => !pinnedTileIds.includes(u.id)
 	)
 
+	const gridGap = 12
+
 	return (
 		<PullAudioTracks
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
@@ -142,20 +144,22 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 			<div className="flex flex-col h-full bg-white dark:bg-zinc-800">
 				<div className="relative flex-grow bg-black isolate">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-[var(--gap)]"
-						style={
-							{
-								'--gap': '1rem',
-							} as any
-						}
+						style={{ '--gap': gridGap + 'px' } as any}
+						className="absolute inset-0 flex isolate p-[--gap] gap-[--gap]"
 					>
 						{pinnedActors.length > 0 && (
 							<div className="flex-grow-[5] overflow-hidden relative">
-								<ParticipantLayout users={pinnedActors.filter(isNonNullable)} />
+								<ParticipantLayout
+									users={pinnedActors.filter(isNonNullable)}
+									gap={gridGap}
+								/>
 							</div>
 						)}
 						<div className="flex-grow overflow-hidden relative">
-							<ParticipantLayout users={unpinnedActors.filter(isNonNullable)} />
+							<ParticipantLayout
+								users={unpinnedActors.filter(isNonNullable)}
+								gap={gridGap}
+							/>
 						</div>
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
