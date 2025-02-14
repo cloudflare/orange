@@ -56,7 +56,7 @@ interface Props {
 export const Participant = forwardRef<
 	HTMLDivElement,
 	JSX.IntrinsicElements['div'] & Props
->(({ user }, ref) => {
+>(({ user, style }, ref) => {
 	const { data } = useUserMetadata(user.name)
 	const {
 		traceLink,
@@ -131,6 +131,7 @@ export const Participant = forwardRef<
 		<div
 			className="grow shrink text-base basis-[calc(var(--flex-container-width)_-_var(--gap)_*_3)]"
 			ref={ref}
+			style={style}
 		>
 			<Flipped flipId={id + pinned}>
 				<div
