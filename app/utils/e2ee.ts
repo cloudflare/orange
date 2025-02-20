@@ -1,5 +1,5 @@
 import type { PartyTracks } from 'partytracks/client'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import invariant from 'tiny-invariant'
 import type useRoom from '~/hooks/useRoom'
 import type { ServerMessage } from '~/types/Messages'
@@ -105,13 +105,9 @@ export class EncryptionWorker {
 	safetyNumber: number = -1
 	id: string
 
-	constructor(config: { createGroup: boolean; id: string }) {
+	constructor(config: { id: string }) {
 		this.id = config.id
-		if (config.createGroup) {
-			this.initializeAndCreateGroup()
-		} else {
-			this.initialize()
-		}
+		this._worker = new Worker('/e2ee/worker.js')
 	}
 
 	dispose() {
@@ -119,12 +115,10 @@ export class EncryptionWorker {
 	}
 
 	initialize() {
-		this._worker = new Worker('/e2ee/worker.js')
 		this.worker.postMessage({ type: 'initialize', id: this.id })
 	}
 
 	initializeAndCreateGroup() {
-		this._worker = new Worker('/e2ee/worker.js')
 		this.worker.postMessage({ type: 'initializeAndCreateGroup', id: this.id })
 	}
 
@@ -239,15 +233,7 @@ export class EncryptionWorker {
 			const excludedEvents = ['workerReady', 'newSafetyNumber']
 			if (!excludedEvents.includes(event.data.type)) {
 				console.log('Message from worker in handleOutgoingEvents', event.data)
-				onMessage(
-					JSON.stringify(
-						{
-							...event.data,
-							// senderId: this.id
-						},
-						replacer
-					)
-				)
+				onMessage(JSON.stringify(event.data, replacer))
 			}
 		})
 	}
@@ -279,21 +265,6 @@ export class EncryptionWorker {
 			}
 		})
 	}
-
-	// handle messages from the worker, broadcasthing them to other users
-
-	// handle incoming messages from other users
-
-	/* TODO:
-  {type: “encryptStream”, in: ReadableStream, out: WriteableStream}
-  {type: “decryptStream”, in: ReadableStream, out: WriteableStream}
-  ==============================================================================
-  # Messages received by the main thread
-  {type: “shareKeyPackage”, keyPkg: UInt8Array}
-  {type: “sendMlsMessage”, msg: UInt8Array, senderId: str}
-  {type: “sendMlsWelcome”, welcome: UInt8Array, rtree: UInt8Array}
-  {type: “newSafetyNumber”, hash: UInt8Array}
-  */
 }
 
 const FLAG_TYPED_ARRAY = 'FLAG_TYPED_ARRAY'
@@ -331,23 +302,17 @@ export function useE2EE({
 	partyTracks: PartyTracks
 	room: ReturnType<typeof useRoom>
 }) {
-	// only want this to be evaluated once
-	const [firstUser] = useState(room.otherUsers.length === 0)
 	const [safetyNumber, setSafetyNumber] = useState<string>()
 
 	const encryptionWorker = useMemo(
 		() =>
 			new EncryptionWorker({
-				createGroup: firstUser,
 				id: room.websocket.id,
 			}),
-		[firstUser, room.websocket.id]
+		[room.websocket.id]
 	)
 
 	useEffect(() => {
-		encryptionWorker.onNewSafetyNumber((buffer) =>
-			setSafetyNumber(arrayBufferToDecimal(buffer))
-		)
 		return () => {
 			encryptionWorker.dispose()
 		}
@@ -356,31 +321,47 @@ export function useE2EE({
 	useEffect(() => {
 		if (!enabled) return
 
-		const subscription = partyTracks.sender$.subscribe((sender) => {
-			console.log('Setting up sender transform', sender)
-			encryptionWorker.setupSenderTransform(sender)
+		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
+			if (transceiver.direction === 'sendonly') {
+				encryptionWorker.setupSenderTransform(transceiver.sender)
+			}
 		})
 
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, encryptionWorker, partyTracks.sender$])
+	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
 	useEffect(() => {
 		if (!enabled) return
-		const subscription = partyTracks.receiver$.subscribe((receiver) => {
-			encryptionWorker.setupReceiverTransform(receiver)
+		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
+			if (transceiver.direction === 'recvonly') {
+				encryptionWorker.setupReceiverTransform(transceiver.receiver)
+			}
 		})
 
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, encryptionWorker, partyTracks.receiver$])
+	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
-	// TODO: Broadcast MLS room messages
+	const [joined, setJoined] = useState(false)
+	const [firstUser, setFirstUser] = useState(false)
+
+	const onJoin = useCallback(
+		(firstUser: boolean) => {
+			if (!enabled) return
+			setJoined(true)
+			setFirstUser(firstUser)
+		},
+		[enabled]
+	)
 
 	useEffect(() => {
-		if (!enabled) return
+		if (!joined) return
+		encryptionWorker.onNewSafetyNumber((buffer) =>
+			setSafetyNumber(arrayBufferToDecimal(buffer))
+		)
 		encryptionWorker.handleOutgoingEvents((data) => {
 			console.log('📬 sending e2eeMlsMessage to peers', data)
 			room.websocket.send(
@@ -390,10 +371,6 @@ export function useE2EE({
 				})
 			)
 		})
-	}, [enabled, encryptionWorker, room.websocket])
-
-	useEffect(() => {
-		if (!enabled) return
 		const handler = (event: MessageEvent) => {
 			const message = JSON.parse(event.data) as ServerMessage
 			if (message.type === 'e2eeMlsMessage') {
@@ -407,12 +384,21 @@ export function useE2EE({
 
 		room.websocket.addEventListener('message', handler)
 
+		if (firstUser) {
+			encryptionWorker.initializeAndCreateGroup()
+		} else {
+			encryptionWorker.initialize()
+		}
+
 		return () => {
 			room.websocket.removeEventListener('message', handler)
 		}
-	}, [enabled, encryptionWorker, room.websocket])
+	}, [encryptionWorker, firstUser, joined, room.websocket])
 
-	return enabled ? safetyNumber : undefined
+	return {
+		e2eeSafetyNumber: enabled ? safetyNumber : undefined,
+		onJoin,
+	}
 }
 
 function arrayBufferToDecimal(buffer: ArrayBuffer) {
@@ -422,37 +408,3 @@ function arrayBufferToDecimal(buffer: ArrayBuffer) {
 	})
 	return hexArray.join('') // Join all hex strings into a single string
 }
-
-/*
-
-Message Flow Overview
-We describe a high level overview of the message flow for an end-to-end encrypted Orange Meets room.
-
-First user joins the room:
-client JS --"initializeAndCreateGroup"--> worker
-client JS --"encryptStream"--> worker     These two calls merely pass the infinite stream of audio/video to the worker. The worker doesn't do anything with it for now, but it will use it once there are recipients.
-client JS --"decryptStream"--> worker
-Nothing is sent, because nobody else is in the room
-Second user joins the room:
-client JS --"initialize"--> worker
-client JS --"encryptStream"--> worker These two calls can happen in parallel with the rest of the flow
-client JS --"decryptStream"--> worker
-worker --"shareKeyPackage"--> client JS --keyPkg--> durable object --keyPkg--> recip JS --"userJoined"--> recip worker
-recip worker --"sendMlsWelcome"--> client JS --msg--> durable object --msg--> recip JS --"recvMlsWelcome"--> recip worker
-recip worker --"sendMlsMessage"--> client JS --msg--> durable object --msg--> recip JS --"recvMlsMessage"--> recip worker
-worker --"newSafetyNumber"--> client JS
-
-
-Third user joins the room:
-
-<same as above>
-
-
-
-Second user leaves the room
-
-client JS --"userLeft"--> durable object --"userLeft"--> recip JS --"userLeft"--> recip worker
-recip worker --"sendMlsMessage"--> client JS --msg--> durable object --msg--> recip JS --"recvMlsMessage"--> recip worker
-worker --"newSafetyNumber"--> client JS
-
-*/

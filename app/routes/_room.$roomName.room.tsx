@@ -32,7 +32,6 @@ import useSounds from '~/hooks/useSounds'
 import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import { dashboardLogsLink } from '~/utils/dashboardLogsLink'
-import { useE2EE } from '~/utils/e2ee'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
 
@@ -47,7 +46,6 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 				context.env.FEEDBACK_STORAGE
 		),
 		mode: context.mode,
-		e2eeEnabled: context.env.E2EE_ENABLED === 'true',
 		hasDb: Boolean(context.env.DB),
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
@@ -78,7 +76,7 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb, hasAiCredentials, e2eeEnabled, dashboardDebugLogsBaseUrl } =
+	const { hasDb, hasAiCredentials, dashboardDebugLogsBaseUrl } =
 		useLoaderData<typeof loader>()
 	const {
 		userMedia,
@@ -87,6 +85,8 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		showDebugInfo,
 		pinnedTileIds,
 		room,
+		e2eeSafetyNumber,
+		e2eeOnJoin,
 	} = useRoomContext()
 	const {
 		otherUsers,
@@ -94,7 +94,13 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		identity,
 		roomState: { meetingId },
 	} = room
-	const e2eeSafetyNumber = useE2EE({ room, partyTracks, enabled: e2eeEnabled })
+
+	// only want this evaluated once upon mounting
+	const [firstUser] = useState(otherUsers.length === 0)
+
+	useEffect(() => {
+		e2eeOnJoin(firstUser)
+	}, [e2eeOnJoin, firstUser])
 
 	useShowDebugInfoShortcut()
 
