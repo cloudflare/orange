@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
 import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { EnsureOnline } from '~/components/EnsureOnline'
@@ -164,6 +164,30 @@ function Room({ room, userMedia }: RoomProps) {
 	])
 	const videoTrackEncodingParams$ =
 		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
+
+	useLayoutEffect(() => {
+		partyTracks.transceiver$.subscribe((transceiver) => {
+			const params = transceiver.sender.getParameters()
+			transceiver.sender.setParameters({
+				...params,
+				encodings: [
+					// for firefox order matters... first high resolution, then scaled resolutions...
+					{
+						rid: 'f',
+					},
+					{
+						rid: 'h',
+						scaleResolutionDownBy: 2.0,
+					},
+					{
+						rid: 'q',
+						scaleResolutionDownBy: 4.0,
+					},
+				],
+			})
+		})
+	}, [partyTracks.transceiver$])
+
 	const pushedVideoTrack$ = useMemo(
 		() => partyTracks.push(userMedia.videoTrack$, videoTrackEncodingParams$),
 		[partyTracks, userMedia.videoTrack$, videoTrackEncodingParams$]
