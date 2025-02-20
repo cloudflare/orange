@@ -17,6 +17,7 @@ import { useRoomHistory } from '~/hooks/useRoomHistory'
 import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
 import type { TrackObject } from '~/utils/callsTypes'
+import { useE2EE } from '~/utils/e2ee'
 import { getIceServers } from '~/utils/getIceServers.server'
 
 function numberOrUndefined(value: unknown): number | undefined {
@@ -55,6 +56,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		maxWebcamBitrate: numberOrUndefined(MAX_WEBCAM_BITRATE),
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),
 		maxApiHistory: numberOrUndefined(MAX_API_HISTORY),
+		e2eeEnabled: context.env.E2EE_ENABLED === 'true',
 	})
 }
 
@@ -133,6 +135,7 @@ function Room({ room, userMedia }: RoomProps) {
 		maxWebcamFramerate = 24,
 		maxWebcamQualityLevel = 1080,
 		maxApiHistory = 100,
+		e2eeEnabled,
 	} = useLoaderData<typeof loader>()
 
 	const params = new URLSearchParams(apiExtraParams)
@@ -198,6 +201,12 @@ function Room({ room, userMedia }: RoomProps) {
 	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
 	const [showDebugInfo, setShowDebugInfo] = useState(false)
 
+	const { e2eeSafetyNumber, onJoin } = useE2EE({
+		enabled: e2eeEnabled,
+		room,
+		partyTracks,
+	})
+
 	const context: RoomContextType = {
 		joined,
 		setJoined,
@@ -213,6 +222,8 @@ function Room({ room, userMedia }: RoomProps) {
 		feedbackEnabled,
 		partyTracks: partyTracks,
 		roomHistory,
+		e2eeSafetyNumber,
+		e2eeOnJoin: onJoin,
 		iceConnectionState,
 		room,
 		pushedTracks: {
