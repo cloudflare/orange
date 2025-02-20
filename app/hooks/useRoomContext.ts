@@ -22,6 +22,8 @@ export type RoomContextType = {
 	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>
+	e2eeSafetyNumber?: string
+	e2eeOnJoin: (firstUser: boolean) => void
 	pushedTracks: {
 		video?: string
 		audio?: string
