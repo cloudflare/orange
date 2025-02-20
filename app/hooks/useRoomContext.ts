@@ -25,6 +25,8 @@ export type RoomContextType = {
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>
 	simulcastEnabled: boolean
+	e2eeSafetyNumber?: string
+	e2eeOnJoin: (firstUser: boolean) => void
 	pushedTracks: {
 		video?: string
 		audio?: string
