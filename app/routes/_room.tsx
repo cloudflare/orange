@@ -167,24 +167,26 @@ function Room({ room, userMedia }: RoomProps) {
 
 	useLayoutEffect(() => {
 		partyTracks.transceiver$.subscribe((transceiver) => {
-			const params = transceiver.sender.getParameters()
-			transceiver.sender.setParameters({
-				...params,
-				encodings: [
-					// for firefox order matters... first high resolution, then scaled resolutions...
-					{
-						rid: 'f',
-					},
-					{
-						rid: 'h',
-						scaleResolutionDownBy: 2.0,
-					},
-					{
-						rid: 'q',
-						scaleResolutionDownBy: 4.0,
-					},
-				],
-			})
+			if (transceiver.direction === 'sendonly') {
+				const params = transceiver.sender.getParameters()
+				transceiver.sender.setParameters({
+					...params,
+					encodings: [
+						// for firefox order matters... first high resolution, then scaled resolutions...
+						{
+							rid: 'f',
+						},
+						{
+							rid: 'h',
+							scaleResolutionDownBy: 2.0,
+						},
+						{
+							rid: 'q',
+							scaleResolutionDownBy: 4.0,
+						},
+					],
+				})
+			}
 		})
 	}, [partyTracks.transceiver$])
 
