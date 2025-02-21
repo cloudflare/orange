@@ -1,8 +1,8 @@
+import { createGrid } from 'good-grid'
+import { useGridDimensions } from 'good-grid/react'
 import { useId, useRef } from 'react'
 import { Flipper } from 'react-flip-toolkit'
 import type { User } from '~/types/Messages'
-import { createGrid } from '~/utils/good-grid'
-import { useGridDimensions } from '~/utils/good-grid/react'
 import { Participant } from './Participant'
 
 export function ParticipantLayout({
