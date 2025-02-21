@@ -1,0 +1,44 @@
+[package]
+name = "orange-mls-worker"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+console_error_panic_hook = "0.1.6"
+console_log = "1.0.0"
+log = "0.4.22"
+openmls = { version = "0.6.0", features = ["js"] }
+openmls_basic_credential = "0.3.0"
+openmls_rust_crypto = "0.3.0"
+sha2 = "0.10.8"
+thiserror = "2.0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.43"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    'console',
+    'Document',
+    'HtmlElement',
+    'HtmlInputElement',
+    'MessageEvent',
+    'Window',
+    'Worker',
+    'RtcTransformEvent',
+    'ReadableStream',
+    'WritableStream',
+    'ReadableStreamGetReaderOptions',
+    'ReadableStreamReaderMode',
+    'ReadableStreamByobReader',
+    'ReadableStreamDefaultReader',
+    'WritableStreamDefaultWriter',
+    'RtcEncodedAudioFrame',
+    'RtcEncodedVideoFrame',
+]
+
+[dev-dependencies]
+rand = "0.8"
