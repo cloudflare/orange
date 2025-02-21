@@ -53,6 +53,7 @@
 		"clsx": "^2.1.1",
 		"cookie": "^0.6.0",
 		"drizzle-orm": "^0.33.0",
+		"good-grid": "^1.1.5",
 		"nanoid": "^5.0.7",
 		"partyserver": "^0.0.57",
 		"partysocket": "^1.0.2",
