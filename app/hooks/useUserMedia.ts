@@ -9,7 +9,7 @@ import noiseSuppression from '~/utils/noiseSuppression'
 import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
 import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 import { getUserMediaTrack$ } from '~/utils/rxjs/getUserMediaTrack$'
-import { mutedAudioTrack$ } from '~/utils/rxjs/mutedAudioTrack$'
+import { inaudibleAudioTrack$ } from '~/utils/rxjs/inaudibleAudioTrack$'
 
 export const errorMessageMap = {
 	NotAllowedError:
@@ -123,7 +123,7 @@ export default function useUserMedia() {
 	const publicAudioTrack$ = useMemo(
 		() =>
 			audioEnabled$.pipe(
-				switchMap((enabled) => (enabled ? audioTrack$ : mutedAudioTrack$)),
+				switchMap((enabled) => (enabled ? audioTrack$ : inaudibleAudioTrack$)),
 				shareReplay({
 					refCount: true,
 					bufferSize: 1,
