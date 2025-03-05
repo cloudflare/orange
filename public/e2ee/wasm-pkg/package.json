@@ -1,0 +1,11 @@
+{
+  "name": "orange-mls-worker",
+  "version": "0.1.0",
+  "files": [
+    "orange_mls_worker_bg.wasm",
+    "orange_mls_worker.js",
+    "orange_mls_worker.d.ts"
+  ],
+  "browser": "orange_mls_worker.js",
+  "types": "orange_mls_worker.d.ts"
+}

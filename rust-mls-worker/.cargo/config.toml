@@ -1,0 +1,4 @@
+[build]
+# The WebRTC Encoder Transform API is unstable, so we must use this build flag
+# https://github.com/rustwasm/wasm-bindgen/pull/4125
+rustflags = ["--cfg=web_sys_unstable_apis"]
