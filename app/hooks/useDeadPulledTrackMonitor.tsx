@@ -14,28 +14,34 @@ export function useDeadPulledTrackMonitor(
 	const [deadTrack, setDeadTrack] = useState(false)
 	const { partyTracks, traceLink, room, feedbackEnabled } = useRoomContext()
 	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
-	const timeoutRef = useRef(-1)
+	const intervalRef = useRef(-1)
+	const bytesRef = useRef(0)
 
 	useEffect(() => {
 		if (!peerConnection || !track || !enabled || deadTrack || !feedbackEnabled)
 			return
-		timeoutRef.current = window.setTimeout(() => {
+		intervalRef.current = window.setInterval(() => {
 			peerConnection.getStats(track).then((report) => {
 				// this means component has unmounted
-				if (timeoutRef.current === -1) return
+				if (intervalRef.current === -1) return
 				const stat = [...report.values()].find(
 					(s) => s.trackIdentifier === track.id
 				)
-				if (stat?.bytesReceived === 0) {
-					setDeadTrack(true)
+				if (stat.type !== 'inbound-rtp') return
+				if (stat?.bytesReceived !== undefined) {
+					if (bytesRef.current === stat.bytesReceived) {
+						setDeadTrack(true)
+					} else {
+						bytesRef.current = stat.bytesReceived
+					}
 				}
 			})
 		}, 10000)
 
 		return () => {
-			clearTimeout(timeoutRef.current)
+			clearInterval(intervalRef.current)
 			// reset this to -1 for the check above
-			timeoutRef.current = -1
+			intervalRef.current = -1
 		}
 	}, [deadTrack, enabled, feedbackEnabled, partyTracks, peerConnection, track])
 
