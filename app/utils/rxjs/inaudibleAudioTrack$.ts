@@ -9,7 +9,7 @@ export const inaudibleAudioTrack$ = new Observable<MediaStreamTrack>(
 		oscillator.frequency.setValueAtTime(20, audioContext.currentTime)
 
 		const gainNode = audioContext.createGain()
-		gainNode.gain.setValueAtTime(0.02, audioContext.currentTime)
+		gainNode.gain.setValueAtTime(0.01, audioContext.currentTime)
 
 		oscillator.connect(gainNode)
 
