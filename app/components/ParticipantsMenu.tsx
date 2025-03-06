@@ -90,6 +90,16 @@ export const ParticipantsDialog: FC<ParticipantDialogProps> = ({
 	onOpenChange,
 }) => {
 	const { userMedia } = useRoomContext()
+	const allParticipants = [identity, ...otherUsers]
+		.filter((x): x is User => x !== undefined)
+		.sort((a, b) => {
+			const nameA = a.name.toLowerCase()
+			const nameB = b.name.toLowerCase()
+
+			if (nameA < nameB) return -1
+			if (nameA > nameB) return 1
+			return 0
+		})
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			{children}
@@ -102,17 +112,19 @@ export const ParticipantsDialog: FC<ParticipantDialogProps> = ({
 							{participantCount(otherUsers.length + 1)}
 						</h2>
 						<ul className="space-y-2">
-							{identity && (
-								<UserListItem
-									user={identity}
-									audioTrack={userMedia.audioStreamTrack}
-								>
-									{identity.name}
-								</UserListItem>
+							{allParticipants.map((p) =>
+								p === identity ? (
+									<UserListItem
+										user={identity}
+										audioTrack={userMedia.audioStreamTrack}
+										key={identity.id}
+									>
+										{identity.name}
+									</UserListItem>
+								) : (
+									<OtherUser user={p} key={p.id} />
+								)
 							)}
-							{otherUsers.map((u) => (
-								<OtherUser user={u} key={u.id} />
-							))}
 						</ul>
 					</div>
 				</DialogContent>
