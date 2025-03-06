@@ -6,10 +6,12 @@ export const inaudibleAudioTrack$ = new Observable<MediaStreamTrack>(
 
 		const oscillator = audioContext.createOscillator()
 		oscillator.type = 'triangle'
+		// roughly sounds like a box fan
 		oscillator.frequency.setValueAtTime(20, audioContext.currentTime)
 
 		const gainNode = audioContext.createGain()
-		gainNode.gain.setValueAtTime(0.01, audioContext.currentTime)
+		// even w/ gain at 0 some packets are sent
+		gainNode.gain.setValueAtTime(0, audioContext.currentTime)
 
 		oscillator.connect(gainNode)
 
