@@ -5,6 +5,7 @@ import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { blackCanvasStreamTrack } from '~/utils/blackCanvasStreamTrack'
 import blurVideoTrack from '~/utils/blurVideoTrack'
+import { mode } from '~/utils/mode'
 import noiseSuppression from '~/utils/noiseSuppression'
 import { prependDeviceToPrioritizeList } from '~/utils/rxjs/devicePrioritization'
 import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
@@ -29,7 +30,7 @@ export default function useUserMedia() {
 		'suppress-noise',
 		false
 	)
-	const [audioEnabled, setAudioEnabled] = useState(true)
+	const [audioEnabled, setAudioEnabled] = useState(mode === 'production')
 	const [videoEnabled, setVideoEnabled] = useState(true)
 	const [screenShareEnabled, setScreenShareEnabled] = useState(false)
 	const [videoUnavailableReason, setVideoUnavailableReason] =
