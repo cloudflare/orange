@@ -1,8 +1,5 @@
 {
-	"name": "orange-meets",
-	"module": "worker.js",
-	"private": true,
-	"sideEffects": false,
+	"name": "@cloudflare/orange-meets",
 	"scripts": {
 		"build": "remix build",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint --max-warnings=0 .",
