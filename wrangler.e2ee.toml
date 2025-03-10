@@ -1,4 +1,4 @@
-name = "orange-meets-public"
+name = "orange-meets-e2ee"
 
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"
@@ -14,9 +14,10 @@ type = "ESModule"
 globs = ["**/*.js"]
 
 [vars]
-CALLS_APP_ID = "01a260020a89a17462bc948d26619e1f"
+CALLS_APP_ID = "5e6ca5ca9db8b1c4bb0c3eadffc180f0"
 TURN_SERVICE_ID = "46711d6c5759085dd70f599f6190ab94"
 PUBLIC = "true"
+E2EE_ENABLED = "true"
 
 [[durable_objects.bindings]]
 name = "rooms"
