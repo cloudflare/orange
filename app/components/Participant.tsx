@@ -1,6 +1,6 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { useObservableAsValue } from 'partytracks/react'
-import { forwardRef, useEffect, useMemo, useRef } from 'react'
+import { forwardRef, useMemo, useRef } from 'react'
 import { Flipped } from 'react-flip-toolkit'
 import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
@@ -18,6 +18,7 @@ import { cn } from '~/utils/style'
 import { usePulledVideoTrack } from '../hooks/usePulledVideoTrack'
 import { AudioGlow } from './AudioGlow'
 import { AudioIndicator } from './AudioIndicator'
+import { Button } from './Button'
 import {
 	ConnectionIndicator,
 	getConnectionQuality,
@@ -27,6 +28,7 @@ import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
 import { OptionalLink } from './OptionalLink'
 import { usePulledAudioTrack } from './PullAudioTracks'
+import { Spinner } from './Spinner'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
 
@@ -79,8 +81,9 @@ export const Participant = forwardRef<
 	const pulledAudioTrack = usePulledAudioTrack(
 		isScreenShare ? undefined : user.tracks.audio
 	)
+	const shouldPullVideo = isScreenShare || (!isSelf && !dataSaverMode)
 	const pulledVideoTrack = usePulledVideoTrack(
-		isScreenShare || (!isSelf && !dataSaverMode) ? user.tracks.video : undefined
+		shouldPullVideo ? user.tracks.video : undefined
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
@@ -103,12 +106,6 @@ export const Participant = forwardRef<
 	)
 
 	const pinned = pinnedTileIds.includes(id)
-
-	useEffect(() => {
-		if (isScreenShare) {
-			setPinnedTileIds((ids) => [...ids, id])
-		}
-	}, [id, isScreenShare, setPinnedTileIds])
 
 	const packetLoss$ = useMemo(
 		() =>
@@ -192,31 +189,34 @@ export const Participant = forwardRef<
 						)}
 						videoTrack={videoTrack}
 					/>
-					{!isScreenShare && (
-						<HoverFade className="absolute inset-0 grid w-full h-full place-items-center">
-							<div className="flex gap-2 p-2 rounded bg-zinc-900/30">
-								{/* <Tooltip content={pinned ? 'Restore' : 'Maximize'}> */}
-								{/* 	<Button */}
-								{/* 		onClick={() => */}
-								{/* 			setPinnedTileIds((ids) => */}
-								{/* 				pinned ? ids.filter((i) => i !== id) : [...ids, id] */}
-								{/* 			) */}
-								{/* 		} */}
-								{/* 		displayType="ghost" */}
-								{/* 	> */}
-								{/* 		<Icon type={pinned ? 'arrowsIn' : 'arrowsOut'} /> */}
-								{/* 	</Button> */}
-								{/* </Tooltip> */}
-								{!isScreenShare && (
-									<MuteUserButton
-										displayType="ghost"
-										mutedDisplayType="ghost"
-										user={user}
-									/>
-								)}
-							</div>
-						</HoverFade>
+					{shouldPullVideo && !pulledVideoTrack && (
+						<div className="absolute inset-0 grid w-full h-full place-items-center">
+							<Spinner className="h-8 w-8" />
+						</div>
 					)}
+					<HoverFade className="absolute inset-0 grid w-full h-full place-items-center">
+						<div className="flex gap-2 p-2 rounded bg-zinc-900/30">
+							<Tooltip content={pinned ? 'Restore' : 'Maximize'}>
+								<Button
+									onClick={() =>
+										setPinnedTileIds((ids) =>
+											pinned ? ids.filter((i) => i !== id) : [...ids, id]
+										)
+									}
+									displayType="ghost"
+								>
+									<Icon type={pinned ? 'arrowsIn' : 'arrowsOut'} />
+								</Button>
+							</Tooltip>
+							{!isScreenShare && (
+								<MuteUserButton
+									displayType="ghost"
+									mutedDisplayType="ghost"
+									user={user}
+								/>
+							)}
+						</div>
+					</HoverFade>
 					{audioTrack && !isScreenShare && (
 						<div className="absolute left-4 top-4">
 							{user.tracks.audioEnabled &&

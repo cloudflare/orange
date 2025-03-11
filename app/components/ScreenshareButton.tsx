@@ -4,17 +4,13 @@ import { useEffect, useState } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { Button } from './Button'
 import { Icon } from './Icon/Icon'
-import { Tooltip } from './Tooltip'
 
 interface ScreenshareButtonProps {}
 
 export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	const {
 		userMedia: { screenShareVideoTrack, startScreenShare, endScreenShare },
-		room: { otherUsers },
 	} = useRoomContext()
-
-	const otherUserIsSharing = otherUsers.some((u) => u.tracks.screenshare)
 
 	const sharing = screenShareVideoTrack !== undefined
 
@@ -34,23 +30,12 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	if (!canShareScreen) return null
 
 	return (
-		<Tooltip
-			content={
-				otherUserIsSharing
-					? 'Someone else is sharing'
-					: sharing
-						? 'Stop sharing'
-						: 'Share screen'
-			}
+		<Button
+			displayType={sharing ? 'danger' : 'secondary'}
+			onClick={sharing ? endScreenShare : startScreenShare}
 		>
-			<Button
-				displayType={sharing ? 'danger' : 'secondary'}
-				disabled={otherUserIsSharing}
-				onClick={sharing ? endScreenShare : startScreenShare}
-			>
-				<VisuallyHidden>Share screen</VisuallyHidden>
-				<Icon type="screenshare" />
-			</Button>
-		</Tooltip>
+			<VisuallyHidden>Share screen</VisuallyHidden>
+			<Icon type="screenshare" />
+		</Button>
 	)
 }
