@@ -100,7 +100,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 
 	useBroadcastStatus({
 		userMedia,
-		partyTracks: partyTracks,
+		partyTracks,
 		websocket,
 		identity,
 		pushedTracks,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '~/types/Messages'
+import { useRoomContext } from './useRoomContext'
 
 /**
  * Returns an updated list with as few
@@ -42,6 +43,7 @@ export default function useStageManager(
 	limit: number,
 	self?: User
 ) {
+	const { setPinnedTileIds } = useRoomContext()
 	const usersAndScreenshares = useMemo(
 		() =>
 			users.concat(self ? [self] : []).flatMap((u) =>
@@ -108,7 +110,12 @@ export default function useStageManager(
 	)
 
 	useEffect(() => {
-		newUsers.forEach(recordActivity)
+		newUsers.forEach((user) => {
+			recordActivity(user)
+			if (user.id.endsWith(screenshareSuffix)) {
+				setPinnedTileIds((ids) => [...ids, user.id])
+			}
+		})
 	}, [newUsers, recordActivity])
 
 	useEffect(() => {
