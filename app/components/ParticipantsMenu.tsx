@@ -20,6 +20,7 @@ const UserListItem: FC<{
 }> = ({ user, audioTrack }) => {
 	const { traceLink } = useRoomContext()
 	const { data } = useUserMetadata(user.name)
+
 	return (
 		<li className="flex items-center gap-4 text-base h-9">
 			<div className="mr-auto overflow-hidden whitespace-nowrap text-ellipsis">
@@ -31,8 +32,16 @@ const UserListItem: FC<{
 					}
 					target="_blank"
 					rel="noopener noreferrer"
+					className="flex items-center gap-3"
 				>
-					{data?.displayName}
+					{data?.photob64 && (
+						<img
+							className="rounded-full h-6"
+							src={`data:image/png;base64,${data.photob64}`}
+							alt={data.displayName}
+						/>
+					)}
+					<span>{data?.displayName}</span>
 				</OptionalLink>
 			</div>
 			{audioTrack && user.tracks.audioEnabled && (
