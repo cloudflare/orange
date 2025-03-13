@@ -14,7 +14,7 @@ type = "ESModule"
 globs = ["**/*.js"]
 
 [vars]
-CALLS_APP_ID = "d83fd70c193329ea4f683ffe7b34d056"
+CALLS_APP_ID = "1ff13ac8f27014b77f7eb5bc178aceae"
 TURN_SERVICE_ID = "46711d6c5759085dd70f599f6190ab94"
 PUBLIC = "true"
 
