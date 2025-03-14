@@ -54,7 +54,7 @@
 		"nanoid": "^5.0.7",
 		"partyserver": "^0.0.57",
 		"partysocket": "^1.0.2",
-		"partytracks": "^0.0.28",
+		"partytracks": "^0.0.29",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1",
 		"react-flip-toolkit": "^7.2.4",

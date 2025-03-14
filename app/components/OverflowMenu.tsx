@@ -19,6 +19,10 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 		room: { otherUsers, identity },
 		dataSaverMode,
 		setDataSaverMode,
+		audioOnlyMode,
+		setAudioOnlyMode,
+		simulcastEnabled,
+		userMedia: { turnCameraOff },
 	} = useRoomContext()
 	const [settingsMenuOpen, setSettingMenuOpen] = useState(false)
 	const [bugReportMenuOpen, setBugReportMenuOpen] = useState(false)
@@ -35,11 +39,22 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Portal>
 					<DropdownMenu.Content sideOffset={5}>
+						{simulcastEnabled && (
+							<DropdownMenu.Item
+								onSelect={() => setDataSaverMode(!dataSaverMode)}
+							>
+								<Icon type="WifiIcon" className="mr-2" />
+								{dataSaverMode ? 'Disable Data Saver' : 'Enable Data Saver'}
+							</DropdownMenu.Item>
+						)}
 						<DropdownMenu.Item
-							onSelect={() => setDataSaverMode(!dataSaverMode)}
+							onSelect={() => {
+								setAudioOnlyMode(!audioOnlyMode)
+								turnCameraOff()
+							}}
 						>
-							<Icon type="WifiIcon" className="mr-2" />
-							{dataSaverMode ? 'Disable Data Saver' : 'Enable Data Saver'}
+							<Icon type="PhoneIcon" className="mr-2" />
+							{audioOnlyMode ? 'Disable Audio Only' : 'Enable Audio Only'}
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							onSelect={() => navigator.clipboard.writeText(roomUrl)}
