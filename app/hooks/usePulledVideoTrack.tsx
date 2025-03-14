@@ -34,14 +34,7 @@ export function usePulledVideoTrack(
 					track
 						? partyTracks.pull(
 								of(track),
-								simulcastEnabled
-									? {
-											simulcast: {
-												// randomly cycle through the options for now
-												preferredRid$,
-											},
-										}
-									: undefined
+								simulcastEnabled ? { simulcast: { preferredRid$ } } : undefined
 							)
 						: of(undefined)
 				)
