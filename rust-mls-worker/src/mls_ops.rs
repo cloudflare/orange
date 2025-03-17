@@ -493,11 +493,14 @@ impl WorkerState {
     }
 
     /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
-    /// the bytes. If any error happens, returns the empty vec.
+    /// the bytes. If decryption fails, returns all zeros.
     fn decrypt_app_msg_nofail(&mut self, ct: &[u8]) -> Vec<u8> {
         self.decrypt_app_msg(ct).unwrap_or_else(|e| {
             info!("Frame decryption failed: {e}");
-            Vec::new()
+            
+            // Instead of an empty vector, create a placeholder of the same size as the original
+            // encrypted data but filled with zeros. 
+            vec![0u8; ct.len()]
         })
     }
 }
@@ -584,7 +587,7 @@ pub fn encrypt_msg(msg: &[u8]) -> Vec<u8> {
 }
 
 /// Acquires the global state and attempts to decrypt the given MLS application message. On failure,
-/// returns the empty vector.
+/// returns a placeholder frame that preserves the original size but contains all zeros.
 pub fn decrypt_msg(msg: &[u8]) -> Vec<u8> {
     STATE
         .try_with(|mutex| {
