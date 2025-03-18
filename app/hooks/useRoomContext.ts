@@ -15,6 +15,8 @@ export type RoomContextType = {
 	setPinnedTileIds: Dispatch<SetStateAction<string[]>>
 	showDebugInfo: boolean
 	setShowDebugInfo: Dispatch<SetStateAction<boolean>>
+	audioOnlyMode: boolean
+	setAudioOnlyMode: Dispatch<SetStateAction<boolean>>
 	dataSaverMode: boolean
 	setDataSaverMode: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
@@ -22,6 +24,7 @@ export type RoomContextType = {
 	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>
+	simulcastEnabled: boolean
 	pushedTracks: {
 		video?: string
 		audio?: string

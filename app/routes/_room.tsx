@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
-import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
+import { useObservableAsValue } from 'partytracks/react'
 import { useMemo, useState } from 'react'
 import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
@@ -12,12 +12,12 @@ import { Spinner } from '~/components/Spinner'
 
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
-import type { RoomContextType } from '~/hooks/useRoomContext'
+import { type RoomContextType } from '~/hooks/useRoomContext'
 import { useRoomHistory } from '~/hooks/useRoomHistory'
-import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
 import type { TrackObject } from '~/utils/callsTypes'
 import { getIceServers } from '~/utils/getIceServers.server'
+import { mode } from '~/utils/mode'
 
 function numberOrUndefined(value: unknown): number | undefined {
 	const num = Number(value)
@@ -38,6 +38,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 			MAX_WEBCAM_BITRATE,
 			MAX_WEBCAM_QUALITY_LEVEL,
 			MAX_API_HISTORY,
+			EXPERIMENTAL_SIMULCAST_ENABLED,
 		},
 	} = context
 
@@ -55,6 +56,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		maxWebcamBitrate: numberOrUndefined(MAX_WEBCAM_BITRATE),
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),
 		maxApiHistory: numberOrUndefined(MAX_API_HISTORY),
+		simulcastEnabled: EXPERIMENTAL_SIMULCAST_ENABLED === 'true',
 	})
 }
 
@@ -120,6 +122,7 @@ interface RoomProps {
 function Room({ room, userMedia }: RoomProps) {
 	const [joined, setJoined] = useState(false)
 	const [dataSaverMode, setDataSaverMode] = useState(false)
+	const [audioOnlyMode, setAudioOnlyMode] = useState(false)
 	const { roomName } = useParams()
 	invariant(roomName)
 
@@ -129,10 +132,11 @@ function Room({ room, userMedia }: RoomProps) {
 		feedbackEnabled,
 		apiExtraParams,
 		iceServers,
-		maxWebcamBitrate = 1_200_000,
+		maxWebcamBitrate = 2_500_000,
 		maxWebcamFramerate = 24,
 		maxWebcamQualityLevel = 1080,
 		maxApiHistory = 100,
+		simulcastEnabled,
 	} = useLoaderData<typeof loader>()
 
 	const params = new URLSearchParams(apiExtraParams)
@@ -148,39 +152,60 @@ function Room({ room, userMedia }: RoomProps) {
 	const roomHistory = useRoomHistory(partyTracks, room)
 
 	const scaleResolutionDownBy = useMemo(() => {
+		if (dataSaverMode) return 4
 		const videoStreamTrack = userMedia.videoStreamTrack
 		const { height, width } = tryToGetDimensions(videoStreamTrack)
 		// we need to do this in case camera is in portrait mode
 		const smallestDimension = Math.min(height, width)
 		return Math.max(smallestDimension / maxWebcamQualityLevel, 1)
-	}, [maxWebcamQualityLevel, userMedia.videoStreamTrack])
+	}, [maxWebcamQualityLevel, userMedia.videoStreamTrack, dataSaverMode])
 
-	const videoEncodingParams = useStablePojo<RTCRtpEncodingParameters[]>([
-		{
-			maxFramerate: maxWebcamFramerate,
-			maxBitrate: maxWebcamBitrate,
-			scaleResolutionDownBy,
-		},
-	])
-	const videoTrackEncodingParams$ =
-		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
-		() => partyTracks.push(userMedia.videoTrack$, videoTrackEncodingParams$),
-		[partyTracks, userMedia.videoTrack$, videoTrackEncodingParams$]
+		() =>
+			partyTracks.push(userMedia.videoTrack$, {
+				sendEncodings:
+					simulcastEnabled && !dataSaverMode
+						? [
+								{
+									scaleResolutionDownBy: 1,
+									rid: 'a',
+									maxFramerate: maxWebcamFramerate,
+								},
+								{
+									scaleResolutionDownBy: 2,
+									rid: 'b',
+									maxFramerate: maxWebcamFramerate,
+								},
+								{
+									scaleResolutionDownBy: 4,
+									rid: 'c',
+									maxFramerate: maxWebcamFramerate,
+								},
+							]
+						: [
+								{
+									maxFramerate: maxWebcamFramerate,
+									maxBitrate: maxWebcamBitrate,
+									scaleResolutionDownBy,
+								},
+							],
+			}),
+		[
+			partyTracks,
+			userMedia.videoTrack$,
+			maxWebcamFramerate,
+			scaleResolutionDownBy,
+			dataSaverMode,
+		]
 	)
 
 	const pushedVideoTrack = useObservableAsValue(pushedVideoTrack$)
 
 	const pushedAudioTrack$ = useMemo(
 		() =>
-			partyTracks.push(
-				userMedia.publicAudioTrack$,
-				of<RTCRtpEncodingParameters[]>([
-					{
-						networkPriority: 'high',
-					},
-				])
-			),
+			partyTracks.push(userMedia.publicAudioTrack$, {
+				sendEncodings: [{ networkPriority: 'high' }],
+			}),
 		[partyTracks, userMedia.publicAudioTrack$]
 	)
 	const pushedAudioTrack = useObservableAsValue(pushedAudioTrack$)
@@ -196,7 +221,7 @@ function Room({ room, userMedia }: RoomProps) {
 		pushedScreenSharingTrack$
 	)
 	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
-	const [showDebugInfo, setShowDebugInfo] = useState(false)
+	const [showDebugInfo, setShowDebugInfo] = useState(mode !== 'production')
 
 	const context: RoomContextType = {
 		joined,
@@ -207,14 +232,17 @@ function Room({ room, userMedia }: RoomProps) {
 		setShowDebugInfo,
 		dataSaverMode,
 		setDataSaverMode,
+		audioOnlyMode,
+		setAudioOnlyMode,
 		traceLink,
 		userMedia,
 		userDirectoryUrl,
 		feedbackEnabled,
-		partyTracks: partyTracks,
+		partyTracks,
 		roomHistory,
 		iceConnectionState,
 		room,
+		simulcastEnabled,
 		pushedTracks: {
 			video: trackObjectToString(pushedVideoTrack),
 			audio: trackObjectToString(pushedAudioTrack),

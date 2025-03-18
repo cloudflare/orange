@@ -11,6 +11,8 @@ import { Tooltip } from './Tooltip'
 
 export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 	const {
+		audioOnlyMode,
+		setAudioOnlyMode,
 		userMedia: {
 			turnCameraOff,
 			turnCameraOn,
@@ -46,6 +48,9 @@ export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 				displayType={videoEnabled ? 'secondary' : 'danger'}
 				disabled={!!videoUnavailableMessage}
 				onClick={(e) => {
+					if (audioOnlyMode) {
+						setAudioOnlyMode(false)
+					}
 					toggle()
 					onClick && onClick(e)
 				}}

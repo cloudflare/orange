@@ -63,7 +63,8 @@ export const Participant = forwardRef<
 	const {
 		traceLink,
 		partyTracks,
-		dataSaverMode,
+		simulcastEnabled,
+		audioOnlyMode,
 		pinnedTileIds,
 		setPinnedTileIds,
 		showDebugInfo,
@@ -81,9 +82,10 @@ export const Participant = forwardRef<
 	const pulledAudioTrack = usePulledAudioTrack(
 		isScreenShare ? undefined : user.tracks.audio
 	)
-	const shouldPullVideo = isScreenShare || (!isSelf && !dataSaverMode)
+	const shouldPullVideo = isScreenShare || (!isSelf && !audioOnlyMode)
 	const pulledVideoTrack = usePulledVideoTrack(
-		shouldPullVideo ? user.tracks.video : undefined
+		shouldPullVideo ? user.tracks.video : undefined,
+		isScreenShare
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
@@ -183,7 +185,7 @@ export const Participant = forwardRef<
 							{
 								'opacity-100': isScreenShare
 									? user.tracks.screenShareEnabled
-									: user.tracks.videoEnabled && (!dataSaverMode || isSelf),
+									: user.tracks.videoEnabled && (!audioOnlyMode || isSelf),
 							},
 							isSelf && isScreenShare && 'opacity-75'
 						)}
