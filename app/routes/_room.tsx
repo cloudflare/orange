@@ -98,20 +98,11 @@ function RoomPreparation() {
 }
 
 function tryToGetDimensions(videoStreamTrack?: MediaStreamTrack) {
-	if (
-		videoStreamTrack === undefined ||
-		// TODO: Determine a better way to get dimensions in Firefox
-		// where this isn't API isn't supported. For now, Firefox will
-		// just not be constrained and scaled down by dimension scaling
-		// but the bandwidth and framerate constraints will still apply
-		// https://caniuse.com/?search=getCapabilities
-		videoStreamTrack.getCapabilities === undefined
-	) {
+	if (videoStreamTrack === undefined) {
 		return { height: 0, width: 0 }
 	}
-	const height = videoStreamTrack?.getCapabilities().height?.max ?? 0
-	const width = videoStreamTrack?.getCapabilities().width?.max ?? 0
-
+	const height = videoStreamTrack?.getSettings().height ?? 0
+	const width = videoStreamTrack?.getSettings().width ?? 0
 	return { height, width }
 }
 
