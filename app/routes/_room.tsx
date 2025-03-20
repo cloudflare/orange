@@ -154,24 +154,18 @@ function Room({ room, userMedia }: RoomProps) {
 
 	const sendEncodings = useStablePojo<RTCRtpEncodingParameters[]>(
 		simulcastEnabled
-			? // Ordering lowest to highest for Chrome
-				[
+			? [
 					{
-						scaleResolutionDownBy: 4,
-						rid: 'c',
-						maxFramerate: maxWebcamFramerate,
+						rid: 'b',
+						scaleResolutionDownBy: 2.0,
+						maxBitrate: 500_000,
+						maxFramerate: 24.0,
 						active: true,
 					},
 					{
-						scaleResolutionDownBy: 2,
-						rid: 'b',
-						maxFramerate: maxWebcamFramerate,
-						active: !dataSaverMode,
-					},
-					{
-						scaleResolutionDownBy: 1,
 						rid: 'a',
-						maxFramerate: maxWebcamFramerate,
+						maxBitrate: 1_300_000,
+						maxFramerate: 30.0,
 						active: !dataSaverMode,
 					},
 				]

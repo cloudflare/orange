@@ -24,7 +24,7 @@ export function usePulledVideoTrack(
 	)
 
 	const preferredRid$ = useValueAsObservable(
-		dataSaverMode && !alwaysUseHighQuality ? 'c' : 'a'
+		dataSaverMode && !alwaysUseHighQuality ? 'b' : 'a'
 	)
 	const trackObject$ = useValueAsObservable(trackObject)
 	const pulledTrack$ = useMemo(
