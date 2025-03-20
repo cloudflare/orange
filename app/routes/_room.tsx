@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
-import { useObservableAsValue } from 'partytracks/react'
+import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useMemo, useState } from 'react'
 import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
@@ -14,6 +14,7 @@ import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
 import { type RoomContextType } from '~/hooks/useRoomContext'
 import { useRoomHistory } from '~/hooks/useRoomHistory'
+import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
 import type { TrackObject } from '~/utils/callsTypes'
 import { getIceServers } from '~/utils/getIceServers.server'
@@ -160,43 +161,45 @@ function Room({ room, userMedia }: RoomProps) {
 		return Math.max(smallestDimension / maxWebcamQualityLevel, 1)
 	}, [maxWebcamQualityLevel, userMedia.videoStreamTrack, dataSaverMode])
 
+	const sendEncodings = useStablePojo<RTCRtpEncodingParameters[]>(
+		simulcastEnabled
+			? // Ordering lowest to highest for Chrome
+				[
+					{
+						scaleResolutionDownBy: 4,
+						rid: 'c',
+						maxFramerate: maxWebcamFramerate,
+						active: true,
+					},
+					{
+						scaleResolutionDownBy: 2,
+						rid: 'b',
+						maxFramerate: maxWebcamFramerate,
+						active: !dataSaverMode,
+					},
+					{
+						scaleResolutionDownBy: 1,
+						rid: 'a',
+						maxFramerate: maxWebcamFramerate,
+						active: !dataSaverMode,
+					},
+				]
+			: [
+					{
+						maxFramerate: maxWebcamFramerate,
+						maxBitrate: maxWebcamBitrate,
+						scaleResolutionDownBy,
+					},
+				]
+	)
+	const sendEncodings$ = useValueAsObservable(sendEncodings)
+
 	const pushedVideoTrack$ = useMemo(
 		() =>
 			partyTracks.push(userMedia.videoTrack$, {
-				sendEncodings:
-					simulcastEnabled && !dataSaverMode
-						? [
-								{
-									scaleResolutionDownBy: 1,
-									rid: 'a',
-									maxFramerate: maxWebcamFramerate,
-								},
-								{
-									scaleResolutionDownBy: 2,
-									rid: 'b',
-									maxFramerate: maxWebcamFramerate,
-								},
-								{
-									scaleResolutionDownBy: 4,
-									rid: 'c',
-									maxFramerate: maxWebcamFramerate,
-								},
-							]
-						: [
-								{
-									maxFramerate: maxWebcamFramerate,
-									maxBitrate: maxWebcamBitrate,
-									scaleResolutionDownBy,
-								},
-							],
+				sendEncodings$,
 			}),
-		[
-			partyTracks,
-			userMedia.videoTrack$,
-			maxWebcamFramerate,
-			scaleResolutionDownBy,
-			dataSaverMode,
-		]
+		[partyTracks, userMedia.videoTrack$, sendEncodings$]
 	)
 
 	const pushedVideoTrack = useObservableAsValue(pushedVideoTrack$)
@@ -204,7 +207,7 @@ function Room({ room, userMedia }: RoomProps) {
 	const pushedAudioTrack$ = useMemo(
 		() =>
 			partyTracks.push(userMedia.publicAudioTrack$, {
-				sendEncodings: [{ networkPriority: 'high' }],
+				sendEncodings$: of([{ networkPriority: 'high' }]),
 			}),
 		[partyTracks, userMedia.publicAudioTrack$]
 	)
