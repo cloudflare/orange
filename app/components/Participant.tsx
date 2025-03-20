@@ -139,7 +139,7 @@ export const Participant = forwardRef<
 						'relative max-w-[--participant-max-width] rounded-xl'
 					)}
 				>
-					{!isScreenShare && (
+					{!isScreenShare && !user.tracks.videoEnabled && (
 						<div
 							className={cn(
 								'absolute inset-0 h-full w-full grid place-items-center'
