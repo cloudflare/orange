@@ -6,9 +6,9 @@ import type { TrackObject } from '~/utils/callsTypes'
 
 export function usePulledVideoTrack(
 	video: string | undefined,
-	alwaysUseHighQuality?: boolean
+	preferredRid: string = ''
 ) {
-	const { partyTracks, dataSaverMode, simulcastEnabled } = useRoomContext()
+	const { partyTracks, simulcastEnabled } = useRoomContext()
 
 	const [sessionId, trackName] = video?.split('/') ?? []
 	const trackObject = useMemo(
@@ -23,9 +23,7 @@ export function usePulledVideoTrack(
 		[sessionId, trackName]
 	)
 
-	const preferredRid$ = useValueAsObservable(
-		dataSaverMode && !alwaysUseHighQuality ? 'b' : 'a'
-	)
+	const preferredRid$ = useValueAsObservable(preferredRid)
 	const trackObject$ = useValueAsObservable(trackObject)
 	const pulledTrack$ = useMemo(
 		() =>
