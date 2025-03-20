@@ -8,5 +8,9 @@ export function getUserMediaTrack$(
 	return resilientTrack$({
 		kind,
 		devicePriority$: getSortedDeviceListObservable(),
+		constraints:
+			kind === 'videoinput'
+				? { width: { ideal: 1280 }, height: { ideal: 720 } }
+				: {},
 	})
 }
