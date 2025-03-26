@@ -1,0 +1,39 @@
+name = "orange-meets-e2ee"
+
+account_id = "8477399eb04accc1792af96aeaa25222"
+main = "./build/index.js"
+# https://developers.cloudflare.com/workers/platform/compatibility-dates
+compatibility_date = "2024-10-07"
+compatibility_flags = ["nodejs_compat"]
+
+[site]
+  bucket = "./public"
+
+[[build.upload.rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
+[vars]
+CALLS_APP_ID = "5e6ca5ca9db8b1c4bb0c3eadffc180f0"
+TURN_SERVICE_ID = "46711d6c5759085dd70f599f6190ab94"
+PUBLIC = "true"
+E2EE_ENABLED = "true"
+
+[[durable_objects.bindings]]
+name = "rooms"
+class_name = "ChatRoom"
+
+# Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["ChatRoom", "RateLimiter"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["RateLimiter"] 
+
+# The necessary secrets are:
+# - CALLS_APP_SECRET
+# Run `echo <VALUE> | wrangler secret put <NAME>` for each of these
+
+

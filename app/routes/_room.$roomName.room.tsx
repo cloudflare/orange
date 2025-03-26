@@ -20,8 +20,9 @@ import { ParticipantLayout } from '~/components/ParticipantLayout'
 import { ParticipantsButton } from '~/components/ParticipantsMenu'
 import { PullAudioTracks } from '~/components/PullAudioTracks'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
+import { SafetyNumberToast } from '~/components/SafetyNumberToast'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
-import Toast from '~/components/Toast'
+import Toast, { useDispatchToast } from '~/components/Toast'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -79,13 +80,23 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		pushedTracks,
 		showDebugInfo,
 		pinnedTileIds,
-		room: {
-			otherUsers,
-			websocket,
-			identity,
-			roomState: { meetingId },
-		},
+		room,
+		e2eeSafetyNumber,
+		e2eeOnJoin,
 	} = useRoomContext()
+	const {
+		otherUsers,
+		websocket,
+		identity,
+		roomState: { meetingId },
+	} = room
+
+	// only want this evaluated once upon mounting
+	const [firstUser] = useState(otherUsers.length === 0)
+
+	useEffect(() => {
+		e2eeOnJoin(firstUser)
+	}, [e2eeOnJoin, firstUser])
 
 	useShowDebugInfoShortcut()
 
@@ -136,6 +147,16 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	)
 
 	const gridGap = 12
+	const dispatchToast = useDispatchToast()
+
+	useEffect(() => {
+		if (e2eeSafetyNumber) {
+			dispatchToast(
+				<SafetyNumberToast safetyNumber={e2eeSafetyNumber.slice(0, 8)} />,
+				{ duration: Infinity, id: 'e2ee-safety-number' }
+			)
+		}
+	}, [e2eeSafetyNumber, dispatchToast])
 
 	return (
 		<PullAudioTracks
