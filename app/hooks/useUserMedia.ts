@@ -55,43 +55,41 @@ export default function useUserMedia() {
 
 	const blurVideo$ = useValueAsObservable(blurVideo)
 	const videoEnabled$ = useValueAsObservable(videoEnabled)
-	const videoTrack$ = useMemo(
-		() =>
-			combineLatest([
-				videoEnabled$.pipe(
-					switchMap((enabled) =>
-						enabled
-							? getUserMediaTrack$('videoinput').pipe(
-									tap({
-										error: (e) => {
-											invariant(e instanceof Error)
-											const reason =
-												e.name in errorMessageMap
-													? (e.name as UserMediaError)
-													: 'UnknownError'
-											if (reason === 'UnknownError') {
-												console.error('Unknown error getting video track: ', e)
-											}
-											setVideoUnavailableReason(reason)
-											setVideoEnabled(false)
-										},
-									})
-								)
-							: of(blackCanvasStreamTrack())
-					)
-				),
-				blurVideo$,
-			]).pipe(
-				switchMap(([track, blur]) =>
-					blur && track ? blurVideoTrack(track) : of(track)
-				),
-				shareReplay({
-					refCount: true,
-					bufferSize: 1,
-				})
+	const videoTrack$ = useMemo(() => {
+		const track$ = videoEnabled$.pipe(
+			switchMap((enabled) =>
+				enabled
+					? getUserMediaTrack$('videoinput').pipe(
+							tap({
+								error: (e) => {
+									invariant(e instanceof Error)
+									const reason =
+										e.name in errorMessageMap
+											? (e.name as UserMediaError)
+											: 'UnknownError'
+									if (reason === 'UnknownError') {
+										console.error('Unknown error getting video track: ', e)
+									}
+									setVideoUnavailableReason(reason)
+									setVideoEnabled(false)
+								},
+							})
+						)
+					: of(undefined)
+			)
+		)
+		return combineLatest([blurVideo$, track$]).pipe(
+			switchMap(([blur, track]) =>
+				blur && track
+					? blurVideoTrack(track)
+					: of(track ?? blackCanvasStreamTrack())
 			),
-		[videoEnabled$, blurVideo$]
-	)
+			shareReplay({
+				refCount: true,
+				bufferSize: 1,
+			})
+		)
+	}, [videoEnabled$, blurVideo$])
 	const videoTrack = useObservableAsValue(videoTrack$)
 	const videoDeviceId = videoTrack?.getSettings().deviceId
 
