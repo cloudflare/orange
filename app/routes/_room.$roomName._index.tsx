@@ -1,7 +1,12 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
-import { useNavigate, useParams, useSearchParams } from '@remix-run/react'
+import {
+	useLoaderData,
+	useNavigate,
+	useParams,
+	useSearchParams,
+} from '@remix-run/react'
 import { useObservableAsValue } from 'partytracks/react'
 import invariant from 'tiny-invariant'
 import { AudioIndicator } from '~/components/AudioIndicator'
@@ -21,9 +26,11 @@ import { useRoomUrl } from '~/hooks/useRoomUrl'
 import getUsername from '~/utils/getUsername.server'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+	const env = context.env
 	const username = await getUsername(request)
 	invariant(username)
-	return json({ username, callsAppId: context.env.CALLS_APP_ID })
+	const maxParticipants = env.MAX_PARTICIPANTS ?? null
+	return json({ username, callsAppId: env.CALLS_APP_ID, maxParticipants })
 }
 
 let refreshCheckDone = false
@@ -53,10 +60,14 @@ export default function Lobby() {
 	const session = useObservableAsValue(partyTracks.session$)
 	const sessionError = useObservableAsValue(partyTracks.sessionError$)
 	trackRefreshes()
+	const { maxParticipants } = useLoaderData<typeof loader>()
 
 	const joinedUsers = new Set(
 		room.otherUsers.filter((u) => u.tracks.audio).map((u) => u.name)
 	).size
+
+	const isRoomFull =
+		maxParticipants !== null && joinedUsers >= maxParticipants
 
 	const roomUrl = useRoomUrl()
 
@@ -72,6 +83,7 @@ export default function Lobby() {
 						{`${joinedUsers} ${
 							joinedUsers === 1 ? 'user' : 'users'
 						} in the room.`}{' '}
+						{isRoomFull && <span className="text-red-500">Room is full.</span>}
 					</p>
 				</div>
 				<div className="relative">
@@ -149,16 +161,13 @@ export default function Lobby() {
 					<Button
 						onClick={() => {
 							setJoined(true)
-							// we navigate here with javascript instead of an a
-							// tag because we don't want it to be possible to join
-							// the room without the JS having loaded
 							navigate(
 								'room' + (params.size > 0 ? '?' + params.toString() : '')
 							)
 						}}
-						disabled={!session?.sessionId}
+						disabled={!session?.sessionId || isRoomFull}
 					>
-						Join
+						{isRoomFull ? 'Room Full' : 'Join'}
 					</Button>
 					<MicButton />
 					<CameraButton />
@@ -167,6 +176,12 @@ export default function Lobby() {
 						<CopyButton contentValue={roomUrl}></CopyButton>
 					</Tooltip>
 				</div>
+				{isRoomFull && (
+					<p className="text-sm text-red-500">
+						This room has reached its maximum capacity of {maxParticipants}{' '}
+						participants.
+					</p>
+				)}
 			</div>
 			<div className="flex flex-col justify-end flex-1">
 				<Disclaimer className="pt-6" />
