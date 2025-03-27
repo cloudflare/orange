@@ -9,6 +9,7 @@ export type DeadTrackInfo = {
 	trackId: string
 	pullingUser?: string
 	pushingUser?: string
+	meetingId?: string
 }
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
@@ -22,9 +23,32 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 		trackId,
 		pullingUser,
 		pushingUser,
+		meetingId,
 	} = info
 
 	const { hostname } = new URL(request.url)
+
+	let dashboardLink = ''
+
+	if (meetingId && context.env.DASHBOARD_WORKER_URL) {
+		const dashboardLogsParams = new URLSearchParams({
+			view: 'events',
+			needle: JSON.stringify({ value: '', matchCase: false, isRegex: false }),
+			filters: JSON.stringify([
+				{
+					id: '2',
+					key: 'meetingId',
+					type: 'string',
+					value: meetingId,
+					operation: 'eq',
+				},
+			]),
+		})
+
+		dashboardLink =
+			context.env.DASHBOARD_WORKER_URL +
+			`/observability/logs?${dashboardLogsParams}`
+	}
 
 	const chatCard: ChatCard = {
 		cardsV2: [
@@ -78,6 +102,30 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 							],
 							collapsible: false,
 						},
+						...(dashboardLink
+							? [
+									{
+										header: 'Dashboard link',
+										widgets: [
+											{
+												buttonList: {
+													buttons: [
+														{
+															text: 'Dashboard logs',
+															onClick: {
+																openLink: {
+																	url: dashboardLink,
+																},
+															},
+														},
+													],
+												},
+											},
+										],
+										collapsible: false,
+									},
+								]
+							: []),
 					],
 				},
 			},

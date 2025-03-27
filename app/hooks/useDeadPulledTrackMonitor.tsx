@@ -58,6 +58,7 @@ export function useDeadPulledTrackMonitor(
 				trackId,
 				pullingUser: room.identity?.name,
 				pushingUser: name,
+				meetingId: room.roomState.meetingId,
 			}
 			fetch('/api/deadTrack', {
 				method: 'POST',
@@ -71,6 +72,7 @@ export function useDeadPulledTrackMonitor(
 		name,
 		sessionId,
 		room.identity?.name,
+		room.roomState.meetingId,
 		traceLink,
 		trackInfo,
 	])

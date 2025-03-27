@@ -1,3 +1,4 @@
+import { type ApiHistoryEntry } from 'partytracks/client'
 import type { TrackObject } from '~/utils/callsTypes'
 
 export type User = {
@@ -91,4 +92,8 @@ export type ClientMessage =
 	  }
 	| {
 			type: 'relenquishAiControl'
+	  }
+	| {
+			type: 'callsApiHistoryEntry'
+			entry: ApiHistoryEntry
 	  }
