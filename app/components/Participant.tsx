@@ -98,7 +98,7 @@ export const Participant = forwardRef<
 
 	useDeadPulledTrackMonitor(
 		user.tracks.video,
-		user.transceiverSessionId,
+		identity?.transceiverSessionId,
 		!!user.tracks.video,
 		videoTrack,
 		user.name
@@ -106,7 +106,7 @@ export const Participant = forwardRef<
 
 	useDeadPulledTrackMonitor(
 		user.tracks.audio,
-		user.transceiverSessionId,
+		identity?.transceiverSessionId,
 		!!user.tracks.audio,
 		audioTrack,
 		user.name

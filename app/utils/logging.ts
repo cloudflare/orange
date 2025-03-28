@@ -1,3 +1,5 @@
+import { type ApiHistoryEntry } from 'partytracks/client'
+
 export type LogEvent =
 	| {
 			eventName: 'onStart'
@@ -69,6 +71,12 @@ export type LogEvent =
 			meetingId?: string
 			connectionId: string
 			error: unknown
+	  }
+	| {
+			eventName: 'clientNegotiationRecord'
+			entry: ApiHistoryEntry
+			meetingId?: string
+			connectionId: string
 	  }
 
 export function log(event: LogEvent) {

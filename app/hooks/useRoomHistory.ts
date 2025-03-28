@@ -1,5 +1,6 @@
 import type { ApiHistoryEntry, PartyTracks } from 'partytracks/client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ClientMessage } from '~/types/Messages'
 import type useRoom from './useRoom'
 
 interface UserSession {
@@ -25,6 +26,15 @@ export function useRoomHistory(
 	useEffect(() => {
 		const handleHistory = () => {
 			setApiHistory(partyTracks.history.entries)
+			const entry = partyTracks.history.entries.at(-1)
+			if (entry) {
+				room.websocket.send(
+					JSON.stringify({
+						type: 'callsApiHistoryEntry',
+						entry,
+					} satisfies ClientMessage)
+				)
+			}
 		}
 		partyTracks.history.addEventListener('logentry', handleHistory)
 
