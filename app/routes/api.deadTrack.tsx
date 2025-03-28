@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import type { ChatCard } from '~/types/GoogleChatApi'
 import { RELEASE } from '~/utils/constants'
+import { dashboardLogsLink } from '~/utils/dashboardLogsLink'
 
 export type DeadTrackInfo = {
 	pullSessionTrace: string
@@ -31,6 +32,15 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 	let dashboardLink = ''
 
 	if (meetingId && context.env.DASHBOARD_WORKER_URL) {
+		dashboardLink = dashboardLogsLink(context.env.DASHBOARD_WORKER_URL, [
+			{
+				id: '2',
+				key: 'meetingId',
+				type: 'string',
+				value: meetingId,
+				operation: 'eq',
+			},
+		])
 		const dashboardLogsParams = new URLSearchParams({
 			view: 'events',
 			needle: JSON.stringify({ value: '', matchCase: false, isRegex: false }),

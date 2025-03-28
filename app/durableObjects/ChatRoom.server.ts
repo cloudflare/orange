@@ -297,12 +297,13 @@ export class ChatRoom extends Server<Env> {
 					break
 				}
 				case 'callsApiHistoryEntry': {
-					const { entry } = data
+					const { entry, sessionId } = data
 					log({
 						eventName: 'clientNegotiationRecord',
 						connectionId: connection.id,
 						meetingId,
 						entry,
+						sessionId,
 					})
 					break
 				}

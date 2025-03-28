@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useMount, useWindowSize } from 'react-use'
 import { AiButton } from '~/components/AiButton'
+import { ButtonLink } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
@@ -29,6 +30,7 @@ import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
 import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
+import { dashboardLogsLink } from '~/utils/dashboardLogsLink'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
 
@@ -47,6 +49,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
+		dashboardDebugLogsBaseUrl: context.env.DASHBOARD_WORKER_URL,
 	})
 }
 
@@ -72,7 +75,8 @@ export default function Room() {
 }
 
 function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
+	const { hasDb, hasAiCredentials, dashboardDebugLogsBaseUrl } =
+		useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		partyTracks,
@@ -187,6 +191,25 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 					/>
 					{showDebugInfo && meetingId && (
 						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
+					)}
+					{showDebugInfo && meetingId && dashboardDebugLogsBaseUrl && (
+						<ButtonLink
+							className="text-xs"
+							displayType="secondary"
+							to={dashboardLogsLink(dashboardDebugLogsBaseUrl, [
+								{
+									id: '2',
+									key: 'meetingId',
+									type: 'string',
+									value: meetingId,
+									operation: 'eq',
+								},
+							])}
+							target="_blank"
+							rel="noreferrer"
+						>
+							Meeting Logs
+						</ButtonLink>
 					)}
 				</div>
 			</div>

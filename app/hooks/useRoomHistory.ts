@@ -1,3 +1,4 @@
+import { useObservableAsValue } from '.yalc/partytracks/dist/react'
 import type { ApiHistoryEntry, PartyTracks } from 'partytracks/client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientMessage } from '~/types/Messages'
@@ -22,6 +23,7 @@ export function useRoomHistory(
 		UserSession[]
 	>([])
 	const sessionIdsRef = useRef(new Set<string>())
+	const { sessionId } = useObservableAsValue(partyTracks.session$) ?? {}
 
 	useEffect(() => {
 		const handleHistory = () => {
@@ -32,6 +34,7 @@ export function useRoomHistory(
 					JSON.stringify({
 						type: 'callsApiHistoryEntry',
 						entry,
+						sessionId,
 					} satisfies ClientMessage)
 				)
 			}
@@ -41,7 +44,7 @@ export function useRoomHistory(
 		return () => {
 			partyTracks.history.removeEventListener('logentry', handleHistory)
 		}
-	}, [partyTracks])
+	}, [partyTracks, sessionId])
 
 	useEffect(() => {
 		room.otherUsers.forEach((user) => {

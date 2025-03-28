@@ -96,4 +96,5 @@ export type ClientMessage =
 	| {
 			type: 'callsApiHistoryEntry'
 			entry: ApiHistoryEntry
+			sessionId?: string
 	  }

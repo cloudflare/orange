@@ -77,6 +77,7 @@ export type LogEvent =
 			entry: ApiHistoryEntry
 			meetingId?: string
 			connectionId: string
+			sessionId?: string
 	  }
 
 export function log(event: LogEvent) {
