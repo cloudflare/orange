@@ -1,5 +1,5 @@
-import { useObservableAsValue } from '.yalc/partytracks/dist/react'
 import type { ApiHistoryEntry, PartyTracks } from 'partytracks/client'
+import { useObservableAsValue } from 'partytracks/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClientMessage } from '~/types/Messages'
 import type useRoom from './useRoom'
