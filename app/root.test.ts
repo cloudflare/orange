@@ -37,7 +37,7 @@ describe('root loader', () => {
 			{ ...payload, exp: Math.round(inFiveMinutes.getTime() / 1000) },
 			signature,
 		]
-			.map((s) => btoa(JSON.stringify(s)))
+			.map((s) => Buffer.from(JSON.stringify(s)).toString('base64'))
 			.join('.')}`
 
 		const url = new URL('https://orange.cloudflare.dev/')
