@@ -323,6 +323,14 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
+				if (transceiver.sender.track?.kind === 'video') {
+					const capability = RTCRtpSender.getCapabilities('video')
+					const codecs = capability ? capability.codecs : []
+					const vp9codec = codecs.filter(
+						(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+					)
+					transceiver.setCodecPreferences(vp9codec)
+				}
 				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
 		})
