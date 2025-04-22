@@ -86,7 +86,9 @@ export const Participant = forwardRef<
 	const shouldPullVideo = isScreenShare || (!isSelf && !audioOnlyMode)
 	let preferredRid: string | undefined = undefined
 	if (!isScreenShare && simulcastEnabled) {
-		preferredRid = dataSaverMode ? 'b' : 'a'
+		// If datasaver mode is off, we want server-side bandwidth estimation and switching
+		// so we will specify empty string to indicate we have no preferredRid
+		preferredRid = dataSaverMode ? 'b' : ''
 	}
 	const pulledVideoTrack = usePulledVideoTrack(
 		shouldPullVideo ? user.tracks.video : undefined,
