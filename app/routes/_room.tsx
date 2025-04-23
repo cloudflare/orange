@@ -159,17 +159,17 @@ function Room({ room, userMedia }: RoomProps) {
 		simulcastEnabled
 			? [
 					{
+						rid: 'a',
+						maxBitrate: 1_300_000,
+						maxFramerate: 30.0,
+						active: !dataSaverMode,
+					},
+					{
 						rid: 'b',
 						scaleResolutionDownBy: 2.0,
 						maxBitrate: 500_000,
 						maxFramerate: 24.0,
 						active: true,
-					},
-					{
-						rid: 'a',
-						maxBitrate: 1_300_000,
-						maxFramerate: 30.0,
-						active: !dataSaverMode,
 					},
 				]
 			: [
