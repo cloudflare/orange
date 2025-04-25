@@ -6,7 +6,7 @@ import type { TrackObject } from '~/utils/callsTypes'
 
 export function usePulledVideoTrack(
 	video: string | undefined,
-	preferredRid: string = ''
+	preferredRid?: string
 ) {
 	const { partyTracks, simulcastEnabled } = useRoomContext()
 
