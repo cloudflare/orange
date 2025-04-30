@@ -13,7 +13,6 @@ export default function useMediaDevices(
 		let mounted = true
 		const requestDevices = () => {
 			navigator.mediaDevices.enumerateDevices().then((d) => {
-				console.log(`enumerateDevices with filter fn: ${filterSource} `, d)
 				if (mounted) setDevices(d)
 			})
 		}
