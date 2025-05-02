@@ -1,5 +1,5 @@
 import { getCamera, getMic } from 'partytracks/client'
-import { useObservableAsValue } from 'partytracks/react'
+import { useObservable, useObservableAsValue } from 'partytracks/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from 'react-use'
 import { map, of, tap } from 'rxjs'
@@ -125,26 +125,31 @@ export default function useUserMedia() {
 		[mic]
 	)
 
-	const videoTrack$ = useMemo(
-		() =>
-			camera.broadcastTrack$.pipe(
-				tap({
-					error: (e) => {
-						invariant(e instanceof Error)
-						const reason =
-							e.name in errorMessageMap
-								? (e.name as UserMediaError)
-								: 'UnknownError'
-						if (reason === 'UnknownError') {
-							console.error('Unknown error getting video track: ', e)
-						}
-						setVideoUnavailableReason(reason)
-						camera.stopBroadcasting()
-					},
-				})
-			),
-		[camera]
-	)
+	useObservable(mic.broadcastTrack$, {
+		error: (e) => {
+			invariant(e instanceof Error)
+			const reason =
+				e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
+			if (reason === 'UnknownError') {
+				console.error('Unknown error getting audio track: ', e)
+			}
+			setAudioUnavailableReason(reason)
+			mic.stopBroadcasting()
+		},
+	})
+
+	useObservable(camera.broadcastTrack$, {
+		error: (e) => {
+			invariant(e instanceof Error)
+			const reason =
+				e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
+			if (reason === 'UnknownError') {
+				console.error('Unknown error getting video track: ', e)
+			}
+			setVideoUnavailableReason(reason)
+			camera.stopBroadcasting()
+		},
+	})
 
 	return {
 		turnMicOn: mic.startBroadcasting,
@@ -174,8 +179,8 @@ export default function useUserMedia() {
 		setBlurVideo,
 		suppressNoise,
 		setSuppressNoise,
-		videoTrack$,
-		videoStreamTrack: useObservableAsValue(videoTrack$),
+		videoTrack$: camera.broadcastTrack$,
+		videoStreamTrack: useObservableAsValue(camera.broadcastTrack$),
 
 		startScreenShare,
 		endScreenShare,
