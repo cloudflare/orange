@@ -1,13 +1,10 @@
-import { getCamera, getMic } from 'partytracks/client'
+import { getCamera, getMic, getScreenshare } from 'partytracks/client'
 import { useObservable, useObservableAsValue } from 'partytracks/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocalStorage } from 'react-use'
-import { map, of, tap } from 'rxjs'
-import invariant from 'tiny-invariant'
 import blurVideoTrack from '~/utils/blurVideoTrack'
 import { mode } from '~/utils/mode'
 import noiseSuppression from '~/utils/noiseSuppression'
-import { getScreenshare$ } from '~/utils/rxjs/getScreenshare$'
 
 export const errorMessageMap = {
 	NotAllowedError:
@@ -22,8 +19,9 @@ export const errorMessageMap = {
 type UserMediaError = keyof typeof errorMessageMap
 
 const broadcastByDefault = mode === 'production'
-const mic = getMic({ broadcasting: broadcastByDefault })
-const camera = getCamera({ broadcasting: true })
+export const mic = getMic({ broadcasting: broadcastByDefault })
+export const camera = getCamera({ broadcasting: true })
+export const screenshare = getScreenshare()
 
 function useNoiseSuppression() {
 	const [suppressNoise, setSuppressNoise] = useLocalStorage(
@@ -53,34 +51,27 @@ function useBlurVideo() {
 }
 
 function useScreenshare() {
-	const [screenShareEnabled, setScreenShareEnabled] = useState(false)
-	const startScreenShare = useCallback(() => setScreenShareEnabled(true), [])
-	const endScreenShare = useCallback(() => setScreenShareEnabled(false), [])
-	const screenShareVideoTrack$ = useMemo(
-		() =>
-			screenShareEnabled
-				? getScreenshare$({ contentHint: 'text' }).pipe(
-						tap({
-							next: (ms) => {
-								if (ms === undefined) {
-									setScreenShareEnabled(false)
-								}
-							},
-							finalize: () => setScreenShareEnabled(false),
-						}),
-						map((ms) => ms?.getVideoTracks()[0])
-					)
-				: of(undefined),
-		[screenShareEnabled]
+	const screenShareIsBroadcasting = useObservableAsValue(
+		screenshare.video.isBroadcasting$,
+		false
 	)
-	const screenShareVideoTrack = useObservableAsValue(screenShareVideoTrack$)
+	const startScreenShare = useCallback(() => {
+		screenshare.audio.startBroadcasting()
+		screenshare.video.startBroadcasting()
+	}, [])
+	const endScreenShare = useCallback(() => {
+		screenshare.audio.stopBroadcasting()
+		screenshare.video.stopBroadcasting()
+	}, [])
 
 	return {
-		screenShareEnabled,
+		screenShareEnabled: screenShareIsBroadcasting,
 		startScreenShare,
 		endScreenShare,
-		screenShareVideoTrack$,
-		screenShareVideoTrack,
+		screenShareVideoTrack$: screenshare.video.broadcastTrack$,
+		screenShareVideoTrack: useObservableAsValue(
+			screenshare.video.broadcastTrack$
+		),
 	}
 }
 
@@ -104,61 +95,34 @@ export default function useUserMedia() {
 	const micDevices = useObservableAsValue(mic.devices$, [])
 	const cameraDevices = useObservableAsValue(camera.devices$, [])
 
-	const publicAudioTrack$ = useMemo(
-		() =>
-			mic.broadcastTrack$.pipe(
-				tap({
-					error: (e) => {
-						invariant(e instanceof Error)
-						const reason =
-							e.name in errorMessageMap
-								? (e.name as UserMediaError)
-								: 'UnknownError'
-						if (reason === 'UnknownError') {
-							console.error('Unknown error getting audio track: ', e)
-						}
-						setAudioUnavailableReason(reason)
-						mic.stopBroadcasting()
-					},
-				})
-			),
-		[mic]
-	)
-
-	useObservable(mic.broadcastTrack$, {
-		error: (e) => {
-			invariant(e instanceof Error)
-			const reason =
-				e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
-			if (reason === 'UnknownError') {
-				console.error('Unknown error getting audio track: ', e)
-			}
-			setAudioUnavailableReason(reason)
-			mic.stopBroadcasting()
-		},
+	useObservable(mic.error$, (e) => {
+		const reason =
+			e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
+		if (reason === 'UnknownError') {
+			console.error('Unknown error getting audio track: ', e)
+		}
+		setAudioUnavailableReason(reason)
+		mic.stopBroadcasting()
 	})
 
-	useObservable(camera.broadcastTrack$, {
-		error: (e) => {
-			invariant(e instanceof Error)
-			const reason =
-				e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
-			if (reason === 'UnknownError') {
-				console.error('Unknown error getting video track: ', e)
-			}
-			setVideoUnavailableReason(reason)
-			camera.stopBroadcasting()
-		},
+	useObservable(camera.error$, (e) => {
+		const reason =
+			e.name in errorMessageMap ? (e.name as UserMediaError) : 'UnknownError'
+		if (reason === 'UnknownError') {
+			console.error('Unknown error getting video track: ', e)
+		}
+		setVideoUnavailableReason(reason)
+		camera.stopBroadcasting()
 	})
 
 	return {
 		turnMicOn: mic.startBroadcasting,
 		turnMicOff: mic.stopBroadcasting,
-		audioStreamTrack: useObservableAsValue(publicAudioTrack$),
+		audioStreamTrack: useObservableAsValue(mic.broadcastTrack$),
 		audioMonitorStreamTrack: useObservableAsValue(mic.localMonitorTrack$),
 		audioEnabled: useObservableAsValue(mic.isBroadcasting$, broadcastByDefault),
 		audioUnavailableReason,
-		publicAudioTrack$,
+		publicAudioTrack$: mic.broadcastTrack$,
 		privateAudioTrack$: mic.localMonitorTrack$,
 		audioDeviceId: useObservableAsValue(mic.activeDevice$)?.deviceId,
 		setAudioDeviceId: (deviceId: string) => {
