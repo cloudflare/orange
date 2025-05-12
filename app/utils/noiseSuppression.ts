@@ -74,6 +74,7 @@ class NoiseSuppressionEffect {
 			.addModule(workletUrl)
 			.then(() => {
 				invariant(this._audioContext)
+				if (this._audioContext.state === 'closed') return
 				// After the resolution of module loading, an AudioWorkletNode can be constructed.
 				this._noiseSuppressorNode = new AudioWorkletNode(
 					this._audioContext,
