@@ -3,20 +3,28 @@ import * as bodySegmentation from '@tensorflow-models/body-segmentation'
 import '@tensorflow/tfjs-backend-webgl'
 import { Observable } from 'rxjs'
 
+let loadedSegmenter: null | bodySegmentation.BodySegmenter = null
+const loadSegmenter = async () => {
+	if (loadedSegmenter !== null) return loadedSegmenter
+	loadedSegmenter = await bodySegmentation.createSegmenter(
+		bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation,
+		{
+			runtime: 'mediapipe',
+			modelType: 'general',
+			solutionPath:
+				'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation',
+		}
+	)
+
+	return loadedSegmenter
+}
+
 export default function blurVideoTrack(
 	originalVideoStreamTrack: MediaStreamTrack
 ): Observable<MediaStreamTrack> {
 	return new Observable((subscriber) => {
 		;(async () => {
-			const segmenter = await bodySegmentation.createSegmenter(
-				bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation,
-				{
-					runtime: 'mediapipe',
-					modelType: 'general',
-					solutionPath:
-						'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation',
-				}
-			)
+			const segmenter = await loadSegmenter()
 
 			const { height: h = 0, width: w = 0 } =
 				originalVideoStreamTrack.getSettings()
