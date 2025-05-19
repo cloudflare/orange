@@ -1,24 +1,22 @@
 // adopted from https://github.com/jitsi/jitsi-meet/tree/master/react/features/stream-effects/noise-suppression
 
+import { Observable } from 'rxjs'
 import invariant from 'tiny-invariant'
 
 export default function noiseSuppression(
 	originalAudioStreamTrack: MediaStreamTrack
-): MediaStreamTrack {
-	const mediaStream = new MediaStream()
-	mediaStream.addTrack(originalAudioStreamTrack)
-
-	const suppressor = new NoiseSuppressionEffect()
-	const output = suppressor.startEffect(mediaStream)
-
-	const noiseSuppressedTrack = output.getAudioTracks()[0]
-	noiseSuppressedTrack.stop = () => {
-		suppressor.stopEffect()
-		MediaStreamTrack.prototype.stop.call(originalAudioStreamTrack)
-	}
-	noiseSuppressedTrack.getSettings = () =>
-		originalAudioStreamTrack.getSettings()
-	return noiseSuppressedTrack
+): Observable<MediaStreamTrack> {
+	return new Observable<MediaStreamTrack>((subscriber) => {
+		const mediaStream = new MediaStream()
+		mediaStream.addTrack(originalAudioStreamTrack)
+		const suppressor = new NoiseSuppressionEffect()
+		const output = suppressor.startEffect(mediaStream)
+		const noiseSuppressedTrack = output.getAudioTracks()[0]
+		subscriber.add(() => {
+			suppressor.stopEffect()
+		})
+		subscriber.next(noiseSuppressedTrack)
+	})
 }
 
 /**
@@ -76,6 +74,7 @@ class NoiseSuppressionEffect {
 			.addModule(workletUrl)
 			.then(() => {
 				invariant(this._audioContext)
+				if (this._audioContext.state === 'closed') return
 				// After the resolution of module loading, an AudioWorkletNode can be constructed.
 				this._noiseSuppressorNode = new AudioWorkletNode(
 					this._audioContext,
