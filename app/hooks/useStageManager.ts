@@ -47,7 +47,7 @@ export default function useStageManager(
 	const usersAndScreenshares = useMemo(
 		() =>
 			users.concat(self ? [self] : []).flatMap((u) =>
-				u.tracks.screenShareEnabled
+				u.tracks.screenshare
 					? [
 							u,
 							{

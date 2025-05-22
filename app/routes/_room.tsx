@@ -3,7 +3,7 @@ import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
 import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
 import { useMemo, useState } from 'react'
-import { of } from 'rxjs'
+import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { EnsureOnline } from '~/components/EnsureOnline'
 import { EnsurePermissions } from '~/components/EnsurePermissions'
@@ -201,10 +201,13 @@ function Room({ room, userMedia }: RoomProps) {
 	)
 	const pushedAudioTrack = useObservableAsValue(pushedAudioTrack$)
 
-	const pushedScreenSharingTrack$ = useMemo(
-		() => partyTracks.push(userMedia.screenShareVideoTrack$),
-		[partyTracks, userMedia.screenShareVideoTrack$]
-	)
+	const pushedScreenSharingTrack$ = useMemo(() => {
+		return userMedia.screenShareVideoTrack$.pipe(
+			switchMap((track) =>
+				track ? from(partyTracks.push(of(track))) : of(undefined)
+			)
+		)
+	}, [partyTracks, userMedia.screenShareVideoTrack$])
 	const pushedScreenSharingTrack = useObservableAsValue(
 		pushedScreenSharingTrack$
 	)
