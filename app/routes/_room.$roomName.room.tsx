@@ -45,6 +45,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 				context.env.FEEDBACK_QUEUE &&
 				context.env.FEEDBACK_STORAGE
 		),
+		disableLobbyEnforcement: context.env.DISABLE_LOBBY_ENFORCEMENT === 'true',
 		mode: context.mode,
 		hasDb: Boolean(context.env.DB),
 		hasAiCredentials: Boolean(
@@ -58,15 +59,16 @@ export default function Room() {
 	const { joined } = useRoomContext()
 	const navigate = useNavigate()
 	const { roomName } = useParams()
-	const { mode, bugReportsEnabled } = useLoaderData<typeof loader>()
+	const { mode, bugReportsEnabled, disableLobbyEnforcement } =
+		useLoaderData<typeof loader>()
 	const [search] = useSearchParams()
 
 	useEffect(() => {
-		if (!joined && mode !== 'development')
+		if (!joined && mode !== 'development' && !disableLobbyEnforcement)
 			navigate(`/${roomName}${search.size > 0 ? '?' + search.toString() : ''}`)
-	}, [joined, mode, navigate, roomName, search])
+	}, [joined, mode, navigate, roomName, search, disableLobbyEnforcement])
 
-	if (!joined && mode !== 'development') return null
+	if (!joined && mode !== 'development' && !disableLobbyEnforcement) return null
 
 	return (
 		<Toast.Provider>
