@@ -56,12 +56,10 @@ function useScreenshare() {
 		false
 	)
 	const startScreenShare = useCallback(() => {
-		screenshare.audio.startBroadcasting()
-		screenshare.video.startBroadcasting()
+		screenshare.startBroadcasting()
 	}, [])
 	const endScreenShare = useCallback(() => {
-		screenshare.audio.stopBroadcasting()
-		screenshare.video.stopBroadcasting()
+		screenshare.stopBroadcasting()
 	}, [])
 
 	return {
