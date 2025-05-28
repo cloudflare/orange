@@ -3,6 +3,7 @@ export type Env = {
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
 	CALLS_API_URL?: string
+	DISABLE_LOBBY_ENFORCEMENT?: string
 	E2EE_ENABLED?: string
 	USER_DIRECTORY_URL?: string
 	FEEDBACK_URL?: string
