@@ -20,7 +20,10 @@ type UserMediaError = keyof typeof errorMessageMap
 
 const broadcastByDefault = mode === 'production'
 export const mic = getMic({ broadcasting: broadcastByDefault })
-export const camera = getCamera({ broadcasting: true })
+export const camera = getCamera({
+	broadcasting: true,
+	constraints: { width: { ideal: 1280 }, height: { ideal: 720 } },
+})
 export const screenshare = getScreenshare({ audio: false })
 
 function useNoiseSuppression() {
