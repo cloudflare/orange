@@ -9,10 +9,8 @@ interface ScreenshareButtonProps {}
 
 export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	const {
-		userMedia: { screenShareVideoTrack, startScreenShare, endScreenShare },
+		userMedia: { startScreenShare, endScreenShare, screenShareEnabled },
 	} = useRoomContext()
-
-	const sharing = screenShareVideoTrack !== undefined
 
 	const [canShareScreen, setCanShareScreen] = useState(true)
 
@@ -31,8 +29,8 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 
 	return (
 		<Button
-			displayType={sharing ? 'danger' : 'secondary'}
-			onClick={sharing ? endScreenShare : startScreenShare}
+			displayType={screenShareEnabled ? 'danger' : 'secondary'}
+			onClick={screenShareEnabled ? endScreenShare : startScreenShare}
 		>
 			<VisuallyHidden>Share screen</VisuallyHidden>
 			<Icon type="screenshare" />
