@@ -448,27 +448,35 @@ impl WorkerState {
     /// Takes a message, encrypts it, frames it as an `MlsMessageOut`, and serializes it. If
     /// `self.mls_group` doesn't exist, returns all 0s, with the length of `msg`.
     fn encrypt_app_msg_nofail(&mut self, msg: &[u8]) -> Vec<u8> {
-        self.mls_group
+        let unencrypted_prefix_size = if msg[0] >> 7 == 0 { 10 } else { 1 };
+        let (unencrypted_prefix, msg_to_encrypt) = msg.split_at(unencrypted_prefix_size);
+
+        let encrypted_payload = self
+            .mls_group
             .as_mut()
             .map(|group| {
                 group
                     .create_message(
                         &self.mls_provider,
                         self.my_signing_keys.as_ref().unwrap(),
-                        msg,
+                        msg_to_encrypt,
                     )
                     .unwrap()
                     .to_bytes()
                     .unwrap()
             })
-            .unwrap_or_else(|| vec![0u8; msg.len()])
+            .unwrap_or_default();
+        [unencrypted_prefix, &encrypted_payload].concat()
     }
 
     /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
     /// the bytes.
     fn decrypt_app_msg(&mut self, ct: &[u8]) -> Result<Vec<u8>, DecryptAppMsgError> {
+        let unencrypted_prefix_size = if ct[0] >> 7 == 0 { 10 } else { 1 };
+        let (unencrypted_prefix, msg_to_decrypt) = ct.split_at(unencrypted_prefix_size);
+
         let group = self.mls_group.as_mut().ok_or(DecryptAppMsgError::NoGroup)?;
-        let framed = MlsMessageIn::tls_deserialize_exact_bytes(ct)?;
+        let framed = MlsMessageIn::tls_deserialize_exact_bytes(msg_to_decrypt)?;
 
         // Process the ciphertext into an application message
         let msg = group
@@ -479,7 +487,9 @@ impl WorkerState {
             .into_content();
 
         match msg {
-            ProcessedMessageContent::ApplicationMessage(app_msg) => Ok(app_msg.into_bytes()),
+            ProcessedMessageContent::ApplicationMessage(app_msg) => {
+                Ok([unencrypted_prefix, &app_msg.into_bytes()].concat())
+            }
             ProcessedMessageContent::ProposalMessage(_) => {
                 Err(DecryptAppMsgError::WrongMsgType("proposal"))
             }
