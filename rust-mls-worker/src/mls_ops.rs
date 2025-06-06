@@ -448,9 +448,10 @@ impl WorkerState {
     /// Takes a message, encrypts it, frames it as an `MlsMessageOut`, and serializes it. If
     /// `self.mls_group` doesn't exist, returns all 0s, with the length of `msg`.
     fn encrypt_app_msg_nofail(&mut self, msg: &[u8]) -> Vec<u8> {
-        let unencrypted_prefix_size = if msg[0] >> 7 == 0 { 10 } else { 1 };
-        let (unencrypted_prefix, msg_to_encrypt) = msg.split_at(unencrypted_prefix_size);
+        // We can't encrypt every part of a VP8 frame. Leave some of the header.
+        let (header, msg_to_encrypt) = split_vp8_header(msg).unwrap_or_default();
 
+        // Encrypt the non-header part
         let encrypted_payload = self
             .mls_group
             .as_mut()
@@ -466,14 +467,16 @@ impl WorkerState {
                     .unwrap()
             })
             .unwrap_or_default();
-        [unencrypted_prefix, &encrypted_payload].concat()
+
+        [header, &encrypted_payload].concat()
     }
 
     /// Takes a ciphertext, deserializes it, decrypts it into an Application Message, and returns
     /// the bytes.
     fn decrypt_app_msg(&mut self, ct: &[u8]) -> Result<Vec<u8>, DecryptAppMsgError> {
-        let unencrypted_prefix_size = if ct[0] >> 7 == 0 { 10 } else { 1 };
-        let (unencrypted_prefix, msg_to_decrypt) = ct.split_at(unencrypted_prefix_size);
+        // Only the header is encrypted
+        let (unencrypted_prefix, msg_to_decrypt) =
+            split_vp8_header(ct).ok_or(DecryptAppMsgError::WrongMsgType("inavlid VP8 frame"))?;
 
         let group = self.mls_group.as_mut().ok_or(DecryptAppMsgError::NoGroup)?;
         let framed = MlsMessageIn::tls_deserialize_exact_bytes(msg_to_decrypt)?;
@@ -668,6 +671,17 @@ pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerRespon
             }
         })
         .expect("couldn't acquire thread-local storage")
+}
+
+/// Splits the given VP8 frame ("uncompressed data chunk") into a part to leave plain and a part to
+/// encrypt.  The part that's left plain is all or part of the VP8 payload header (1–10 bytes).
+/// The header must be intact in order for the browser's depacketizer to not freak out.
+fn split_vp8_header(frame: &[u8]) -> Option<(&[u8], &[u8])> {
+    // We follow https://github.com/discord/dave-protocol/blob/29c431b67a1366223f555a3f66a1f385b17215b9/protocol.md#vp8
+    // If this is a keyframe, keep 10 bytes unencrypted. Otherwise, 1 is enough
+    let is_keyframe = frame[0] >> 7 == 0;
+    let unencrypted_prefix_size = if is_keyframe { 10 } else { 1 };
+    frame.split_at_checked(unencrypted_prefix_size)
 }
 
 #[cfg(test)]
