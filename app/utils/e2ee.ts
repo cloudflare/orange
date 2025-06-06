@@ -326,10 +326,10 @@ export function useE2EE({
 				if (transceiver.sender.track?.kind === 'video') {
 					const capability = RTCRtpSender.getCapabilities('video')
 					const codecs = capability ? capability.codecs : []
-					const vp9codec = codecs.filter(
-						(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+					const vp8codec = codecs.filter(
+						(a) => a.mimeType === 'video/VP8' || a.mimeType === 'video/rtx'
 					)
-					transceiver.setCodecPreferences(vp9codec)
+					transceiver.setCodecPreferences(vp8codec)
 				}
 				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
