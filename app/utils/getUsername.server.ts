@@ -7,6 +7,13 @@ export async function setUsername(
 	request: Request,
 	returnUrl: string = '/'
 ) {
+	if (
+		['javascript:', 'data:', 'vbscript:'].some((str) =>
+			decodeURI(returnUrl).trim().toLowerCase().startsWith(str)
+		)
+	) {
+		returnUrl = '/'
+	}
 	const session = await getSession(request.headers.get('Cookie'))
 	session.set('username', username)
 	throw redirect(returnUrl, {
