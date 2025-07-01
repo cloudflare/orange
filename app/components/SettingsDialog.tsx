@@ -1,6 +1,8 @@
 import type { FC, ReactNode } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { AudioInputSelector } from './AudioInputSelector'
+import { AudioOutputSelector } from './AudioOutputSelector'
+
 import { Button } from './Button'
 import {
 	Dialog,
@@ -67,6 +69,13 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
 							Mic
 						</Label>
 						<AudioInputSelector id="mic" />
+						<Label
+							className="text-base -mb-2 md:mb-0 text-left md:text-right"
+							htmlFor="mic"
+						>
+							Audio
+						</Label>
+						<AudioOutputSelector id="audio" />
 						<Label
 							className="text-base -mb-2 md:mb-0 text-left md:text-right"
 							htmlFor="blurBackground"
