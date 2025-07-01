@@ -1,6 +1,5 @@
 import {
 	json,
-	redirect,
 	type LinksFunction,
 	type LoaderFunctionArgs,
 	type MetaFunction,
@@ -23,6 +22,7 @@ import { QueryClient, QueryClientProvider } from 'react-query'
 import tailwind from '~/styles/tailwind.css'
 import { elementNotContainedByClickTarget } from './utils/elementNotContainedByClickTarget'
 import getUsername from './utils/getUsername.server'
+import { safeRedirect } from './utils/safeReturnUrl'
 import { cn } from './utils/style'
 
 function addOneDay(date: Date): Date {
@@ -38,7 +38,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		const redirectUrl = new URL(url)
 		redirectUrl.pathname = '/set-username'
 		redirectUrl.searchParams.set('return-url', request.url)
-		throw redirect(redirectUrl.toString())
+		throw safeRedirect(redirectUrl.toString())
 	}
 
 	const defaultResponse = json({
@@ -68,7 +68,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 			)
 		)
 
-		throw redirect(request.url, { headers })
+		throw safeRedirect(request.url, { headers })
 	}
 
 	return defaultResponse

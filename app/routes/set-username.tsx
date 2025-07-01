@@ -1,10 +1,11 @@
-import { redirect, type ActionFunctionArgs } from '@remix-run/cloudflare'
+import { type ActionFunctionArgs } from '@remix-run/cloudflare'
 import { Form } from '@remix-run/react'
 import invariant from 'tiny-invariant'
 import { Button } from '~/components/Button'
 import { Input } from '~/components/Input'
 import { ACCESS_AUTHENTICATED_USER_EMAIL_HEADER } from '~/utils/constants'
 import { setUsername } from '~/utils/getUsername.server'
+import { safeRedirect } from '~/utils/safeReturnUrl'
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 	const url = new URL(request.url)
@@ -12,7 +13,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 	const accessUsername = request.headers.get(
 		ACCESS_AUTHENTICATED_USER_EMAIL_HEADER
 	)
-	if (accessUsername) throw redirect(returnUrl)
+	if (accessUsername) throw safeRedirect(returnUrl)
 	const { username } = Object.fromEntries(await request.formData())
 	invariant(typeof username === 'string')
 	return setUsername(username, request, returnUrl)
