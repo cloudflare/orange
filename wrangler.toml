@@ -1,4 +1,4 @@
-name = "orange-meets"
+name = "orange"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
 compatibility_date = "2024-10-07"
 main = "./build/index.js"
@@ -8,7 +8,8 @@ compatibility_flags = ["nodejs_compat"]
   bucket = "./public"
 
 [vars]
-CALLS_APP_ID = "YOUR_CALLS_SFU_APP_ID_HERE"
+CALLS_APP_ID = "fa7e6c35409ed36fd1c945aa318bd713"
+TURN_SERVICE_ID = "76e83b97a7c221d5aa13fae464650c14"
 
 # Optional vars
 # OPENAI_MODEL_ENDPOINT = ""
