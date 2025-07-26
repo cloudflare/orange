@@ -1,0 +1,63 @@
+name = "orange-meets-development"
+
+account_id = "8477399eb04accc1792af96aeaa25222"
+main = "./build/index.js"
+# https://developers.cloudflare.com/workers/platform/compatibility-dates
+compatibility_date = "2024-10-07"
+compatibility_flags = ["nodejs_compat"]
+
+[site]
+  bucket = "./public"
+
+[[build.upload.rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
+[[kv_namespaces]] 
+binding = "FEEDBACK_STORAGE"
+id = "acb3952303514551a17b6fe627fb6953"
+preview_id = "acb3952303514551a17b6fe627fb6953"
+
+[[durable_objects.bindings]]
+name = "rooms"
+class_name = "ChatRoom"
+
+[vars]
+CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
+TURN_SERVICE_ID = "124bb066f462e966159bc4eef4b42048"
+EXPERIMENTAL_SIMULCAST_ENABLED = "true"
+DISABLE_LOBBY_ENFORCEMENT = "true"
+
+
+[[queues.producers]]
+ queue = "orange-meets-feedback-queue-development"
+ binding = "FEEDBACK_QUEUE"
+
+[[queues.consumers]]
+ queue = "orange-meets-feedback-queue-development"
+ # Required: this should match the name of the queue you created in step 3.
+ # If you misspell the name, you will receive an error when attempting to publish your Worker.
+ max_batch_size = 10 # optional: defaults to 10
+ max_batch_timeout = 5 # optional: defaults to 5 seconds
+
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "orange-meets-db-development"
+database_id = "6b0eceef-c836-4ba7-aac2-fa9b6f702e3b"
+
+# Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["ChatRoom", "RateLimiter"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["RateLimiter"] 
+
+[observability]
+enabled = true
+
+# The necessary secrets are:
+# - CALLS_APP_SECRET
+# Run `echo <VALUE> | wrangler secret put <NAME>` for each of these
+
