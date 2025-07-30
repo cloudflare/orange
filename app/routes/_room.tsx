@@ -1,7 +1,11 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
-import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
+import {
+	useObservable,
+	useObservableAsValue,
+	useValueAsObservable,
+} from 'partytracks/react'
 import { useMemo, useState } from 'react'
 import { of } from 'rxjs'
 import invariant from 'tiny-invariant'
@@ -210,6 +214,19 @@ function Room({ room, userMedia }: RoomProps) {
 	)
 	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
 	const [showDebugInfo, setShowDebugInfo] = useState(mode !== 'production')
+
+	useObservable(partyTracks.transceiver$, (transceiver) => {
+		if (transceiver.direction === 'sendonly') {
+			if (transceiver.sender.track?.kind === 'video') {
+				const capability = RTCRtpSender.getCapabilities('video')
+				const codecs = capability ? capability.codecs : []
+				const vp9codec = codecs.filter(
+					(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+				)
+				transceiver.setCodecPreferences(vp9codec)
+			}
+		}
+	})
 
 	const { e2eeSafetyNumber, onJoin } = useE2EE({
 		enabled: e2eeEnabled,
