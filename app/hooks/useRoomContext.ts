@@ -21,6 +21,7 @@ export type RoomContextType = {
 	setDataSaverMode: Dispatch<SetStateAction<boolean>>
 	userMedia: UserMedia
 	partyTracks: PartyTracks
+	partyTracksReceiver: PartyTracks
 	iceConnectionState: RTCIceConnectionState
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>

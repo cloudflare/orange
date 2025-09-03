@@ -74,7 +74,7 @@ function AudioTrack({
 	const onTrackRemovedRef = useRef(onTrackRemoved)
 	onTrackRemovedRef.current = onTrackRemoved
 
-	const { partyTracks } = useRoomContext()
+	const { partyTracksReceiver } = useRoomContext()
 	const trackObject = useMemo(() => {
 		const [sessionId, trackName] = track.split('/')
 		return {
@@ -85,8 +85,8 @@ function AudioTrack({
 	}, [track])
 
 	const pulledTrack$ = useMemo(() => {
-		return partyTracks.pull(of(trackObject))
-	}, [partyTracks, trackObject])
+		return partyTracksReceiver.pull(of(trackObject))
+	}, [partyTracksReceiver, trackObject])
 
 	const audioTrack = useObservableAsValue(pulledTrack$)
 

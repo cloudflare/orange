@@ -11,6 +11,36 @@ setLogLevel('debug')
 
 export const usePeerConnection = (config: PartyTracksConfig) => {
 	const stableConfig = useStablePojo(config)
+
+	const partyTracksReceiver = useMemo(
+		() => new PartyTracks(stableConfig),
+		[stableConfig]
+	)
+	const peerConnectionReceiver = useObservableAsValue(
+		partyTracksReceiver.peerConnection$
+	)
+
+	const [iceConnectionStateReceiver, setIceConnectionStateReceiver] =
+		useState<RTCIceConnectionState>('new')
+
+	useEffect(() => {
+		if (!peerConnectionReceiver) return
+		setIceConnectionStateReceiver(peerConnectionReceiver.iceConnectionState)
+		const iceConnectionStateChangeHandler = () => {
+			setIceConnectionStateReceiver(peerConnectionReceiver.iceConnectionState)
+		}
+		peerConnectionReceiver.addEventListener(
+			'iceconnectionstatechange',
+			iceConnectionStateChangeHandler
+		)
+		return () => {
+			peerConnectionReceiver.removeEventListener(
+				'connectionstatechange',
+				iceConnectionStateChangeHandler
+			)
+		}
+	}, [peerConnectionReceiver])
+
 	const partyTracks = useMemo(
 		() => new PartyTracks(stableConfig),
 		[stableConfig]
@@ -41,5 +71,7 @@ export const usePeerConnection = (config: PartyTracksConfig) => {
 	return {
 		partyTracks,
 		iceConnectionState,
+		partyTracksReceiver,
+		iceConnectionStateReceiver,
 	}
 }

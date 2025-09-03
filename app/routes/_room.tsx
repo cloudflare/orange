@@ -139,11 +139,12 @@ function Room({ room, userMedia }: RoomProps) {
 	invariant(room.roomState.meetingId, 'Meeting ID cannot be missing')
 	params.set('correlationId', room.roomState.meetingId)
 
-	const { partyTracks, iceConnectionState } = usePeerConnection({
-		maxApiHistory,
-		apiExtraParams: params.toString(),
-		iceServers,
-	})
+	const { partyTracks, iceConnectionState, partyTracksReceiver } =
+		usePeerConnection({
+			maxApiHistory,
+			apiExtraParams: params.toString(),
+			iceServers,
+		})
 	const roomHistory = useRoomHistory(partyTracks, room)
 
 	const scaleResolutionDownBy = useMemo(() => {
@@ -233,6 +234,7 @@ function Room({ room, userMedia }: RoomProps) {
 		userDirectoryUrl,
 		feedbackEnabled,
 		partyTracks,
+		partyTracksReceiver,
 		roomHistory,
 		e2eeSafetyNumber,
 		e2eeOnJoin: onJoin,

@@ -8,7 +8,7 @@ export function usePulledVideoTrack(
 	video: string | undefined,
 	preferredRid?: string
 ) {
-	const { partyTracks, simulcastEnabled } = useRoomContext()
+	const { partyTracksReceiver, simulcastEnabled } = useRoomContext()
 
 	const [sessionId, trackName] = video?.split('/') ?? []
 	const trackObject = useMemo(
@@ -30,14 +30,14 @@ export function usePulledVideoTrack(
 			trackObject$.pipe(
 				switchMap((track) =>
 					track
-						? partyTracks.pull(
+						? partyTracksReceiver.pull(
 								of(track),
 								simulcastEnabled ? { simulcast: { preferredRid$ } } : undefined
 							)
 						: of(undefined)
 				)
 			),
-		[partyTracks, trackObject$, preferredRid$]
+		[trackObject$, partyTracksReceiver, simulcastEnabled, preferredRid$]
 	)
 	return useObservableAsValue(pulledTrack$)
 }
