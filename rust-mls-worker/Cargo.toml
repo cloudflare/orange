@@ -10,9 +10,9 @@ crate-type = ["cdylib"]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0.0"
 log = "0.4.22"
-openmls = { version = "0.6.0", features = ["js"] }
-openmls_basic_credential = "0.3.0"
-openmls_rust_crypto = "0.3.0"
+openmls = { version = "0.7.1", features = ["js"] }
+openmls_basic_credential = "0.4.1"
+openmls_rust_crypto = "0.4.1"
 sha2 = "0.10.8"
 thiserror = "2.0.3"
 wasm-bindgen = "0.2"
