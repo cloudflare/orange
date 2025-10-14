@@ -38,7 +38,9 @@ pub enum DecryptAppMsgError {
     Mls(#[from] openmls::prelude::Error),
 
     #[error(transparent)]
-    Processing(#[from] openmls::prelude::ProcessMessageError),
+    Processing(
+        #[from] openmls::prelude::ProcessMessageError<openmls_rust_crypto::MemoryStorageError>,
+    ),
 
     #[error("Not in a group, so decryption does not make sense")]
     NoGroup,
