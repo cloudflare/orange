@@ -64,8 +64,13 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 }
 
 export default function RoomWithPermissions() {
+	const [micDeviceId, setMicDeviceId] = useState<string>()
+	const [cameraDeviceId, setCameraDeviceId] = useState<string>()
 	return (
-		<EnsurePermissions>
+		<EnsurePermissions
+			onCameraSelected={setCameraDeviceId}
+			onMicSelected={setMicDeviceId}
+		>
 			<EnsureOnline
 				fallback={
 					<div className="grid h-full place-items-center">
@@ -78,16 +83,22 @@ export default function RoomWithPermissions() {
 					</div>
 				}
 			>
-				<RoomPreparation />
+				<RoomPreparation
+					micDeviceId={micDeviceId}
+					cameraDeviceId={cameraDeviceId}
+				/>
 			</EnsureOnline>
 		</EnsurePermissions>
 	)
 }
 
-function RoomPreparation() {
+function RoomPreparation(props: {
+	micDeviceId?: string
+	cameraDeviceId?: string
+}) {
 	const { roomName } = useParams()
 	invariant(roomName)
-	const userMedia = useUserMedia()
+	const userMedia = useUserMedia(props)
 	const room = useRoom({ roomName, userMedia })
 
 	return room.roomState.meetingId ? (
