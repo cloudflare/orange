@@ -44,7 +44,7 @@ export function useRoomHistory(
 		return () => {
 			partyTracks.history.removeEventListener('logentry', handleHistory)
 		}
-	}, [partyTracks, sessionId])
+	}, [partyTracks, room.websocket, sessionId])
 
 	useEffect(() => {
 		room.otherUsers.forEach((user) => {

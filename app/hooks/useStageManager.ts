@@ -116,7 +116,7 @@ export default function useStageManager(
 				setPinnedTileIds((ids) => [...ids, user.id])
 			}
 		})
-	}, [newUsers, recordActivity])
+	}, [newUsers, recordActivity, setPinnedTileIds])
 
 	useEffect(() => {
 		setActorsOnStage((actorsAlreadyOnStage) =>
