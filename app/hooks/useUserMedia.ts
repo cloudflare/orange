@@ -76,7 +76,29 @@ function useScreenshare() {
 	}
 }
 
-export default function useUserMedia() {
+export default function useUserMedia(options: {
+	micDeviceId?: string
+	cameraDeviceId?: string
+}) {
+	useEffect(() => {
+		if (!options.micDeviceId) return
+		navigator.mediaDevices
+			.enumerateDevices()
+			.then((ds) => ds.find((d) => d.deviceId === options.micDeviceId))
+			.then((d) => {
+				d && mic.setPreferredDevice(d)
+			})
+	}, [options.micDeviceId])
+	useEffect(() => {
+		if (!options.cameraDeviceId) return
+		navigator.mediaDevices
+			.enumerateDevices()
+			.then((ds) => ds.find((d) => d.deviceId === options.cameraDeviceId))
+			.then((d) => {
+				d && camera.setPreferredDevice(d)
+			})
+	}, [options.cameraDeviceId])
+
 	const [suppressNoise, setSuppressNoise] = useNoiseSuppression()
 	const [blurVideo, setBlurVideo] = useBlurVideo()
 

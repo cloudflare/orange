@@ -3,6 +3,8 @@ import { Button } from './Button'
 
 export interface EnsurePermissionsProps {
 	children?: ReactNode
+	onMicSelected: (deviceId: string) => void
+	onCameraSelected: (deviceId: string) => void
 }
 
 type PermissionState = 'denied' | 'granted' | 'prompt' | 'unable-to-determine'
@@ -66,6 +68,10 @@ export function EnsurePermissions(props: EnsurePermissionsProps) {
 								})
 								.then((ms) => {
 									if (mountedRef.current) setPermissionState('granted')
+									const micId = ms.getAudioTracks()[0].getSettings().deviceId
+									if (micId) props.onMicSelected(micId)
+									const cameraId = ms.getVideoTracks()[0].getSettings().deviceId
+									if (cameraId) props.onCameraSelected(cameraId)
 									ms.getTracks().forEach((t) => t.stop())
 								})
 								.catch(() => {
