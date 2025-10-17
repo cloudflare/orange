@@ -1,0 +1,10 @@
+node_modules
+.wrangler
+/.cache
+/build
+/dist
+/public/build
+/.mf
+playwright-report
+test-results
+public/e2ee/
